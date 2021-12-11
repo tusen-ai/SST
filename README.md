@@ -50,5 +50,5 @@ Note that we train the 3 classes together, so the performance above is a little 
 ## Acknowlegement
 This project is based on the following codebases.  
 
-* [MMdetection3D](https://github.com/open-mmlab/mmdetection3d)
+* [MMDetection3D](https://github.com/open-mmlab/mmdetection3d)
 * [LiDAR-RCNN](https://github.com/TuSimple/LiDAR_RCNN)
