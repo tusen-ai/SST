@@ -2,9 +2,16 @@
 __pycache__/
 *.py[cod]
 *$py.class
+*.ipynb
+
+*.bin
+*txtpb
 
 # C extensions
 *.so
+
+#core dump
+cores-*
 
 # Distribution / packaging
 .Python
@@ -20,12 +27,11 @@ parts/
 sdist/
 var/
 wheels/
-pip-wheel-metadata/
-share/python-wheels/
 *.egg-info/
 .installed.cfg
 *.egg
 MANIFEST
+local_run*.sh
 
 # PyInstaller
 #  Usually these files are written by a python script from a template
@@ -40,14 +46,12 @@ pip-delete-this-directory.txt
 # Unit test / coverage reports
 htmlcov/
 .tox/
-.nox/
 .coverage
 .coverage.*
 .cache
 nosetests.xml
 coverage.xml
 *.cover
-*.py,cover
 .hypothesis/
 .pytest_cache/
 
@@ -59,7 +63,6 @@ coverage.xml
 *.log
 local_settings.py
 db.sqlite3
-db.sqlite3-journal
 
 # Flask stuff:
 instance/
@@ -77,26 +80,11 @@ target/
 # Jupyter Notebook
 .ipynb_checkpoints
 
-# IPython
-profile_default/
-ipython_config.py
-
 # pyenv
 .python-version
 
-# pipenv
-#   According to pypa/pipenv#598, it is recommended to include Pipfile.lock in version control.
-#   However, in case of collaboration, if having platform-specific dependencies or dependencies
-#   having no cross-platform support, pipenv may install dependencies that don't work, or not
-#   install all needed dependencies.
-#Pipfile.lock
-
-# PEP 582; used by e.g. github.com/David-OConnor/pyflow
-__pypackages__/
-
-# Celery stuff
+# celery beat schedule file
 celerybeat-schedule
-celerybeat.pid
 
 # SageMath parsed files
 *.sage.py
@@ -122,8 +110,32 @@ venv.bak/
 
 # mypy
 .mypy_cache/
-.dmypy.json
-dmypy.json
 
-# Pyre type checker
-.pyre/
+# cython generated cpp
+data
+.vscode
+.idea
+
+# custom
+*.pkl
+*.npz
+*.pkl.json
+*.log.json
+work_dirs/
+exps/
+*~
+
+# Pytorch
+*.pth
+
+# demo
+*.jpg
+*.png
+data/s3dis/Stanford3dDataset_v1.2_Aligned_Version/
+data/scannet/scans/
+data/sunrgbd/OFFICIAL_SUNRGBD/
+*.obj
+*.ply
+
+# Waymo evaluation
+mmdet3d/core/evaluation/waymo_utils/compute_detection_metrics_main
