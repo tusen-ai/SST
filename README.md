@@ -27,7 +27,7 @@ Authors:
 - SST consists of 6 **Regional Sparse Attention (SRA)** blocks, which deal with the sparse voxel set. It's similar to Submanifold Sparse Convolution (SSC), but much more powerful than SSC. It's locality and sparsity guarantee the efficiency in the single stride setting.
 - The SRA can also be used in many other task to process sparse point clouds. Our implementation of SRA only relies on the pure Python APIs in PyTorch without engineering efforts
 as taken in the CUDA implementation of sparse convolution. 
-- Large room for further improvements. For example, second stage, anchor-free head, IoU scores and advanced techniques from ViT, etc.
+- Large room for further improvements. For example, second stage, anchor-free head, IoU scores and advanced techniques from many kinds of vision transformers, etc.
 
 ## Usage
 **PyTorch >= 1.9 is recommended for a better support of the checkpoint technique.**
@@ -37,6 +37,15 @@ Our immplementation is based on [MMDetection3D](https://github.com/open-mmlab/mm
 
 We only provide the single-stage model here, as for our two-stage models, please follow [LiDAR-RCNN](https://github.com/TuSimple/LiDAR_RCNN). It's also a good choice to apply other powerful second stage detectors to our single-stage SST.
 
+## Play with your first single-stride model
+
+In `./configs/sst/`, we provide a basic config `sst_waymoD5_1x_ped_cyc_8heads_3f` to show the power of our single-stride network on small object detection (Pedestrian and Cyclist). With this config (**only 20% training data for 12 epoch**), we can get a very good results, which are better than most other published methods:
+|         |    Ped AP/APH | Cyc AP/APH  | 
+|---------|--------|--------|
+|  Level 1 |   80.51/75.48  |  70.44/69.43   |
+|  Level 2 |   72.18/67.51  |  67.94/67.00   |
+
+(20% training data, taking ~7 hours with 8 2080Ti GPUs)
 
 ## Main results
 
