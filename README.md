@@ -1,7 +1,7 @@
 # SST: Single-stride Sparse Transformer
 This is the official implementation of paper:
 
-**Embracing Single Stride 3D Object Detector with Sparse Transformer**
+### Embracing Single Stride 3D Object Detector with Sparse Transformer
 
 Authors: 
 [Lue Fan](https://lue.fan/),
@@ -15,6 +15,12 @@ Authors:
 
 [Paper Link]() (Check again on Monday)
 
+**Visualization of a sequence by AB3DMOT tracking:**
+
+![demo-min](https://user-images.githubusercontent.com/21312704/145702575-24647aed-256d-486c-835f-730584cf99ee.gif)
+
+
+
 ## Introduction and Highlights
 - SST is a **single-stride** network, which maintains original feature resolution from the beginning to the end of the network. Due to the characterisric of single stride, SST achieves exciting performances on small object detection (Pedestrian, Cyclist).
 - For simplicity, except for backbone, SST is almost the same with the basic PointPillars in MMDetection3D. With such a basic setting, SST achieves state-of-the-art performance in Pedestrian and Cyclist and outperforms PointPillars more than **10 AP** only at a cost of 1.5x latency.
@@ -24,7 +30,8 @@ as taken in the CUDA implementation of sparse convolution.
 - Large room for further improvements. For example, second stage, anchor-free head, IoU scores and advanced techniques from ViT, etc.
 
 ## Usage
-**PyTorch >= 1.9 is highly recommended for a better support of the checkpoint technique.**
+**PyTorch >= 1.9 is recommended for a better support of the checkpoint technique.**
+(or you can manually replace the interface of checkpoint in torch < 1.9 with the one in torch >= 1.9.)
 
 Our immplementation is based on [MMDetection3D](https://github.com/open-mmlab/mmdetection3d), so just follow their [getting_started](https://github.com/open-mmlab/mmdetection3d/blob/master/docs/getting_started.md) and simply run the script: `run.sh`. Then you will get a basic results of SST after 5~7 hours (depends on your devices).
 
@@ -52,3 +59,5 @@ This project is based on the following codebases.
 
 * [MMDetection3D](https://github.com/open-mmlab/mmdetection3d)
 * [LiDAR-RCNN](https://github.com/TuSimple/LiDAR_RCNN)
+
+Thank the authors of CenterPoint for providing their detailed results. 
