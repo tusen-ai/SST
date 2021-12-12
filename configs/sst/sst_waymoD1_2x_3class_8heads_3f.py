@@ -75,7 +75,7 @@ model = dict(
         pos_temperature=10000,
         normalize_pos=False,
         window_shape=window_shape,
-        checkpoint_blocks=[0,1,2]
+        checkpoint_blocks=[0,1,2,3]
     ),
 )
 

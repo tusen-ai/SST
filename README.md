@@ -5,7 +5,7 @@ This is the official implementation of paper:
 
 Authors: 
 [Lue Fan](https://lue.fan/),
-[Ziqi Pang](https://ziqipang.github.io/),
+[Ziqi Pang](https://ziqipang.me/),
 [Tianyuan Zhang](http://tianyuanzhang.com/),
 [Yu-Xiong Wang](https://yxw.web.illinois.edu/),
 [Hang Zhao](https://hangzhaomit.github.io/),
