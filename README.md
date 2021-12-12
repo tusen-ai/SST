@@ -39,7 +39,7 @@ We only provide the single-stage model here, as for our two-stage models, please
 
 ## Play with your first single-stride model
 
-In `./configs/sst/`, we provide a basic config `sst_waymoD5_1x_ped_cyc_8heads_3f` to show the power of our single-stride network on small object detection (Pedestrian and Cyclist). With this config (**only 20% training data for 12 epoch**), we can get a very good performance, which is better than most other published methods:
+In `./configs/sst/`, we provide a basic config `sst_waymoD5_1x_ped_cyc_8heads_3f` to show the power of our single-stride network on small object detection (Pedestrian and Cyclist). With this config (**only 20% training data for 12 epoch**), we can get a very good performance, which is better than most other published methods (WOD validation split):
 |         |    Ped AP/APH | Cyc AP/APH  | 
 |---------|--------|--------|
 |  Level 1 |   80.51/75.48  |  70.44/69.43   |
@@ -49,12 +49,12 @@ In `./configs/sst/`, we provide a basic config `sst_waymoD5_1x_ped_cyc_8heads_3f
 
 ## Main results
 
-#### Single-stage Model (based on PointPillars) on Waymo validation split
+#### One stage Model (based on PointPillars) on Waymo validation split
 
-|         |  #Sweeps | Veh_L1 | Ped_L1 | Cyc_L1  | 
-|---------|---------|--------|--------|---------|
-|  SST_1f | 1       |  73.57  |  80.01  |  70.72   |
-|  SST_3f | 3       |  75.16  |  83.24  |  75.96   |
+|         |  #Sweeps | Veh_L1 | Ped_L1 | Cyc_L1  | Veh_L2 | Ped_L2 | Cyc_L2  | 
+|---------|---------|--------|--------|---------|--------|--------|---------|
+|  SST_1f | 1       |  73.57  |  80.01  |  70.72   |  64.80  |  71.66  |  68.01
+|  SST_3f | 3       |  75.16  |  83.24  |  75.96   |  66.52  |  76.17  |  73.59   |
 
 Note that we train the 3 classes together, so the performance above is a little bit lower than that reported in our paper.
 
