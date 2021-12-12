@@ -33,13 +33,13 @@ as taken in the CUDA implementation of sparse convolution.
 **PyTorch >= 1.9 is recommended for a better support of the checkpoint technique.**
 (or you can manually replace the interface of checkpoint in torch < 1.9 with the one in torch >= 1.9.)
 
-Our immplementation is based on [MMDetection3D](https://github.com/open-mmlab/mmdetection3d), so just follow their [getting_started](https://github.com/open-mmlab/mmdetection3d/blob/master/docs/getting_started.md) and simply run the script: `run.sh`. Then you will get a basic results of SST after 5~7 hours (depends on your devices).
+Our immplementation is based on [MMDetection3D](https://github.com/open-mmlab/mmdetection3d), so just follow their [getting_started](https://github.com/open-mmlab/mmdetection3d/blob/master/docs/getting_started.md) and simply run the script: `run.sh`. Then you will get a basic result of SST after 5~7 hours (depends on your devices).
 
 We only provide the single-stage model here, as for our two-stage models, please follow [LiDAR-RCNN](https://github.com/TuSimple/LiDAR_RCNN). It's also a good choice to apply other powerful second stage detectors to our single-stage SST.
 
 ## Play with your first single-stride model
 
-In `./configs/sst/`, we provide a basic config `sst_waymoD5_1x_ped_cyc_8heads_3f` to show the power of our single-stride network on small object detection (Pedestrian and Cyclist). With this config (**only 20% training data for 12 epoch**), we can get a very good results, which are better than most other published methods:
+In `./configs/sst/`, we provide a basic config `sst_waymoD5_1x_ped_cyc_8heads_3f` to show the power of our single-stride network on small object detection (Pedestrian and Cyclist). With this config (**only 20% training data for 12 epoch**), we can get a very good performance, which is better than most other published methods:
 |         |    Ped AP/APH | Cyc AP/APH  | 
 |---------|--------|--------|
 |  Level 1 |   80.51/75.48  |  70.44/69.43   |
