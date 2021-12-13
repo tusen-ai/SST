@@ -27,7 +27,7 @@ Authors:
 - SST consists of 6 **Regional Sparse Attention (SRA)** blocks, which deal with the sparse voxel set. It's similar to Submanifold Sparse Convolution (SSC), but much more powerful than SSC. It's locality and sparsity guarantee the efficiency in the single stride setting.
 - The SRA can also be used in many other task to process sparse point clouds. Our implementation of SRA only relies on the pure Python APIs in PyTorch without engineering efforts
 as taken in the CUDA implementation of sparse convolution. 
-- Large room for further improvements. For example, second stage, anchor-free head, IoU scores and advanced techniques from many kinds of vision transformers, etc.
+- Large room for further improvements. For example, **second stage, anchor-free head, IoU scores and advanced techniques from many kinds of vision transformers, etc.**
 
 ## Usage
 **PyTorch >= 1.9 is recommended for a better support of the checkpoint technique.**
