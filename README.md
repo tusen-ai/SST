@@ -45,7 +45,7 @@ In `./configs/sst/`, we provide a basic config `sst_waymoD5_1x_ped_cyc_8heads_3f
 |  Level 1 |   80.51/75.48  |  70.44/69.43   |
 |  Level 2 |   72.18/67.51  |  67.94/67.00   |
 
-(20% training data, taking ~7 hours with 8 2080Ti GPUs)
+(Based on PointPillars, single stage, 3sweeps, 20% training data for 12 epochs, taking ~7 hours with 8 2080Ti GPUs)
 
 ## Main results
 
