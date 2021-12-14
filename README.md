@@ -13,7 +13,7 @@ Authors:
 [Naiyan Wang](https://winsty.net/),
 [Zhaoxiang Zhang](https://zhaoxiangzhang.net/)
 
-[Paper Link]() (Check again on Tuesday)
+[Paper Link](https://arxiv.org/pdf/2112.06375.pdf)
 
 **Visualization of a sequence by AB3DMOT tracking:**
 
