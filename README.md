@@ -34,7 +34,7 @@ as taken in the CUDA implementation of sparse convolution.
 **PyTorch >= 1.9 is recommended for a better support of the checkpoint technique.**
 (or you can manually replace the interface of checkpoint in torch < 1.9 with the one in torch >= 1.9.)
 
-Our immplementation is based on [MMDetection3D](https://github.com/open-mmlab/mmdetection3d), so just follow their [getting_started](https://github.com/open-mmlab/mmdetection3d/blob/master/docs/getting_started.md) and simply run the script: `run.sh`. Then you will get a basic result of SST after 5~7 hours (depends on your devices).
+Our implementation is based on [MMDetection3D](https://github.com/open-mmlab/mmdetection3d), so just follow their [getting_started](https://github.com/open-mmlab/mmdetection3d/blob/master/docs/getting_started.md) and simply run the script: `run.sh`. Then you will get a basic result of SST after 5~7 hours (depends on your devices).
 
 We only provide the single-stage model here, as for our two-stage models, please follow [LiDAR-RCNN](https://github.com/TuSimple/LiDAR_RCNN). It's also a good choice to apply other powerful second stage detectors to our single-stage SST.
 
@@ -64,7 +64,7 @@ Note that we train the 3 classes together, so the performance above is a little 
 - [ ] Build SRA block with similar API as Sparse Convolution for more convenient usage.
 
 
-## Acknowlegement
+## Acknowledgments
 This project is based on the following codebases.  
 
 * [MMDetection3D](https://github.com/open-mmlab/mmdetection3d)
