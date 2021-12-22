@@ -78,7 +78,7 @@ class EncoderLayer(nn.Module):
         self.dropout2 = nn.Dropout(mlp_dropout)
 
         self.activation = _get_activation_fn(activation)
-        self.fp16_enabled=True
+        self.fp16_enabled = False
 
     @auto_fp16(apply_to=('src'))
     def forward(
