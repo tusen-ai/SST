@@ -66,7 +66,7 @@ model = dict(
         conv_kwargs=[
             dict(kernel_size=3, dilation=1, padding=1, stride=1),
             dict(kernel_size=3, dilation=1, padding=1, stride=1),
-            dict(kernel_size=3, dilation=2, padding=1, stride=1),
+            dict(kernel_size=3, dilation=2, padding=2, stride=1),
         ],
         conv_in_channel=192,
         conv_out_channel=128,
