@@ -54,7 +54,7 @@ In `./configs/sst/`, we provide a basic config `sst_waymoD5_1x_ped_cyc_8heads_3f
 
 |         |  #Sweeps | Veh_L1 | Ped_L1 | Cyc_L1  | Veh_L2 | Ped_L2 | Cyc_L2  | 
 |---------|---------|--------|--------|---------|--------|--------|---------|
-|  SST_3f | 3       |  80.99  |  83.30  |  75.69   |  73.08  |  76.93  |  73.22   |
+|  SST_TS_3f | 3       |  80.99  |  83.30  |  75.69   |  73.08  |  76.93  |  73.22   |
 
 Please visit the website for detailed results: [SST_v1](https://waymo.com/open/challenges/entry/?challenge=DETECTION_3D&emailId=5854f8ae-6285&timestamp=1640329826551565)
 
