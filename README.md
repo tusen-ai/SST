@@ -15,6 +15,11 @@ Authors:
 
 [Paper Link](https://arxiv.org/pdf/2112.06375.pdf)
 
+**NEWS**
+- We refactored the code to provide more clear function prototypes and a better understanding. See `./configs/sst_refactor`
+- Supported voxel-based region partition in `./configs/sst_refactor`. Users can easily use voxel-based SST by modifying the `recover_bev` function in the backbone.
+- Waymo Leaderboard results updated in [SST_v1](https://waymo.com/open/challenges/entry/?challenge=DETECTION_3D&emailId=5854f8ae-6285&timestamp=1640329826551565)
+
 **Visualization of a sequence by AB3DMOT tracking:**
 
 ![demo-min](https://user-images.githubusercontent.com/21312704/145702575-24647aed-256d-486c-835f-730584cf99ee.gif)
