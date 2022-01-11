@@ -55,6 +55,9 @@ In `./configs/sst/`, we provide a basic config `sst_waymoD5_1x_ped_cyc_8heads_3f
 
 ## Main results
 
+**_All the results in this section are reproducible. We also find that some improvements can usually be obtained by replacing your pillar-based conv backbone with SST.
+So please let us know if you have trouble reproducing the results. Discussions are definitely welcome if you could not obtain satisfactory performances with SST in your projects._**
+
 #### Waymo Leaderboard
 
 |         |  #Sweeps | Veh_L1 | Ped_L1 | Cyc_L1  | Veh_L2 | Ped_L2 | Cyc_L2  | 
@@ -63,7 +66,7 @@ In `./configs/sst/`, we provide a basic config `sst_waymoD5_1x_ped_cyc_8heads_3f
 
 Please visit the website for detailed results: [SST_v1](https://waymo.com/open/challenges/entry/?challenge=DETECTION_3D&emailId=5854f8ae-6285&timestamp=1640329826551565)
 
-#### One stage Model (based on PointPillars) on Waymo validation split
+#### One stage model (based on PointPillars) on Waymo validation split
 
 |         |  #Sweeps | Veh_L1 | Ped_L1 | Cyc_L1  | Veh_L2 | Ped_L2 | Cyc_L2  | 
 |---------|---------|--------|--------|---------|--------|--------|---------|
@@ -73,9 +76,20 @@ Please visit the website for detailed results: [SST_v1](https://waymo.com/open/c
 Note that we train the 3 classes together, so the performance above is a little bit lower than that reported in our paper.
 
 
+
 ## TODO
 - [ ] Build SRA block with similar API as Sparse Convolution for more convenient usage.
 
+## Citation
+Please consider citing our work as follows if it is helpful.
+```
+@article{fan2021embracing,
+  title={Embracing Single Stride 3D Object Detector with Sparse Transformer},
+  author={Fan, Lue and Pang, Ziqi and Zhang, Tianyuan and Wang, Yu-Xiong and Zhao, Hang and Wang, Feng and Wang, Naiyan and Zhang, Zhaoxiang},
+  journal={arXiv preprint arXiv:2112.06375},
+  year={2021}
+}
+```
 
 ## Acknowledgments
 This project is based on the following codebases.  
