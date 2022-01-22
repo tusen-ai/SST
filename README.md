@@ -55,7 +55,7 @@ In `./configs/sst/`, we provide a basic config `sst_waymoD5_1x_ped_cyc_8heads_3f
 
 ## Main results
 
-**_All the results in this section are reproducible. We also find that some improvements can usually be obtained by replacing your pillar-based conv backbone with SST.
+**_All the results of single stage models are reproducible with this repo. We also find that some improvements can usually be obtained by replacing your pillar-based conv backbone with SST.
 So please let us know if you have trouble reproducing the results. Discussions are definitely welcome if you could not obtain satisfactory performances with SST in your projects._**
 
 #### Waymo Leaderboard
