@@ -3,6 +3,7 @@ import numpy as np
 import torch
 
 from mmdet3d.ops.iou3d.iou3d_utils import nms_gpu, nms_normal_gpu
+from mmdet3d.core.bbox.structures import det11_to_xyzwhlr
 
 from pdb import set_trace
 
@@ -125,6 +126,103 @@ def box3d_multiclass_nms(mlvl_bboxes,
         results = results + (bboxes2d, )
 
     return results
+
+def box3d_multiclass_wnms(mlvl_bboxes,
+                         mlvl_bboxes_for_nms,
+                         mlvl_scores,
+                         score_thr,
+                         max_num,
+                         cfg,
+                         mlvl_dir_scores=None):
+    """Multi-class weighted nms for 3D boxes, cpu version.
+
+    Args:
+        mlvl_bboxes (torch.Tensor): Multi-level boxes with shape (N, M).
+            M is the dimensions of boxes.
+        mlvl_bboxes_for_nms (torch.Tensor): Multi-level boxes with shape
+            (N, 11). N is the number of boxes.
+        mlvl_scores (torch.Tensor): Multi-level boxes with shape
+            (N, ). N is the number of boxes.
+        score_thr (float): Score thredhold to filter boxes with low
+            confidence.
+        max_num (int): Maximum number of boxes will be kept.
+        cfg (dict): Configuration dict of NMS.
+        mlvl_dir_scores (torch.Tensor, optional): Multi-level scores
+            of direction classifier. Defaults to None.
+
+    Returns:
+        tuple[torch.Tensor]: Return results after nms, including 3D \
+            bounding boxes, scores, labels and direction scores.
+    """
+    num_classes = mlvl_scores.shape[1] - 1
+    bboxes = []
+    scores = []
+    labels = []
+    dir_scores = []
+    for i in range(0, num_classes):
+        if mlvl_bboxes_for_nms.shape[0] == 0:
+            continue
+        # get bboxes and scores of this class
+        cls_inds = mlvl_scores[:, i] > score_thr
+        if not cls_inds.any():
+            continue
+
+        _scores = mlvl_scores[cls_inds, i]
+        pre_nms_num = _scores.shape[0]
+        _bboxes_for_nms = mlvl_bboxes_for_nms[cls_inds, :]
+        if _bboxes_for_nms.shape[0] == 0:
+            continue
+
+        try:
+            from processing_cxx import wnms_4c
+        except ImportError:
+            print('Can not import weight nms, please install rangedet following instruction.')
+
+        nms_func = wnms_4c
+        thr_hi = cfg.get('wnms_thr_hi', 0.7)
+        thr_lo = cfg.get('wnms_thr_lo', 0.1)
+        is_3d_iou = cfg.get('is_3d_iou', False)
+
+        nms_input = torch.cat([_bboxes_for_nms, _scores[:, None]], dim=-1).cpu().numpy()
+        
+        det_12, keep_inds = nms_func(nms_input, thr_lo, thr_hi, is_3d_iou, 100)
+
+        det_12 = np.array(det_12).reshape((-1, 12))
+
+        _mlvl_bboxes = torch.from_numpy(det11_to_xyzwhlr(det_12[:,:11])).to(mlvl_bboxes.device)
+        _scores = torch.from_numpy(det_12[:,-1]).to(mlvl_bboxes.device)
+
+        bboxes.append(_mlvl_bboxes)
+        scores.append(_scores)
+        cls_label = mlvl_bboxes.new_full((len(keep_inds), ),
+                                         i,
+                                         dtype=torch.long)
+        labels.append(cls_label)
+
+        if mlvl_dir_scores is not None:
+            _mlvl_dir_scores = mlvl_dir_scores[cls_inds]
+            dir_scores.append(_mlvl_dir_scores[keep_inds])
+
+    if bboxes:
+        bboxes = torch.cat(bboxes, dim=0)
+        scores = torch.cat(scores, dim=0)
+        labels = torch.cat(labels, dim=0)
+        if mlvl_dir_scores is not None:
+            dir_scores = torch.cat(dir_scores, dim=0)
+        if bboxes.shape[0] > max_num:
+            _, inds = scores.sort(descending=True)
+            inds = inds[:max_num]
+            bboxes = bboxes[inds, :]
+            labels = labels[inds]
+            scores = scores[inds]
+            if mlvl_dir_scores is not None:
+                dir_scores = dir_scores[inds]
+    else:
+        bboxes = mlvl_scores.new_zeros((0, mlvl_bboxes.size(-1)))
+        scores = mlvl_scores.new_zeros((0, ))
+        labels = mlvl_scores.new_zeros((0, ), dtype=torch.long)
+        dir_scores = mlvl_scores.new_zeros((0, ))
+    return bboxes, scores, labels, dir_scores
 
 
 def aligned_3d_nms(boxes, scores, classes, thresh):

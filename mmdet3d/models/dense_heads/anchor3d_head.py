@@ -5,7 +5,7 @@ from mmcv.cnn import build_norm_layer
 from torch import nn as nn
 
 from mmdet3d.core import (PseudoSampler, box3d_multiclass_nms, limit_period,
-                          xywhr2xyxyr)
+                          xywhr2xyxyr, box3d_multiclass_wnms)
 from mmdet.core import (build_anchor_generator, build_assigner,
                         build_bbox_coder, build_sampler, multi_apply)
 from mmdet.models import HEADS
@@ -14,7 +14,7 @@ from .train_mixins import AnchorTrainMixin
 
 from mmdet3d.core.bbox.structures import LiDARInstance3DBoxes
 
-from pdb import set_trace
+from ipdb import set_trace
 from mmdet.core.bbox.iou_calculators.builder import IOU_CALCULATORS
 from mmcv.utils import build_from_cfg
 
@@ -533,6 +533,7 @@ class Anchor3DHead(BaseModule, AnchorTrainMixin):
                             mlvl_scores, score_thr, cfg.max_num,
                             cfg, mlvl_dir_scores)
         elif wnms_gpu:
+            raise NotImplementedError('GPU Weighted NMS is not supported for now.')
             results = box3d_multiclass_wnms_gpu(mlvl_bboxes, mlvl_bboxes_for_nms, mlvl_bboxes_for_merge,
                             mlvl_scores, score_thr, cfg.max_num,
                             cfg, mlvl_dir_scores)
@@ -550,7 +551,6 @@ class Anchor3DHead(BaseModule, AnchorTrainMixin):
         return bboxes, scores, labels
 
     def get_wnms_bboxes(self, mlvl_bboxes, input_meta):
-            # bbox_4pts = np.concatenate([xy, yaw[:, None], bot[:, None], height[:, None]], axis=1)
         boxIns = input_meta['box_type_3d'](mlvl_bboxes, box_dim=self.box_code_size)
         if mlvl_bboxes.shape[0] == 0:
             return None
@@ -561,10 +561,5 @@ class Anchor3DHead(BaseModule, AnchorTrainMixin):
         bot = mlvl_bboxes[:, 2, None]
         height = mlvl_bboxes[:, 5, None]
         out = torch.cat([xy, yaw, bot, height], dim=-1)
-        # from mmdet3d.core.bbox.structures import det11_to_xyzwhlr
-        # recover = det11_to_xyzwhlr(out.cpu().numpy())
-        # error = np.abs(recover - mlvl_bboxes.cpu().numpy()).mean(0)
-        # print(error)
-        # set_trace()
         
         return out
