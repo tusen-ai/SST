@@ -19,6 +19,7 @@ Authors:
 [Paper Link](https://arxiv.org/pdf/2112.06375.pdf)
 
 **NEWS**
+- 🔥 SST is accepted at CVPR 2022.
 - Support Weighted NMS (CPU version) in [RangeDet](https://github.com/TuSimple/RangeDet), improving performance of vehicle class by ~1 AP.
 See `Usage` section.
 - We refactored the code to provide more clear function prototypes and a better understanding. See `./configs/sst_refactor`
