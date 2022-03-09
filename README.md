@@ -18,7 +18,7 @@ Authors:
 [Naiyan Wang](https://winsty.net/),
 [Zhaoxiang Zhang](https://zhaoxiangzhang.net/)
 
-[Paper Link](https://arxiv.org/pdf/2112.06375.pdf)
+[Paper Link](https://arxiv.org/pdf/2112.06375.pdf)， [中文解读](https://zhuanlan.zhihu.com/p/476056546)
 
 **NEWS**
 - 🔥 SST is accepted at CVPR 2022.
