@@ -8,7 +8,7 @@ class_names = [
     'motorcycle', 'pedestrian', 'traffic_cone', 'barrier'
 ]
 dataset_type = 'NuScenesDataset'
-data_root = 'data/nuscenes/'
+data_root = './data/nuscenes/'
 # Input modality for nuScenes dataset, this is consistent with the submission
 # format which requires the information in input_modality.
 input_modality = dict(
@@ -32,7 +32,7 @@ train_pipeline = [
         type='LoadPointsFromFile',
         coord_type='LIDAR',
         load_dim=5,
-        use_dim=3,
+        use_dim=5,
         file_client_args=file_client_args),
     dict(
         type='LoadPointsFromMultiSweeps',
@@ -57,7 +57,7 @@ test_pipeline = [
         type='LoadPointsFromFile',
         coord_type='LIDAR',
         load_dim=5,
-        use_dim=3,
+        use_dim=5,
         file_client_args=file_client_args),
     dict(
         type='LoadPointsFromMultiSweeps',
@@ -91,7 +91,7 @@ eval_pipeline = [
         type='LoadPointsFromFile',
         coord_type='LIDAR',
         load_dim=5,
-        use_dim=3,
+        use_dim=5,
         file_client_args=file_client_args),
     dict(
         type='LoadPointsFromMultiSweeps',
@@ -105,7 +105,7 @@ eval_pipeline = [
 ]
 
 data = dict(
-    samples_per_gpu=4,
+    samples_per_gpu=1,
     workers_per_gpu=4,
     train=dict(
         type=dataset_type,

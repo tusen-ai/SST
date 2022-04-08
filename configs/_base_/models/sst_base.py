@@ -12,26 +12,34 @@ model = dict(
 
     bbox_head=dict(
         type='Anchor3DHead',
-        num_classes=3,
+        num_classes=10,
         in_channels=384,
         feat_channels=384,
         use_direction_classifier=True,
         anchor_generator=dict(
             type='AlignedAnchor3DRangeGenerator',
-            ranges=[[-74.88, -74.88, -0.0345, 74.88, 74.88, -0.0345],
-                    [-74.88, -74.88, -0.1188, 74.88, 74.88, -0.1188],
-                    [-74.88, -74.88, 0, 74.88, 74.88, 0]],
-            sizes=[
-                [2.08, 4.73, 1.77],  # car
-                [0.84, 1.81, 1.77],  # cyclist
-                [0.84, 0.91, 1.74]  # pedestrian
-            ],
+            ranges=[[-49.6, -49.6, -1.80032795, 49.6, 49.6, -1.80032795],
+                    [-49.6, -49.6, -1.74440365, 49.6, 49.6, -1.74440365],
+                    [-49.6, -49.6, -1.68526504, 49.6, 49.6, -1.68526504],
+                    [-49.6, -49.6, -1.67339111, 49.6, 49.6, -1.67339111],
+                    [-49.6, -49.6, -1.61785072, 49.6, 49.6, -1.61785072],
+                    [-49.6, -49.6, -1.80984986, 49.6, 49.6, -1.80984986],
+                    [-49.6, -49.6, -1.763965, 49.6, 49.6, -1.763965]],
+            sizes=[[1.95017717, 4.60718145, 1.72270761],
+                   [2.4560939, 6.73778078, 2.73004906],
+                   [2.87427237, 12.01320693, 3.81509561],
+                   [0.60058911, 1.68452161, 1.27192197],
+                   [0.66344886, 0.7256437, 1.75748069],
+                   [0.39694519, 0.40359262, 1.06232151],
+                   [2.49008838, 0.48578221, 0.98297065]],
+            custom_values=[0, 0],
             rotations=[0, 1.57],
-            reshape_out=False),
+            reshape_out=True),
+        assigner_per_size=False,
         diff_rad_by_sin=True,
         dir_offset=0.7854,  # pi/4
         dir_limit_offset=0,
-        bbox_coder=dict(type='DeltaXYZWLHRBBoxCoder', code_size=7),
+        bbox_coder=dict(type='DeltaXYZWLHRBBoxCoder', code_size=9),
         loss_cls=dict(
             type='FocalLoss',
             use_sigmoid=True,
@@ -44,31 +52,15 @@ model = dict(
     ),
     # model training and testing settings
     train_cfg=dict(
-        assigner=[
-            dict(  # car
+        assigner=dict(
                 type='MaxIoUAssigner',
                 iou_calculator=dict(type='BboxOverlapsNearest3D'),
-                pos_iou_thr=0.55,
-                neg_iou_thr=0.4,
-                min_pos_iou=0.4,
-                ignore_iof_thr=-1),
-            dict(  # cyclist
-                type='MaxIoUAssigner',
-                iou_calculator=dict(type='BboxOverlapsNearest3D'),
-                pos_iou_thr=0.5,
+                pos_iou_thr=0.6,
                 neg_iou_thr=0.3,
                 min_pos_iou=0.3,
                 ignore_iof_thr=-1),
-            dict(  # pedestrian
-                type='MaxIoUAssigner',
-                iou_calculator=dict(type='BboxOverlapsNearest3D'),
-                pos_iou_thr=0.5,
-                neg_iou_thr=0.3,
-                min_pos_iou=0.3,
-                ignore_iof_thr=-1),
-        ],
         allowed_border=0,
-        code_weight=[1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
+        code_weight=[1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.2, 0.2],
         pos_weight=-1,
         debug=False),
     test_cfg=dict(

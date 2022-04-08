@@ -101,6 +101,8 @@ def main():
     if args.cfg_options is not None:
         cfg.merge_from_dict(args.cfg_options)
 
+    print(os.getcwd())
+    time.sleep(2)
     # import modules from string list.
     if cfg.get('custom_imports', None):
         from mmcv.utils import import_modules_from_strings
@@ -191,6 +193,7 @@ def main():
     model.init_weights()
 
     logger.info(f'Model:\n{model}')
+    print(cfg.data.train)
     datasets = [build_dataset(cfg.data.train)]
     if len(cfg.workflow) == 2:
         val_dataset = copy.deepcopy(cfg.data.val)
