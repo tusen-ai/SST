@@ -35,6 +35,8 @@ def get_flat2win_inds(batch_win_inds, voxel_drop_lvl, drop_info, debug=True):
 
     for dl in drop_info: # dl: short for drop level
 
+        # Find all voxels in within a window of this drop level
+        # E.g.  window which should contain 30 tokens belong to drop level 1
         dl_mask = voxel_drop_lvl == dl
         if not dl_mask.any():
             continue
@@ -44,8 +46,9 @@ def get_flat2win_inds(batch_win_inds, voxel_drop_lvl, drop_info, debug=True):
         num_windows = len(torch.unique(conti_win_inds))
         max_tokens = drop_info[dl]['max_tokens']
 
-        inner_win_inds = get_inner_win_inds(conti_win_inds)
+        inner_win_inds = get_inner_win_inds(conti_win_inds)  # When more give a index to each token in each window
 
+        # Gives a index to each token unique to all tokens in all windows
         flat2window_inds = conti_win_inds * max_tokens + inner_win_inds
 
         flat2window_inds_dict[dl] = (flat2window_inds, torch.where(dl_mask))
@@ -54,8 +57,8 @@ def get_flat2win_inds(batch_win_inds, voxel_drop_lvl, drop_info, debug=True):
             assert inner_win_inds.max() < max_tokens, f'Max inner inds({inner_win_inds.max()}) larger(equal) than {max_tokens}'
             assert (flat2window_inds >= 0).all()
             max_ind = flat2window_inds.max().item()
-            assert  max_ind < num_windows * max_tokens, f'max_ind({max_ind}) larger than upper bound({num_windows * max_tokens})'
-            assert  max_ind >= (num_windows-1) * max_tokens, f'max_ind({max_ind}) less than lower bound({(num_windows-1) * max_tokens})'
+            assert max_ind < num_windows * max_tokens, f'max_ind({max_ind}) larger than upper bound({num_windows * max_tokens})'
+            assert max_ind >= (num_windows-1) * max_tokens, f'max_ind({max_ind}) less than lower bound({(num_windows-1) * max_tokens})'
 
     return flat2window_inds_dict
 
@@ -224,6 +227,7 @@ def get_window_coors(coors, sparse_shape, window_shape, do_shift):
     shifted_coors_y = coors[:, 2] + shift_y
     shifted_coors_z = coors[:, 1] + shift_z
 
+    # Starts at index 1 with no shift and index 0 with shift
     win_coors_x = shifted_coors_x // win_shape_x
     win_coors_y = shifted_coors_y // win_shape_y
     win_coors_z = shifted_coors_z // win_shape_z
@@ -231,6 +235,7 @@ def get_window_coors(coors, sparse_shape, window_shape, do_shift):
     if len(window_shape) == 2:
         assert (win_coors_z == 0).all()
 
+    # Divide each window into its own 'batch'
     batch_win_inds = coors[:, 0] * max_num_win_per_sample + \
                         win_coors_x * max_num_win_y * max_num_win_z + \
                         win_coors_y * max_num_win_z + \
