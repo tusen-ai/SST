@@ -46,6 +46,7 @@ class SSTv2(nn.Module):
         conv_kwargs=dict(kernel_size=3, dilation=2, padding=2, stride=1),
         checkpoint_blocks=[],
         layer_cfg=dict(),
+        masked=False,
         ):
         super().__init__()
         
@@ -71,6 +72,8 @@ class SSTv2(nn.Module):
         self.output_shape = output_shape
 
         self.debug = debug
+
+        self.masked = masked
 
         self.num_attached_conv = num_attached_conv
 
@@ -127,17 +130,21 @@ class SSTv2(nn.Module):
         for i, block in enumerate(self.block_list):
             output = block(output, pos_embed_list, ind_dict_list, 
                 padding_mask_list, using_checkpoint = i in self.checkpoint_blocks)
-        
-        output = self.recover_bev(output, voxel_info['voxel_coors'], batch_size)
 
-        if self.num_attached_conv > 0:
-            for conv in self.conv_layer:
-                output = conv(output)
+        # If masked we want to send the output to the decoder and not a FPN how requires dense bev image
+        if not self.masked:
+            output = self.recover_bev(output, voxel_info['voxel_coors'], batch_size)
 
-        output_list = []
-        output_list.append(output)
+            if self.num_attached_conv > 0:
+                for conv in self.conv_layer:
+                    output = conv(output)
 
-        return output_list
+            output_list = []
+            output_list.append(output)
+            return output_list
+        else:
+            voxel_info["output"] = output
+            return voxel_info
         
     def _reset_parameters(self):
         for name, p in self.named_parameters():
