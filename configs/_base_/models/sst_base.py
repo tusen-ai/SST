@@ -46,7 +46,7 @@ model = dict(
             gamma=2.0,
             alpha=0.25,
             loss_weight=1.0),
-        loss_bbox=dict(type='L1Loss', loss_weight=0.5),
+        loss_bbox=dict(type='SmoothL1Loss', beta=0.1111111111111111, loss_weight=0.5), # Changed from L1Loss with no beta
         loss_dir=dict(
             type='CrossEntropyLoss', use_sigmoid=False, loss_weight=0.2)
     ),
@@ -62,7 +62,7 @@ model = dict(
         allowed_border=0,
         code_weight=[1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.2, 0.2],
         pos_weight=-1,
-        debug=False),
+        debug=True),
     test_cfg=dict(
             use_rotate_nms=True,
             nms_across_levels=False,
