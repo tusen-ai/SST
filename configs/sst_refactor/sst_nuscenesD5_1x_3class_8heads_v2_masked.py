@@ -1,5 +1,5 @@
 _base_ = [
-    '../_base_/models/sst_base.py',
+    '../_base_/models/sst_base_masked.py',
     '../_base_/datasets/nus-3d-2sweep.py',
     '../_base_/schedules/cosine_2x.py',
     '../_base_/default_runtime.py',
@@ -20,7 +20,7 @@ drop_info_test ={
     3:{'max_tokens':144, 'drop_range':(100, 100000)},
 }
 drop_info = (drop_info_training, drop_info_test)
-shifts_list=[(0, 0), (window_shape[0]//2, window_shape[1]//2)]
+shifts_list = [(0, 0), (window_shape[0]//2, window_shape[1]//2)]
 
 model = dict(
     type='DynamicVoxelNet',
@@ -55,8 +55,27 @@ model = dict(
         normalize_pos=False,
     ),
 
-    backbone=dict(
+    backbone = dict(
         type='SSTv2',
+        d_model=[128,] * 1,
+        nhead=[2, ] * 1,
+        num_blocks=1,
+        dim_feedforward=[256, ] * 1,
+        output_shape=[400, 400],
+        num_attached_conv=3,
+        conv_kwargs=[
+            dict(kernel_size=3, dilation=1, padding=1, stride=1),
+            dict(kernel_size=3, dilation=1, padding=1, stride=1),
+            dict(kernel_size=3, dilation=2, padding=2, stride=1),
+        ],
+        conv_in_channel=128,
+        conv_out_channel=128,
+        debug=True,
+        masked=True
+    ),
+
+    neck=dict(
+        type='SSTv2Decoder',
         d_model=[128,] * 1,
         nhead=[2, ] * 1,
         num_blocks=1,
