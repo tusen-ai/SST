@@ -62,6 +62,8 @@ class SSTInputLayerV2(nn.Module):
             flat2win_inds_list: two dict containing transformation information for non-shifted grouping and shifted grouping, respectively. The two dicts are used in function flat2window and window2flat.
             voxel_info: dict containing extra information of each voxel for usage in the backbone.
         '''
+        original_index = torch.arange(len(voxel_feats), device=voxel_feats.device)
+
         self.set_drop_info()
         voxel_coors = voxel_coors.long()
 
@@ -70,20 +72,26 @@ class SSTInputLayerV2(nn.Module):
             shuffle_inds = torch.randperm(len(voxel_feats))
             voxel_feats = voxel_feats[shuffle_inds]
             voxel_coors = voxel_coors[shuffle_inds]
+            original_index = original_index[shuffle_inds]
 
         voxel_info = self.window_partition(voxel_coors)
         voxel_info['voxel_feats'] = voxel_feats
         voxel_info['voxel_coors'] = voxel_coors
+        voxel_info['original_index'] = original_index
         voxel_info = self.drop_voxel(voxel_info, 2) # voxel_info is updated in this function
 
-        voxel_feats = voxel_info['voxel_feats'] # after dropping
+        voxel_feats = voxel_info['voxel_feats']  # after dropping
         voxel_coors = voxel_info['voxel_coors']
+        original_index = voxel_info['voxel_coors']
 
         for i in range(2):
-
+            # Dict where for each drop level we give a index to each token
+            # unique to all tokens in all windows of that drop level
             voxel_info[f'flat2win_inds_shift{i}'] = \
-                get_flat2win_inds_v2(voxel_info[f'batch_win_inds_shift{i}'], voxel_info[f'voxel_drop_level_shift{i}'], self.drop_info, debug=True) 
+                get_flat2win_inds_v2(voxel_info[f'batch_win_inds_shift{i}'], voxel_info[f'voxel_drop_level_shift{i}'], self.drop_info, debug=True)
 
+            # Same structure as above. Positional embedding is done using Sine-Cos embedding within a window, i.e.
+            # not related to global position. Position in window is thus x_coord % windows_size_x and same for y
             voxel_info[f'pos_dict_shift{i}'] = \
                 self.get_pos_embed(voxel_info[f'flat2win_inds_shift{i}'], voxel_info[f'coors_in_win_shift{i}'], voxel_feats.size(1), voxel_feats.dtype)
 
@@ -125,6 +133,12 @@ class SSTInputLayerV2(nn.Module):
     def drop_voxel(self, voxel_info, num_shifts):
         '''
         To make it clear and easy to follow, we do not use loop to process two shifts.
+
+        Separates windows by the number of tokens e.g.:
+        group 1: 0-30 tokens, pad windows with less than 30 token to 30 token
+        group 2: 30-60 tokens, pad windows with less than 60 tokens to 60 tokens
+        group 3: 60-100000 tokens, pad windows with less than 100 token to 100 tokens
+                    drop tokens in windows with more than 100 tokens so that they have 100 tokens
         '''
 
         batch_win_inds_s0 = voxel_info['batch_win_inds_shift0']
@@ -171,6 +185,7 @@ class SSTInputLayerV2(nn.Module):
         voxel_num_before_drop = len(voxel_info['voxel_coors'])
         voxel_info['voxel_feats'] = voxel_info['voxel_feats'][voxel_keep_inds]
         voxel_info['voxel_coors'] = voxel_info['voxel_coors'][voxel_keep_inds]
+        voxel_info['original_index'] = voxel_info['original_index'][voxel_keep_inds]
 
         # Some other variables need to be dropped.
         for k, v in voxel_info.items():
@@ -204,6 +219,7 @@ class SSTInputLayerV2(nn.Module):
     def window_partition(self, coors):
         voxel_info = {}
         for i in range(2):
+            # Adds indexation which window (counted across all batches) and which spot in the window
             batch_win_inds, coors_in_win = get_window_coors(coors, self.sparse_shape, self.window_shape, i == 1)
             voxel_info[f'batch_win_inds_shift{i}'] = batch_win_inds
             voxel_info[f'coors_in_win_shift{i}'] = coors_in_win
