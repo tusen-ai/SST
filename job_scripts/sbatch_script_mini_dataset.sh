@@ -40,8 +40,7 @@ echo ""
 ######################## DO NOT EXIST YET ##################################################
 echo ""
 echo "Start copying dataset to '$TMPDIR/SST_$GPU_TYPE/'"
-job_scripts_path=$(dirname ${BASH_SOURCE[0]})
-source $job_scripts_path//copy_mini.sh
+source ./copy_mini.sh
 echo ""
 echo "Copying of dataset to repo in tempdir is now done."
 echo ""
