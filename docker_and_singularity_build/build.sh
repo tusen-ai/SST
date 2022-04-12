@@ -4,4 +4,4 @@
 docker build -f Dockerfile -t mmdetection3d ..
 
 # Convert to singularity
-singularity build mmdetection3d.sif docker-daemon://mmdetection3d:latest
+singularity build mmdetection3d_2.sif docker-daemon://mmdetection3d:latest
