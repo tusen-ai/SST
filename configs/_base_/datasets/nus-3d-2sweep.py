@@ -1,7 +1,7 @@
 # If point cloud range is changed, the models should also change their point
 # cloud range accordingly
 point_cloud_range = [-50, -50, -5, 50, 50, 3]
-number_of_sweeps = 2
+number_of_sweeps = 1
 # For nuScenes we usually do 10-class detection
 class_names = [
     'car', 'truck', 'trailer', 'bus', 'construction_vehicle', 'bicycle',
@@ -37,7 +37,10 @@ train_pipeline = [
     dict(
         type='LoadPointsFromMultiSweeps',
         sweeps_num=number_of_sweeps,
-        file_client_args=file_client_args),
+        file_client_args=file_client_args,
+        pad_empty_sweeps=True,
+        remove_close=True,
+        close_radius=2.0),
     dict(type='LoadAnnotations3D', with_bbox_3d=True, with_label_3d=True),
     dict(
         type='GlobalRotScaleTrans',
@@ -62,7 +65,10 @@ test_pipeline = [
     dict(
         type='LoadPointsFromMultiSweeps',
         sweeps_num=number_of_sweeps,
-        file_client_args=file_client_args),
+        file_client_args=file_client_args,
+        pad_empty_sweeps=True,
+        remove_close=True,
+        close_radius=2.0),
     dict(
         type='MultiScaleFlipAug3D',
         img_scale=(1333, 800),
@@ -96,7 +102,10 @@ eval_pipeline = [
     dict(
         type='LoadPointsFromMultiSweeps',
         sweeps_num=number_of_sweeps,
-        file_client_args=file_client_args),
+        file_client_args=file_client_args,
+        pad_empty_sweeps=True,
+        remove_close=True,
+        close_radius=2.0),
     dict(
         type='DefaultFormatBundle3D',
         class_names=class_names,

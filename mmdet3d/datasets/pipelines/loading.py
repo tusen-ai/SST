@@ -125,6 +125,7 @@ class LoadPointsFromMultiSweeps(object):
                  file_client_args=dict(backend='disk'),
                  pad_empty_sweeps=False,
                  remove_close=False,
+                 close_radius=1.0,
                  test_mode=False):
         self.load_dim = load_dim
         self.sweeps_num = sweeps_num
@@ -134,6 +135,7 @@ class LoadPointsFromMultiSweeps(object):
         self.pad_empty_sweeps = pad_empty_sweeps
         self.remove_close = remove_close
         self.test_mode = test_mode
+        self.close_radius = close_radius
 
     def _load_points(self, pts_filename):
         """Private function to load point clouds data.
@@ -195,12 +197,12 @@ class LoadPointsFromMultiSweeps(object):
         """
         points = results['points']
         points.tensor[:, 4] = 0
-        sweep_points_list = [points]
+        sweep_points_list = [self._remove_close(points, self.close_radius) if self.remove_close else points]
         ts = results['timestamp']
         if self.pad_empty_sweeps and len(results['sweeps']) == 0:
             for i in range(self.sweeps_num):
                 if self.remove_close:
-                    sweep_points_list.append(self._remove_close(points))
+                    sweep_points_list.append(self._remove_close(points, self.close_radius))
                 else:
                     sweep_points_list.append(points)
         else:
@@ -216,7 +218,7 @@ class LoadPointsFromMultiSweeps(object):
                 points_sweep = self._load_points(sweep['data_path'])
                 points_sweep = np.copy(points_sweep).reshape(-1, self.load_dim)
                 if self.remove_close:
-                    points_sweep = self._remove_close(points_sweep)
+                    points_sweep = self._remove_close(points_sweep, self.close_radius)
                 sweep_ts = sweep['timestamp'] / 1e6
                 points_sweep[:, :3] = points_sweep[:, :3] @ sweep[
                     'sensor2lidar_rotation'].T
