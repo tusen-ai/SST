@@ -18,7 +18,6 @@ from ipdb import set_trace
 from mmdet.core.bbox.iou_calculators.builder import IOU_CALCULATORS
 from mmcv.utils import build_from_cfg
 
-import time
 
 @HEADS.register_module()
 class Anchor3DHead(BaseModule, AnchorTrainMixin):
@@ -279,11 +278,6 @@ class Anchor3DHead(BaseModule, AnchorTrainMixin):
             if self.use_direction_classifier:
                 loss_dir = pos_dir_cls_preds.sum()
 
-        print("hi")
-        print(loss_cls)
-        print(loss_bbox)
-        print(loss_dir)
-        time.sleep(2)
         return loss_cls, loss_bbox, loss_dir
 
     @staticmethod

@@ -4,7 +4,6 @@ from mmcv.runner import auto_fp16
 from torch import nn
 from torch.nn import functional as F
 
-import time
 
 def get_paddings_indicator(actual_num, max_num, axis=0):
     """Create boolean mask by actually number of a padded tensor.
@@ -139,13 +138,9 @@ class DynamicVFELayer(nn.Module):
             torch.Tensor: point features in shape (M, C).
         """
         # [K, T, 7] tensordot [7, units] = [K, T, units]
-        print(inputs.shape)
         x = self.linear(inputs)
-        print(x.shape)
         x = self.norm(x)
-        print(x.shape)
         pointwise = F.relu(x)
-        time.sleep(2)
         return pointwise
 
 

@@ -95,7 +95,7 @@ def parse_args():
 
 def main():
     args = parse_args()
-    torch.autograd.set_detect_anomaly(True)
+    #torch.autograd.set_detect_anomaly(True)
 
     cfg = Config.fromfile(args.config)
     if args.cfg_options is not None:
