@@ -38,7 +38,8 @@ echo ""
 
 echo ""
 echo "Start copying dataset to '$TMPDIR/SST_$GPU_TYPE/'"
-source ./unpack_trainval.sh
+job_scripts_path=$(dirname ${BASH_SOURCE[0]})
+source $job_scripts_path/unpack_trainval.sh
 echo ""
 echo "Copying of dataset to repo in tempdir is now done."
 echo ""
