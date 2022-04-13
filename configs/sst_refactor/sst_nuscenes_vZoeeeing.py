@@ -57,6 +57,7 @@ model = dict(
         drop_info=drop_info,
         pos_temperature=10000,
         normalize_pos=False,
+        mute=True,
     ),
 
     backbone=dict(
