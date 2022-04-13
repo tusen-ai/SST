@@ -74,6 +74,7 @@ class SSTv2Decoder(SSTv2):
 
         # store original input as ground truth (mayby in masked input layer)
         ground_truth = copy.deepcopy(voxel_info_decoder['voxel_feats'])
+        voxel_info_decoder['gt'] = ground_truth
 
         # if in_channel project encoder output to right dimension
         if hasattr(self, 'enc2dec_projection'):

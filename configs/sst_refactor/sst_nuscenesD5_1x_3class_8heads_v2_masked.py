@@ -11,13 +11,16 @@ point_cloud_range = [-50, -50, -5, 50, 50, 3]
 drop_info_training ={
     0:{'max_tokens':30, 'drop_range':(0, 30)},
     1:{'max_tokens':60, 'drop_range':(30, 60)},
-    2:{'max_tokens':100, 'drop_range':(60, 100000)},
+    2:{'max_tokens':100, 'drop_range':(60, 100)},
+    3:{'max_tokens':200, 'drop_range':(100, 200)},
+    4:{'max_tokens':256, 'drop_range':(200, 100000)},
 }
 drop_info_test ={
     0:{'max_tokens':30, 'drop_range':(0, 30)},
     1:{'max_tokens':60, 'drop_range':(30, 60)},
     2:{'max_tokens':100, 'drop_range':(60, 100)},
-    3:{'max_tokens':144, 'drop_range':(100, 100000)},
+    3:{'max_tokens':200, 'drop_range':(100, 200)},
+    4:{'max_tokens':256, 'drop_range':(200, 100000)},
 }
 drop_info = (drop_info_training, drop_info_test)
 shifts_list = [(0, 0), (window_shape[0]//2, window_shape[1]//2)]
@@ -34,7 +37,7 @@ model = dict(
 
     voxel_encoder=dict(
         type='DynamicVFE',
-        in_channels=3,
+        in_channels=4,
         feat_channels=[64, 128],
         with_distance=False,
         voxel_size=voxel_size,
@@ -62,36 +65,29 @@ model = dict(
         num_blocks=1,
         dim_feedforward=[256, ] * 1,
         output_shape=[400, 400],
-        num_attached_conv=3,
-        conv_kwargs=[
-            dict(kernel_size=3, dilation=1, padding=1, stride=1),
-            dict(kernel_size=3, dilation=1, padding=1, stride=1),
-            dict(kernel_size=3, dilation=2, padding=2, stride=1),
-        ],
-        conv_in_channel=128,
-        conv_out_channel=128,
+        num_attached_conv=0,
         debug=True,
         masked=True
     ),
 
     neck=dict(
         type='SSTv2Decoder',
-        d_model=[128,] * 1,
-        nhead=[2, ] * 1,
-        num_blocks=1,
-        dim_feedforward=[256, ] * 1,
+        d_model=[128,] * 6,
+        nhead=[8, ] * 6,
+        num_blocks=6,
+        dim_feedforward=[256, ] * 6,
         output_shape=[400, 400],
-        num_attached_conv=3,
-        conv_kwargs=[
-            dict(kernel_size=3, dilation=1, padding=1, stride=1),
-            dict(kernel_size=3, dilation=1, padding=1, stride=1),
-            dict(kernel_size=3, dilation=2, padding=2, stride=1),
-        ],
-        conv_in_channel=128,
-        conv_out_channel=128,
+        num_attached_conv=0,
         debug=True,
     ),
 
+    bbox_head=dict(
+        type='ReconstructionHead',
+        in_channels=128,
+        feat_channels=128,
+        num_reg_points=10,
+        only_masked=True,
+    )
 )
 
 # runtime settings

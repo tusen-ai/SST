@@ -130,6 +130,7 @@ class DynamicVFE(nn.Module):
                  mode='max',
                  fusion_layer=None,
                  return_point_feats=False,
+                 return_gt_points=False
                  ):
         super(DynamicVFE, self).__init__()
         assert mode in ['avg', 'max']
@@ -145,6 +146,7 @@ class DynamicVFE(nn.Module):
         self._with_cluster_center = with_cluster_center
         self._with_voxel_center = with_voxel_center
         self.return_point_feats = return_point_feats
+        self.return_gt_points = return_gt_points
         self.fp16_enabled = False
 
         # Need pillar (voxel) size and x/y offset in order to calculate offset
@@ -236,7 +238,7 @@ class DynamicVFE(nn.Module):
 
         Args:
             features (torch.Tensor): Features of voxels, shape is NxC.
-            coors (torch.Tensor): Coordinates of voxels, shape is  Nx(1+NDim).
+            coors (torch.Tensor): Coordinates of voxels, shape is  Nx(1+NDim).[Nx4] [b,z,y,x]
             points (list[torch.Tensor], optional): Raw points used to guide the
                 multi-modality fusion. Defaults to None.
             img_feats (list[torch.Tensor], optional): Image fetures used for
@@ -301,6 +303,22 @@ class DynamicVFE(nn.Module):
                 features = torch.cat([point_feats, feat_per_point], dim=1)
         if self.return_point_feats:
             return point_feats
+        if self.return_gt_points:
+            canvas_z = round(
+                (self.point_cloud_range[5] - self.point_cloud_range[2]) / self.vz)
+            canvas_y = round(
+                (self.point_cloud_range[4] - self.point_cloud_range[1]) / self.vy)
+            canvas_x = round(
+                (self.point_cloud_range[3] - self.point_cloud_range[0]) / self.vx)
+            batch_size = coors[-1, 0].int() + 1
+            canvas_len = canvas_z * canvas_y * canvas_x * batch_size
+            indices = (
+                coors[:, 0] * canvas_z * canvas_y * canvas_x +  # Batch
+                coors[:, 1] * canvas_y * canvas_x +  # z voxel
+                coors[:, 2] * canvas_x +  # y voxel
+                coors[:, 3]  # x voxel
+            )
+            return voxel_feats, voxel_coors, low_level_point_feature, indices
         return voxel_feats, voxel_coors
 
 

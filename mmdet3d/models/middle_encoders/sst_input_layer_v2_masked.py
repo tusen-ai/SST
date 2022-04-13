@@ -54,17 +54,29 @@ class SSTInputLayerV2Masked(SSTInputLayerV2):
         self.masking_ratio = 0.7
 
     @auto_fp16(apply_to=('voxel_feat', ))
-    def forward(self, voxel_feats, voxel_coors, batch_size=None):
+    def forward(self, voxel_feats, voxel_coors, low_level_point_feature, indices, batch_size=None):
         '''
         Args:
             voxel_feats: shape=[N, C], N is the voxel num in the batch.
             coors: shape=[N, 4], [b, z, y, x]
+            low_level_point_feature: shape=[Np, 10], Np is the point num in the batch.
+            indices: shape=[Np], point voxel index
         Returns:
             feat_3d_dict: contains region features (feat_3d) of each region batching level. Shape of feat_3d is [num_windows, num_max_tokens, C].
             flat2win_inds_list: two dict containing transformation information for non-shifted grouping and shifted grouping, respectively. The two dicts are used in function flat2window and window2flat.
             voxel_info: dict containing extra information of each voxel for usage in the backbone.
         '''
         # TODO: Potentially add fake voxels
+        gt_dict = {}
+
+        batch_size = voxel_coors[:, 0].max() + 1
+        vx, vy, vz = self.sparse_shape
+        max_index = batch_size*vz*vy*vx
+        tmp = torch.bincount(indices)
+        non_zero_voxels = torch.where(tmp)
+        n_points_per_voxel = torch.zeros(max_index, device=voxel_feats.device, dtype=torch.long)
+        n_points_per_voxel[non_zero_voxels] = tmp[non_zero_voxels].long()
+        gt_dict["num_points_per_voxel"] = n_points_per_voxel
 
         n_unmasked_voxels = int(len(voxel_feats)*self.masking_ratio)
         mask = torch.ones(len(voxel_feats), device=voxel_feats.device)
@@ -78,7 +90,10 @@ class SSTInputLayerV2Masked(SSTInputLayerV2):
         unmasked_voxels = voxel_feats[unmasked_idx]
         unmasked_voxel_coors = voxel_coors[unmasked_idx]
 
+        # Might drop voxels
         voxel_info_decoder = super().forward(voxel_feats, voxel_coors, batch_size=None)
+        assert len(voxel_info_decoder["voxel_feats"]) == len(voxel_feats), "Dropping is not allowed for reconstruction"
+
         voxel_info_decoder["n_unmasked"] = n_unmasked_voxels
         voxel_info_decoder["n_masked"] = len(voxel_feats) - n_unmasked_voxels
         voxel_info_decoder["mask"] = mask
@@ -86,11 +101,15 @@ class SSTInputLayerV2Masked(SSTInputLayerV2):
         voxel_info_decoder["masked_idx"] = masked_idx
 
         voxel_info_encoder = super().forward(unmasked_voxels, unmasked_voxel_coors, batch_size=None)
+        assert len(voxel_info_encoder["voxel_feats"]) == n_unmasked_voxels, "Dropping is not allowed for reconstruction"
 
         dec2dec_input_idx = torch.argsort(voxel_info_decoder["original_index"])
         dec2masked_idx = dec2dec_input_idx[masked_idx]
         dec2unmasked_idx = dec2dec_input_idx[unmasked_idx]
         dec2enc_idx = dec2unmasked_idx[voxel_info_encoder["original_index"]]
+        voxel_info_decoder["dec2input_idx"] = dec2dec_input_idx
+
+        voxel_info_decoder["dec2unmasked_idx"] = dec2unmasked_idx
         voxel_info_decoder["dec2masked_idx"] = dec2masked_idx
         voxel_info_decoder["dec2enc_idx"] = dec2enc_idx
 
