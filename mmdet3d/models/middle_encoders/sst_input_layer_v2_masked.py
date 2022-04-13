@@ -82,7 +82,7 @@ class SSTInputLayerV2Masked(SSTInputLayerV2):
             voxel_coors[:, 1] * vy * vx +  # z
             voxel_coors[:, 2] * vx +  # y
             voxel_coors[:, 3]  # x
-        )
+        ).long()
         n_points_per_voxel = n_points_per_voxel[input_index]
 
         gt_dict["num_points_per_voxel"] = n_points_per_voxel
