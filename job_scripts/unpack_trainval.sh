@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-GPU_TYPE=A40
+GPU_TYPE=${GPU_TYPE:-A40}
 src_folder=/mimer/NOBACKUP/Datasets/NuScenes_v1.0/Trainval-Boston
 trg_folder=$TMPDIR/SST_$GPU_TYPE/data/nuscenes
 

@@ -7,7 +7,7 @@
 #SBATCH -J "MNMG PyTorch"  # multi node, multi GPU
 CONFIG=sst_nuscenesD5_1x_3class_8heads_v2
 GPUS_PER_NODE=4
-GPU_TYPE=A40
+export GPU_TYPE=A40
 # Options for GPU type are T4 or A40. Choose A40 also when running on V100, A100 or A100fat.
 
 echo $HOSTNAME
