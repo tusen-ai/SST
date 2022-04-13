@@ -71,8 +71,8 @@ class SSTInputLayerV2Masked(SSTInputLayerV2):
 
         batch_size = voxel_coors[:, 0].max() + 1
         vx, vy, vz = self.sparse_shape
-        max_index = batch_size*vz*vy*vx
-        tmp = torch.bincount(indices)
+        max_index = batch_size.long().item()*vz*vy*vx
+        tmp = torch.bincount(indices.long())
         non_zero_voxels = torch.where(tmp)
         n_points_per_voxel = torch.zeros(max_index, device=voxel_feats.device, dtype=torch.long)
         n_points_per_voxel[non_zero_voxels] = tmp[non_zero_voxels].long()
@@ -115,31 +115,32 @@ class SSTInputLayerV2Masked(SSTInputLayerV2):
 
         # Debug - sanity check
         decoder_feats = voxel_info_decoder["voxel_feats"]
-        decoder_coors = voxel_info_decoder["voxel_feats"]
+        decoder_coors = voxel_info_decoder["voxel_coors"]
 
         encoder_feats = voxel_info_encoder["voxel_feats"]
-        encoder_coors = voxel_info_encoder["voxel_feats"]
+        encoder_coors = voxel_info_encoder["voxel_coors"]
 
         assert torch.allclose(decoder_feats[dec2dec_input_idx], voxel_feats), \
             "The mapping from decoder to decoder input is invalid"
-        assert torch.allclose(decoder_coors[dec2dec_input_idx], voxel_coors), \
+        assert torch.allclose(decoder_coors[dec2dec_input_idx], voxel_coors.long()), \
             "The mapping from decoder to decoder input is invalid"
 
         assert torch.allclose(decoder_feats[dec2masked_idx], voxel_feats[masked_idx]), \
             "The mapping from decoder to masked input is invalid"
-        assert torch.allclose(decoder_coors[dec2masked_idx], voxel_coors[masked_idx]), \
+        assert torch.allclose(decoder_coors[dec2masked_idx], voxel_coors[masked_idx].long()), \
             "The mapping from decoder to masked input is invalid"
 
         assert torch.allclose(decoder_feats[dec2unmasked_idx], unmasked_voxels), \
             "The mapping from decoder to encoder input is invalid"
-        assert torch.allclose(decoder_coors[dec2unmasked_idx], unmasked_voxel_coors), \
+        assert torch.allclose(decoder_coors[dec2unmasked_idx], unmasked_voxel_coors.long()), \
             "The mapping from decoder to encoder input is invalid"
 
         assert torch.allclose(decoder_feats[dec2enc_idx], encoder_feats), \
             "The mapping from decoder to encoder output is invalid"
-        assert torch.allclose(decoder_coors[dec2enc_idx], encoder_coors), \
+        assert torch.allclose(decoder_coors[dec2enc_idx], encoder_coors.long()), \
             "The mapping from decoder to encoder output is invalid"
 
+        voxel_info_decoder["gt_dict"] = gt_dict
         voxel_info_encoder["voxel_info_decoder"] = voxel_info_decoder
 
         return voxel_info_encoder

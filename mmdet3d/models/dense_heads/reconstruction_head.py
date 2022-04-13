@@ -1,6 +1,6 @@
 import numpy as np
 import torch
-from torch.nn.functional import l1_loss, mse_loss, smooth_l1_loss
+from torch.nn.functional import l1_loss, mse_loss, smooth_l1_loss, binary_cross_entropy, sigmoid
 from mmcv.runner import BaseModule, force_fp32
 from mmcv.cnn import build_norm_layer
 from torch import nn as nn
@@ -72,18 +72,23 @@ class ReconstructionHead(BaseModule):
         if init_cfg is None:
             self.init_cfg = dict(
                 type='Normal',
-                layer='Conv2d',
+                layer='Conv1d',
                 std=0.01,
                 override=dict(
-                    type='Normal', name='conv_cls', std=0.01, bias_prob=0.01))
+                    type='Normal', name='conv_occupied', std=0.01, bias_prob=0.01))
 
     def _init_layers(self):
         """Initialize neural network layers of the head."""
-        self.conv_occupied = nn.Conv2d(self.feat_channels, 1, 1)
-        self.conv_num_points = nn.Conv2d(self.feat_channels, 1, 1)
-        self.conv_reg = nn.Conv2d(self.feat_channels, self.num_reg_points * 3, 1)
+        self.conv_occupied = nn.Conv1d(self.feat_channels, 1, 1)
+        self.conv_num_points = nn.Conv1d(self.feat_channels, 1, 1)
+        self.conv_reg = nn.Conv1d(self.feat_channels, self.num_reg_points * 3, 1)
 
-    def forward(self, voxel_info, voxel_info_decoder, voxel_info_encoder):
+    def _apply_1dconv(self, conv, x):
+        x = x.unsqueeze(0).transpose(1, 2)
+        x = conv(x).transpose(1, 2).squeeze(0)
+        return x
+
+    def forward(self, x):
         """Forward pass.
 
         Args:r
@@ -94,6 +99,7 @@ class ReconstructionHead(BaseModule):
             tuple[list[torch.Tensor]]: Multi-level class score, bbox \
                 and direction predictions.
         """
+        voxel_info, voxel_info_decoder, voxel_info_encoder = x
         predictions = voxel_info_decoder["output"]  # [N, C]
         gt_dict = voxel_info_decoder["gt_dict"]
 
@@ -101,11 +107,12 @@ class ReconstructionHead(BaseModule):
         unmasked_predictions = predictions[voxel_info_decoder["dec2unmasked_idx"]]
 
         # TODO: Do occupied loss
-        pred_occupied = self.conv_occupied(predictions)
+        pred_occupied = sigmoid(self._apply_1dconv(self.conv_occupied, predictions).view(-1))
 
         # Predict number of points loss
-        pred_num_points_masked = self.conv_num_points(masked_predictions)
-        pred_num_points_unmasked = self.conv_num_points(unmasked_predictions)
+        pred_num_points_masked = self._apply_1dconv(self.conv_num_points, masked_predictions).view(-1)
+        pred_num_points_unmasked = self._apply_1dconv(self.conv_num_points, unmasked_predictions).view(-1)
+
 
         gt_num_points = gt_dict["num_points_per_voxel"]
         gt_num_points_masked = gt_num_points[voxel_info_decoder["masked_idx"]]
@@ -114,13 +121,15 @@ class ReconstructionHead(BaseModule):
         pred_dict = {}
 
         pred_dict["pred_occupied"] = pred_occupied
+        pred_dict["gt_occupied"] = torch.ones_like(
+            pred_occupied, dtype=pred_occupied.dtype, device=pred_occupied.device)
 
         pred_dict["pred_num_points_masked"] = pred_num_points_masked
         pred_dict["pred_num_points_unmasked"] = pred_num_points_unmasked
         pred_dict["gt_num_points_masked"] = gt_num_points_masked
         pred_dict["gt_num_points_unmasked"] = gt_num_points_unmasked
 
-        return pred_dict
+        return (pred_dict,)
 
     def loss(self,
              pred_dict,
@@ -152,14 +161,19 @@ class ReconstructionHead(BaseModule):
                 - loss_dir (list[torch.Tensor]): Direction classification \
                     losses.
         """
-        gt_num_points = pred_dict["num_points_per_voxel"]
+        pred_occupied = pred_dict["pred_occupied"]
+        gt_occupied = pred_dict["gt_occupied"]
+        loss_occupied = binary_cross_entropy(pred_occupied, gt_occupied)
+
         pred_num_points_masked = pred_dict["pred_num_points_masked"]
         pred_num_points_unmasked = pred_dict["pred_num_points_unmasked"]
         gt_num_points_masked = pred_dict["gt_num_points_masked"]
-        gt_num_points_unmasked= pred_dict["gt_num_points_unmasked"]
-        loss_num_points_masked = smooth_l1_loss(pred_num_points_masked, gt_num_points_masked, reduction="Mean")
-        loss_num_points_unmasked = smooth_l1_loss(pred_num_points_unmasked, gt_num_points_unmasked, reduction="Mean")
+        gt_num_points_unmasked = pred_dict["gt_num_points_unmasked"]
+        loss_num_points_masked = smooth_l1_loss(pred_num_points_masked, gt_num_points_masked, reduction="mean")
+        loss_num_points_unmasked = smooth_l1_loss(pred_num_points_unmasked, gt_num_points_unmasked, reduction="mean")
 
         return dict(
-            loss_num_points_masked=loss_num_points_masked, loss_num_points_unmasked=loss_num_points_unmasked)
+            loss_occupied=loss_occupied,
+            loss_num_points_masked=loss_num_points_masked,
+            loss_num_points_unmasked=loss_num_points_unmasked)
 

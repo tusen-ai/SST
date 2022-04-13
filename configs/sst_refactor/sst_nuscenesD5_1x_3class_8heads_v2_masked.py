@@ -43,11 +43,12 @@ model = dict(
         with_cluster_center=True,
         with_voxel_center=True,
         point_cloud_range=point_cloud_range,
-        norm_cfg=dict(type='naiveSyncBN1d', eps=1e-3, momentum=0.01)
+        norm_cfg=dict(type='naiveSyncBN1d', eps=1e-3, momentum=0.01),
+        return_gt_points=True
     ),
 
     middle_encoder=dict(
-        type='SSTInputLayerV2',
+        type='SSTInputLayerV2Masked',
         window_shape=window_shape,
         sparse_shape=(400, 400, 1),
         shuffle_voxels=True,
@@ -93,6 +94,8 @@ runner = dict(type='EpochBasedRunner', max_epochs=12)
 evaluation = dict(interval=12)
 
 fp16 = dict(loss_scale=32.0)
+
+find_unused_parameters = True  # Whether to find unused parameters
 """data = dict(
     samples_per_gpu=1,
     workers_per_gpu=4,

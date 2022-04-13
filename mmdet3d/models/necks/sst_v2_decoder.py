@@ -72,11 +72,11 @@ class SSTv2Decoder(SSTv2):
         voxel_info_decoder = voxel_info["voxel_info_decoder"]
 
         # _____ add in encoder output to the input _____
-        encoder_out = voxel_info_encoder["encoder_output"]
+        encoder_out = voxel_info_encoder["output"]
 
         # store original input as ground truth (mayby in masked input layer)
-        ground_truth = copy.deepcopy(voxel_info_decoder['voxel_feats'])
-        voxel_info_decoder['gt'] = ground_truth
+        ground_truth = voxel_info_decoder['voxel_feats'].clone()
+        voxel_info_decoder['gt'] = ground_truth.clone()
 
         # if in_channel project encoder output to right dimension
         if hasattr(self, 'enc2dec_projection'):
@@ -94,7 +94,7 @@ class SSTv2Decoder(SSTv2):
         n_masked = voxel_info_decoder["n_masked"]
         masked_tokens = self.mask_token.repeat(n_masked)
         voxel_feat[dec2masked_idx] = masked_tokens
-        voxel_info_decoder['voxel_feats'] = voxel_feat[dec2masked_idx]
+        voxel_info_decoder['voxel_feats'] = voxel_feat
 
         voxel_info_decoder = super().forward(voxel_info_decoder)
 
