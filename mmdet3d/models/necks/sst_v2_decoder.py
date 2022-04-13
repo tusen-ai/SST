@@ -43,11 +43,6 @@ class SSTv2Decoder(SSTv2):
         checkpoint_blocks=[],
         layer_cfg=dict(),
         ):
-        # Needs to be before super() to make _reset_parameters() work
-        self.mask_token = nn.Parameter(torch.zeros(1, self.decoder_dim))
-
-        if in_channel is not None:
-            self.enc2dec_projection = nn.Linear(in_channel, d_model[0])
 
         super().__init__(
             d_model=d_model,
@@ -61,7 +56,14 @@ class SSTv2Decoder(SSTv2):
             debug=debug,
             checkpoint_blocks=checkpoint_blocks,
             layer_cfg=layer_cfg,
-            mask=True,)
+            masked=True,)
+
+        if in_channel is not None:
+            self.enc2dec_projection = nn.Linear(in_channel, d_model[0])
+        self._reset_parameters()
+
+        self.mask_token = nn.Parameter(torch.zeros(1, d_model[0]))
+        torch.nn.init.normal_(self.mask_token, std=.02)
 
     def forward(self, voxel_info):
         '''
@@ -97,9 +99,3 @@ class SSTv2Decoder(SSTv2):
         voxel_info_decoder = super().forward(voxel_info_decoder)
 
         return voxel_info, voxel_info_decoder, voxel_info_encoder
-        
-    def _reset_parameters(self):
-        for name, p in self.named_parameters():
-            if p.dim() > 1 and 'scaler' not in name:
-                nn.init.xavier_uniform_(p)
-        torch.nn.init.normal_(self.mask_token, std=.02)

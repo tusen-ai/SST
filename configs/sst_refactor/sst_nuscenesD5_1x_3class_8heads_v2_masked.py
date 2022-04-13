@@ -1,5 +1,4 @@
 _base_ = [
-    '../_base_/models/sst_base_masked.py',
     '../_base_/datasets/nus-3d-2sweep.py',
     '../_base_/schedules/cosine_2x.py',
     '../_base_/default_runtime.py',
@@ -77,7 +76,6 @@ model = dict(
         num_blocks=6,
         dim_feedforward=[256, ] * 6,
         output_shape=[400, 400],
-        num_attached_conv=0,
         debug=True,
     ),
 
