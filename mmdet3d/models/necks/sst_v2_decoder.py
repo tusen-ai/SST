@@ -75,7 +75,7 @@ class SSTv2Decoder(SSTv2):
         encoder_out = voxel_info_encoder["output"]
 
         # store original input as ground truth (mayby in masked input layer)
-        ground_truth = voxel_info_decoder['voxel_feats'].clone()
+        ground_truth = voxel_info_decoder['voxel_feats']
         voxel_info_decoder['gt'] = ground_truth.clone()
 
         # if in_channel project encoder output to right dimension
@@ -92,7 +92,7 @@ class SSTv2Decoder(SSTv2):
         # replace masked voxels with masking token
         dec2masked_idx = voxel_info_decoder["dec2masked_idx"]
         n_masked = voxel_info_decoder["n_masked"]
-        masked_tokens = self.mask_token.repeat(n_masked)
+        masked_tokens = self.mask_token.repeat(n_masked, 1)
         voxel_feat[dec2masked_idx] = masked_tokens
         voxel_info_decoder['voxel_feats'] = voxel_feat
 
