@@ -1,7 +1,7 @@
 # Used to try same settings as Zoeeeing as presented here: https://github.com/TuSimple/SST/issues/18
 _base_ = [
     '../_base_/models/sst_base.py',
-    '../_base_/datasets/nus-3d-2sweep.py',
+    '../_base_/datasets/nus-3d-1sweep.py',
     '../_base_/schedules/cosine_2x.py',
     '../_base_/default_runtime.py',
 ]
