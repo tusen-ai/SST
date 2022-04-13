@@ -13,25 +13,24 @@ RUN apt-get update && apt-get install -y ffmpeg libsm6 libxext6 git ninja-build 
     && rm -rf /var/lib/apt/lists/*
 
 # Install MMCV, MMDetection and MMSegmentation
-RUN pip install mmcv-full==1.3.8 -f https://download.openmmlab.com/mmcv/dist/cu102/torch1.9.0/index.html
+#RUN pip install mmcv-full==1.3.8 -f https://download.openmmlab.com/mmcv/dist/cu102/torch1.9.0/index.html
+#RUN git clone https://github.com/open-mmlab/mmcv.git /mmcv
+#WORKDIR /mmcv
+#RUN MMCV_WITH_OPS=1 pip install -e . 
+RUN pip install mmcv-full==1.4.0 -f https://download.openmmlab.com/mmcv/dist/cu102/torch1.9.0/index.html
 RUN pip install mmdet==2.14.0
 RUN pip install mmsegmentation==0.14.1
-
-# Install MMDetection3D
-RUN conda clean --all
-RUN git clone https://github.com/open-mmlab/mmdetection3d.git /mmdetection3d
-WORKDIR /mmdetection3d
-ENV FORCE_CUDA="1"
-RUN pip install -r requirements/build.txt
-RUN pip install --no-cache-dir -e .
 
 # Install MMDetection3D
 RUN conda clean --all
 RUN git clone https://github.com/Jaxang/SST.git /sst
 WORKDIR /sst
 ENV FORCE_CUDA="1"
+ARG TORCH_CUDA_ARCH_LIST="Volta;Turing;Ampere"
+ENV TORCH_CUDA_ARCH_LIST="${TORCH_CUDA_ARCH_LIST}"
 RUN pip install -r requirements/build.txt
 RUN pip install --no-cache-dir -e .
+# removed -e
 
 RUN pip install ipdb
 RUN pip install numba==0.48
@@ -40,3 +39,4 @@ RUN pip install numba==0.48
 RUN conda install cython
 RUN pip uninstall pycocotools --no-cache-dir -y
 RUN pip install mmpycocotools --no-cache-dir --force --no-deps
+

@@ -1,7 +1,7 @@
 # If point cloud range is changed, the models should also change their point
 # cloud range accordingly
 point_cloud_range = [-49.95, -49.95, -4.95, 49.95, 49.95, 2.95]
-number_of_sweeps = 1  # Extra sweeps to be merged. Max is 10.
+number_of_sweeps = 0  # Extra sweeps to be merged. Max is 10.
 # For nuScenes we usually do 10-class detection
 class_names = [
     'car', 'truck', 'trailer', 'bus', 'construction_vehicle', 'bicycle',
