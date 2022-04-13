@@ -45,6 +45,6 @@ echo "Copying of dataset to repo in tempdir is now done."
 echo ""
 
 cd $TMPDIR/SST_$GPU_TYPE
-singularity exec --pwd $TMPDIR/SST_$GPU_TYPE /cephyr/NOBACKUP/groups/snic2021-7-127/eliassv/sst_env/mmdetection3d_alvis3.sif bash tools/dist_train.sh configs/sst_refactor/$CONFIG.py $GPUS_PER_NODE --port=$MASTER_PORT --work-dir /cephyr/NOBACKUP/groups/snic2021-7-127/eliassv/jobs/$JOB_ID --cfg-options evaluation.pklfile_prefix=/cephyr/NOBACKUP/groups/snic2021-7-127/eliassv/jobs/$JOB_ID/results evaluation.metric=nuscenes
+singularity exec --pwd $TMPDIR/SST_$GPU_TYPE /cephyr/NOBACKUP/groups/snic2021-7-127/eliassv/sst_env/mmdetection3d_alvis3.sif bash tools/dist_train.sh configs/sst_refactor/$CONFIG.py $GPUS_PER_NODE --work-dir /cephyr/NOBACKUP/groups/snic2021-7-127/eliassv/jobs/$JOB_ID --cfg-options evaluation.pklfile_prefix=/cephyr/NOBACKUP/groups/snic2021-7-127/eliassv/jobs/$JOB_ID/results evaluation.metric=nuscenes
 
 cp /cephyr/NOBACKUP/groups/snic2021-7-127/eliassv/slurm-out/slurm-$JOB_ID.out /cephyr/NOBACKUP/groups/snic2021-7-127/eliassv/jobs/$JOB_ID
