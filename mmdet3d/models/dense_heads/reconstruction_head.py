@@ -169,8 +169,8 @@ class ReconstructionHead(BaseModule):
         pred_num_points_unmasked = pred_dict["pred_num_points_unmasked"]
         gt_num_points_masked = pred_dict["gt_num_points_masked"]
         gt_num_points_unmasked = pred_dict["gt_num_points_unmasked"]
-        loss_num_points_masked = smooth_l1_loss(pred_num_points_masked, gt_num_points_masked, reduction="mean")
-        loss_num_points_unmasked = smooth_l1_loss(pred_num_points_unmasked, gt_num_points_unmasked, reduction="mean")
+        loss_num_points_masked = smooth_l1_loss(pred_num_points_masked, gt_num_points_masked.float(), reduction="mean")
+        loss_num_points_unmasked = smooth_l1_loss(pred_num_points_unmasked, gt_num_points_unmasked.float(), reduction="mean")
 
         return dict(
             loss_occupied=loss_occupied,

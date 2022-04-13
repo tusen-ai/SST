@@ -56,6 +56,7 @@ model = dict(
         drop_info=drop_info,
         pos_temperature=10000,
         normalize_pos=False,
+        mute=True
     ),
 
     backbone = dict(
@@ -90,12 +91,23 @@ model = dict(
 )
 
 # runtime settings
-runner = dict(type='EpochBasedRunner', max_epochs=12)
-evaluation = dict(interval=12)
+epochs = 12
+runner = dict(type='EpochBasedRunner', max_epochs=epochs)
+evaluation = dict(interval=epochs+1)  # Don't evaluate when doing pretraining
+workflow = [("train", 1), ("val", 1)]  # But calculate val loss after each epoch
 
 fp16 = dict(loss_scale=32.0)
-workflow = [("train", 1), ("val", 1)]
 data = dict(
     samples_per_gpu=1,
     workers_per_gpu=4,
+    # Trin with less of the dataset
+    #train=dict(
+    #    type="NuScenesDataset",
+    #    load_interval=5
+    #    ),
+    # Validate with less of the dataset for speed
+    val=dict(
+        type="NuScenesDataset",
+        load_interval=5
+    )
 )
