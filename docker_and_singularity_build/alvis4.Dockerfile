@@ -35,6 +35,7 @@ RUN pip install --no-cache-dir -e .
 
 RUN pip install ipdb
 RUN pip install numba==0.48
+RUN pip install numpy==1.22.3
 
 # uninstall pycocotools installed by nuscenes-devkit and reinstall mmpycocotools
 RUN conda install cython
