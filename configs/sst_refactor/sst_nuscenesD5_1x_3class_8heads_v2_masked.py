@@ -94,7 +94,7 @@ runner = dict(type='EpochBasedRunner', max_epochs=12)
 evaluation = dict(interval=12)
 
 fp16 = dict(loss_scale=32.0)
-workflow: [("train", 1), ("val", 1)]
+workflow = [("train", 1), ("val", 1)]
 data = dict(
     samples_per_gpu=1,
     workers_per_gpu=4,

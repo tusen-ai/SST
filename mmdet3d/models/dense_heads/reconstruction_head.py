@@ -1,6 +1,6 @@
 import numpy as np
 import torch
-from torch.nn.functional import l1_loss, mse_loss, smooth_l1_loss, binary_cross_entropy, sigmoid
+from torch.nn.functional import l1_loss, mse_loss, smooth_l1_loss, binary_cross_entropy_with_logits
 from mmcv.runner import BaseModule, force_fp32
 from mmcv.cnn import build_norm_layer
 from torch import nn as nn
@@ -81,7 +81,7 @@ class ReconstructionHead(BaseModule):
         """Initialize neural network layers of the head."""
         self.conv_occupied = nn.Conv1d(self.feat_channels, 1, 1)
         self.conv_num_points = nn.Conv1d(self.feat_channels, 1, 1)
-        self.conv_reg = nn.Conv1d(self.feat_channels, self.num_reg_points * 3, 1)
+        # self.conv_reg = nn.Conv1d(self.feat_channels, self.num_reg_points * 3, 1)
 
     def _apply_1dconv(self, conv, x):
         x = x.unsqueeze(0).transpose(1, 2)
@@ -107,7 +107,7 @@ class ReconstructionHead(BaseModule):
         unmasked_predictions = predictions[voxel_info_decoder["dec2unmasked_idx"]]
 
         # TODO: Do occupied loss
-        pred_occupied = sigmoid(self._apply_1dconv(self.conv_occupied, predictions).view(-1))
+        pred_occupied = self._apply_1dconv(self.conv_occupied, predictions).view(-1)
 
         # Predict number of points loss
         pred_num_points_masked = self._apply_1dconv(self.conv_num_points, masked_predictions).view(-1)
@@ -163,7 +163,7 @@ class ReconstructionHead(BaseModule):
         """
         pred_occupied = pred_dict["pred_occupied"]
         gt_occupied = pred_dict["gt_occupied"]
-        loss_occupied = binary_cross_entropy(pred_occupied, gt_occupied)
+        loss_occupied = binary_cross_entropy_with_logits(pred_occupied, gt_occupied)
 
         pred_num_points_masked = pred_dict["pred_num_points_masked"]
         pred_num_points_unmasked = pred_dict["pred_num_points_unmasked"]
