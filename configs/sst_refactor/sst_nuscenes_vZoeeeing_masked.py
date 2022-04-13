@@ -1,5 +1,5 @@
 _base_ = [
-    './sst_nuscenesD5_1x_3class_8heads_2v.py.py',
+    './sst_nuscenes_vZoeeeing.py'
 ]
 
 drop_info_training ={
@@ -22,17 +22,16 @@ model = dict(
     type='DynamicVoxelNet',
 
     voxel_encoder=dict(
-        type='DynamicVFE',
         return_gt_points=True
     ),
 
     middle_encoder=dict(
-        type='SSTInputLayerV2Masked',
         drop_info=drop_info,
     ),
 
     backbone=dict(
         type='SSTv2',
+        num_attached_conv=0,
         masked=True
     ),
 
@@ -58,14 +57,14 @@ model = dict(
 )
 
 # runtime settings
-epochs = 12
+epochs = 24
 runner = dict(type='EpochBasedRunner', max_epochs=epochs)
 evaluation = dict(interval=epochs+1)  # Don't evaluate when doing pretraining
 workflow = [("train", 1), ("val", 1)]  # But calculate val loss after each epoch
 
 fp16 = dict(loss_scale=32.0)
 data = dict(
-    samples_per_gpu=1,
+    samples_per_gpu=4,
     workers_per_gpu=4,
     # Trin with less of the dataset
     #train=dict(
