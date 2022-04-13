@@ -5,9 +5,9 @@
 #SBATCH -N 1
 #SBATCH --output=/cephyr/NOBACKUP/groups/snic2021-7-127/eliassv/slurm-out/slurm-%j.out
 #SBATCH -J "MNMG PyTorch"  # multi node, multi GPU
-CONFIG=sst_nuscenesD5_1x_3class_8heads_v2
-GPUS_PER_NODE=4
-GPU_TYPE=A40
+export CONFIG=sst_nuscenesD5_1x_3class_8heads_v2
+export GPUS_PER_NODE=4
+export GPU_TYPE=A40
 
 echo $HOSTNAME
 echo $SLURM_JOB_NODELIST
@@ -45,6 +45,6 @@ echo "Copying of dataset to repo in tempdir is now done."
 echo ""
 
 cd $TMPDIR/SST_$GPU_TYPE
-singularity exec --pwd $TMPDIR/SST_$GPU_TYPE /cephyr/NOBACKUP/groups/snic2021-7-127/eliassv/sst_env/mmdetection3d_alvis3.sif bash tools/dist_train.sh configs/sst_refactor/$CONFIG.py $GPUS_PER_NODE --work-dir /cephyr/NOBACKUP/groups/snic2021-7-127/eliassv/jobs/$JOB_ID --cfg-options evaluation.pklfile_prefix=/cephyr/NOBACKUP/groups/snic2021-7-127/eliassv/jobs/$JOB_ID/results evaluation.metric=nuscenes
+singularity exec --pwd $TMPDIR/SST_$GPU_TYPE /cephyr/NOBACKUP/groups/snic2021-7-127/eliassv/sst_env/mmdetection3d_alvis3.sif bash job_scripts/temp.sh
 
 cp /cephyr/NOBACKUP/groups/snic2021-7-127/eliassv/slurm-out/slurm-$JOB_ID.out /cephyr/NOBACKUP/groups/snic2021-7-127/eliassv/jobs/$JOB_ID
