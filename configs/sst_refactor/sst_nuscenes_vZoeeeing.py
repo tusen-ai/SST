@@ -80,7 +80,7 @@ model = dict(
 )
 
 # runtime settings
-runner = dict(type='EpochBasedRunner', max_epochs=12)
+runner = dict(type='EpochBasedRunner', max_epochs=24)
 evaluation = dict(interval=12)
 
 fp16 = dict(loss_scale=32.0)
