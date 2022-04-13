@@ -82,7 +82,7 @@ model = dict(
 
 # runtime settings
 runner = dict(type='EpochBasedRunner', max_epochs=24)
-evaluation = dict(interval=12)
+evaluation = dict(interval=24)
 
 fp16 = dict(loss_scale=32.0)
 data = dict(
