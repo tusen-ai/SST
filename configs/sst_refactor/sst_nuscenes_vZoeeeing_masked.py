@@ -2,6 +2,7 @@ _base_ = [
     './sst_nuscenes_vZoeeeing.py'
 ]
 
+window_shape = (16, 16, 1) # 12 * 0.32m
 drop_info_training ={
     0:{'max_tokens':30, 'drop_range':(0, 30)},
     1:{'max_tokens':60, 'drop_range':(30, 60)},
@@ -26,7 +27,17 @@ model = dict(
     ),
 
     middle_encoder=dict(
+        _delete_=True,
+        type='SSTInputLayerV2Masked',
+        window_shape=window_shape,
+        sparse_shape=(400, 400, 1),
+        shuffle_voxels=True,
+        debug=True,
         drop_info=drop_info,
+        pos_temperature=10000,
+        normalize_pos=False,
+        mute=True,
+        masking_ratio=0.7
     ),
 
     backbone=dict(
