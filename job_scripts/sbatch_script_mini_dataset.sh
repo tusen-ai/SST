@@ -8,6 +8,7 @@
 CONFIG=sst_nuscenesD5_1x_3class_8heads_v2
 GPUS_PER_NODE=4
 GPU_TYPE=A40
+# Options for GPU type are T4 or A40. Choose A40 also when running on V100, A100 or A100fat.
 
 echo $HOSTNAME
 echo $SLURM_JOB_NODELIST
@@ -29,7 +30,7 @@ echo ""
 echo "Copying of repo to tempdir is now done."
 echo ""
 
-######################## DO NOT EXIST YET ##################################################
+######################## DOES NOT EXIST YET ##################################################
 echo ""
 echo "Start copying nusenes info to '$TMPDIR/SST_$GPU_TYPE/'"
 tar -xf /cephyr/NOBACKUP/groups/snic2021-7-127/eliassv/nuscenes_info/nuscenes_mini_infos.zip -C $TMPDIR/SST_$GPU_TYPE
@@ -37,7 +38,7 @@ echo ""
 echo "Copying of nusenes info to repo in tempdir is now done."
 echo ""
 
-######################## DO NOT EXIST YET ##################################################
+######################## DOES NOT EXIST YET ##################################################
 echo ""
 echo "Start copying dataset to '$TMPDIR/SST_$GPU_TYPE/'"
 source ./copy_mini.sh
@@ -45,6 +46,6 @@ echo ""
 echo "Copying of dataset to repo in tempdir is now done."
 echo ""
 
-singularity exec --pwd $TMPDIR/ /cephyr/NOBACKUP/groups/snic2021-7-127/eliassv/sst_env/mmdetection3d_alvis3.sif bash tools/dist_train.sh configs/sst_refactor/$CONFIG.py $GPUS_PER_NODE --work-dir /cephyr/NOBACKUP/groups/snic2021-7-127/eliassv/jobs/$JOB_ID --cfg-options evaluation.pklfile_prefix=/cephyr/NOBACKUP/groups/snic2021-7-127/eliassv/jobs/$JOB_ID/results evaluation.metric=nuscenes
+singularity exec --pwd $TMPDIR/ /cephyr/NOBACKUP/groups/snic2021-7-127/eliassv/sst_env/mmdetection3d_$GPU_TYPE.sif bash tools/dist_train.sh configs/sst_refactor/$CONFIG.py $GPUS_PER_NODE --work-dir /cephyr/NOBACKUP/groups/snic2021-7-127/eliassv/jobs/$JOB_ID --cfg-options evaluation.pklfile_prefix=/cephyr/NOBACKUP/groups/snic2021-7-127/eliassv/jobs/$JOB_ID/results evaluation.metric=nuscenes
 
 cp /cephyr/NOBACKUP/groups/snic2021-7-127/eliassv/slurm-out/slurm-$JOB_ID.out /cephyr/NOBACKUP/groups/snic2021-7-127/eliassv/jobs/$JOB_ID
