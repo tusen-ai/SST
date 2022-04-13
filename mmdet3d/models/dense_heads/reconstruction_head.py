@@ -1,24 +1,8 @@
-import numpy as np
 import torch
-from torch.nn.functional import l1_loss, mse_loss, smooth_l1_loss, binary_cross_entropy_with_logits
+from torch.nn.functional import smooth_l1_loss, binary_cross_entropy_with_logits
 from mmcv.runner import BaseModule, force_fp32
-from mmcv.cnn import build_norm_layer
 from torch import nn as nn
-
-from mmdet3d.core import (PseudoSampler, box3d_multiclass_nms, limit_period,
-                          xywhr2xyxyr, box3d_multiclass_wnms)
-from mmdet.core import (build_anchor_generator, build_assigner,
-                        build_bbox_coder, build_sampler, multi_apply)
 from mmdet.models import HEADS
-from ..builder import build_loss
-from .train_mixins import AnchorTrainMixin
-
-from mmdet3d.core.bbox.structures import LiDARInstance3DBoxes
-
-from ipdb import set_trace
-from mmdet.core.bbox.iou_calculators.builder import IOU_CALCULATORS
-from mmcv.utils import build_from_cfg
-
 
 @HEADS.register_module()
 class ReconstructionHead(BaseModule):

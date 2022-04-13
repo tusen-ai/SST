@@ -76,6 +76,15 @@ class SSTInputLayerV2Masked(SSTInputLayerV2):
         non_zero_voxels = torch.where(tmp)
         n_points_per_voxel = torch.zeros(max_index, device=voxel_feats.device, dtype=torch.long)
         n_points_per_voxel[non_zero_voxels] = tmp[non_zero_voxels].long()
+
+        input_index = (
+            voxel_coors[:, 0] * vz * vy * vx +  # batch
+            voxel_coors[:, 1] * vy * vx +  # z
+            voxel_coors[:, 2] * vx +  # y
+            voxel_coors[:, 3]  # x
+        )
+        n_points_per_voxel = n_points_per_voxel[input_index]
+
         gt_dict["num_points_per_voxel"] = n_points_per_voxel
 
         n_unmasked_voxels = int(len(voxel_feats)*self.masking_ratio)
