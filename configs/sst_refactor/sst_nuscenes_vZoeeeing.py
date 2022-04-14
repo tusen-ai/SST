@@ -79,7 +79,6 @@ model = dict(
     ),
 
 )
-workflow = [("train", 1), ("val", 1)]  # Calculate val loss after each epoch
 # runtime settings
 runner = dict(type='EpochBasedRunner', max_epochs=24)
 evaluation = dict(interval=24)
