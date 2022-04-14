@@ -74,10 +74,6 @@ class SSTv2Decoder(SSTv2):
         # _____ add in encoder output to the input _____
         encoder_out = voxel_info_encoder["output"]
 
-        # store original input as ground truth (mayby in masked input layer)
-        ground_truth = voxel_info_decoder['voxel_feats']
-        voxel_info_decoder['gt'] = ground_truth.clone()
-
         # if in_channel project encoder output to right dimension
         if hasattr(self, 'enc2dec_projection'):
             encoder_out = self.enc2dec_projection(encoder_out)
@@ -95,6 +91,18 @@ class SSTv2Decoder(SSTv2):
         masked_tokens = self.mask_token.repeat(n_masked, 1)
         voxel_feat[dec2masked_idx] = masked_tokens
         voxel_info_decoder['voxel_feats'] = voxel_feat
+
+        if self.debug:
+            test_mapping = -torch.ones(len(voxel_feat))
+            test_mapping[dec2enc_idx] = 0
+            test_mapping[dec2masked_idx] = 1
+            assert not (test_mapping == -1).any(), "All voxels are not covered by the enc_idx and masked_idx"
+            assert test_mapping.sum() == n_masked, \
+                f"The number of masked voxels differ {test_mapping.sum()} vs {n_masked}"
+            assert (1-test_mapping).sum() == len(voxel_feat)-n_masked, \
+                f"The number of unmasked voxels differ  {(1-test_mapping).sum()} vs {len(voxel_feat)-n_masked}"
+            assert (test_mapping[voxel_info_decoder["dec2input_idx"]].long() == voxel_info_decoder["mask"].long()
+                    ).all(), "The masking of the mismatches"
 
         voxel_info_decoder = super().forward(voxel_info_decoder)
 

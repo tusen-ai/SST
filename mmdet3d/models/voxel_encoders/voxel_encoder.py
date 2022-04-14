@@ -304,7 +304,7 @@ class DynamicVFE(nn.Module):
         if self.return_point_feats:
             return point_feats
         if self.return_gt_points:
-            canvas_z = round(
+            """canvas_z = round(
                 (self.point_cloud_range[5] - self.point_cloud_range[2]) / self.vz)
             canvas_y = round(
                 (self.point_cloud_range[4] - self.point_cloud_range[1]) / self.vy)
@@ -317,8 +317,8 @@ class DynamicVFE(nn.Module):
                 coors[:, 1] * canvas_y * canvas_x +  # z voxel
                 coors[:, 2] * canvas_x +  # y voxel
                 coors[:, 3]  # x voxel
-            )
-            return voxel_feats, voxel_coors, low_level_point_feature, indices
+            )"""
+            return voxel_feats, voxel_coors, low_level_point_feature, coors
         return voxel_feats, voxel_coors
 
 

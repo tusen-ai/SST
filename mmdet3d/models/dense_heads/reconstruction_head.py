@@ -84,36 +84,32 @@ class ReconstructionHead(BaseModule):
                 and direction predictions.
         """
         voxel_info, voxel_info_decoder, voxel_info_encoder = x
-        predictions = voxel_info_decoder["output"]  # [N, C]
+        dec_out = voxel_info_decoder["output"]  # [N, C]
         gt_dict = voxel_info_decoder["gt_dict"]
 
-        masked_predictions = predictions[voxel_info_decoder["dec2masked_idx"]]
-        unmasked_predictions = predictions[voxel_info_decoder["dec2unmasked_idx"]]
+        masked_predictions = dec_out[voxel_info_decoder["dec2masked_idx"]]
+        unmasked_predictions = dec_out[voxel_info_decoder["dec2unmasked_idx"]]
 
         # TODO: Do occupied loss
-        pred_occupied = self._apply_1dconv(self.conv_occupied, predictions).view(-1)
+        pred_occupied = self._apply_1dconv(self.conv_occupied, dec_out).view(-1)
 
         # Predict number of points loss
         pred_num_points_masked = self._apply_1dconv(self.conv_num_points, masked_predictions).view(-1)
         pred_num_points_unmasked = self._apply_1dconv(self.conv_num_points, unmasked_predictions).view(-1)
 
-
         gt_num_points = gt_dict["num_points_per_voxel"]
         gt_num_points_masked = gt_num_points[voxel_info_decoder["masked_idx"]]
         gt_num_points_unmasked = gt_num_points[voxel_info_decoder["unmasked_idx"]]
 
-        pred_dict = {}
+        pred_dict = {
+            "pred_occupied": pred_occupied,
+            "gt_occupied": torch.ones_like(pred_occupied, dtype=pred_occupied.dtype, device=pred_occupied.device),
+            "pred_num_points_masked": pred_num_points_masked,
+            "pred_num_points_unmasked": pred_num_points_unmasked,
+            "gt_num_points_masked": gt_num_points_masked,
+            "gt_num_points_unmasked": gt_num_points_unmasked}
 
-        pred_dict["pred_occupied"] = pred_occupied
-        pred_dict["gt_occupied"] = torch.ones_like(
-            pred_occupied, dtype=pred_occupied.dtype, device=pred_occupied.device)
-
-        pred_dict["pred_num_points_masked"] = pred_num_points_masked
-        pred_dict["pred_num_points_unmasked"] = pred_num_points_unmasked
-        pred_dict["gt_num_points_masked"] = gt_num_points_masked
-        pred_dict["gt_num_points_unmasked"] = gt_num_points_unmasked
-
-        return (pred_dict,)
+        return (pred_dict, ) # Output needs to be tuple
 
     def loss(self,
              pred_dict,

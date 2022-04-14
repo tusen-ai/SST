@@ -51,118 +51,111 @@ class SSTInputLayerV2Masked(SSTInputLayerV2):
             pos_temperature=pos_temperature,
             mute=mute,
         )
-        self.masking_ratio = 0.7
+        self.masking_ratio = masking_ratio
 
     @auto_fp16(apply_to=('voxel_feat', ))
-    def forward(self, voxel_feats, voxel_coors, low_level_point_feature, indices, batch_size=None):
+    def forward(self, voxel_feats, voxel_coors, low_level_point_feature, point_coors, batch_size=None):
         '''
         Args:
             voxel_feats: shape=[N, C], N is the voxel num in the batch.
-            coors: shape=[N, 4], [b, z, y, x]
+            voxel_coors: shape=[N, 4], [b, z, y, x], voxel coordinate for each voxel
             low_level_point_feature: shape=[Np, 10], Np is the point num in the batch.
-            indices: shape=[Np], point voxel index
+            point_coors: shape=[Np, 4], [b, z, y, x], voxel coordinate for each point
         Returns:
             feat_3d_dict: contains region features (feat_3d) of each region batching level. Shape of feat_3d is [num_windows, num_max_tokens, C].
             flat2win_inds_list: two dict containing transformation information for non-shifted grouping and shifted grouping, respectively. The two dicts are used in function flat2window and window2flat.
             voxel_info: dict containing extra information of each voxel for usage in the backbone.
         '''
+        batch_size = voxel_coors[:, 0].max() + 1
+
         # TODO: Potentially add fake voxels
         gt_dict = {}
 
-        batch_size = voxel_coors[:, 0].max() + 1
+        # Points per voxel
         vx, vy, vz = self.sparse_shape
-        max_index = batch_size.long().item()*vz*vy*vx
-        tmp = torch.bincount(indices.long())
-        non_zero_voxels = torch.where(tmp)
-        n_points_per_voxel = torch.zeros(max_index, device=voxel_feats.device, dtype=torch.long)
-        n_points_per_voxel[non_zero_voxels] = tmp[non_zero_voxels].long()
-
-        input_index = (
+        point_indices = (
+            point_coors[:, 0] * vz * vy * vx +  # batch
+            point_coors[:, 1] * vy * vx +  # z
+            point_coors[:, 2] * vx +  # y
+            point_coors[:, 3]  # x
+        ).long()
+        voxel_indices = (
             voxel_coors[:, 0] * vz * vy * vx +  # batch
             voxel_coors[:, 1] * vy * vx +  # z
             voxel_coors[:, 2] * vx +  # y
             voxel_coors[:, 3]  # x
         ).long()
-        n_points_per_voxel = n_points_per_voxel[input_index]
-
+        n_points_per_voxel_with_zeros = torch.bincount(point_indices)
+        point_indices_unique = n_points_per_voxel_with_zeros.nonzero()
+        n_points_per_voxel = n_points_per_voxel_with_zeros[voxel_indices]
         gt_dict["num_points_per_voxel"] = n_points_per_voxel
+        assert (n_points_per_voxel > 0).all(), "Exists voxel without connected points"
+        assert len(point_indices_unique) == len(voxel_indices), \
+            "There is a mismatch between point indices and voxel indices"
+        assert (point_indices_unique == voxel_indices.sort()).all(), \
+            "There is a mismatch between point indices and voxel indices"
 
-        n_unmasked_voxels = int(len(voxel_feats)*self.masking_ratio)
-        mask = torch.ones(len(voxel_feats), device=voxel_feats.device)
-        mask[:n_unmasked_voxels] = 0
-        shuffle_inds = torch.randperm(len(voxel_feats))
+        # Masking voxels: True -> masked, False -> unmasked
+        mask = torch.rand(len(voxel_feats), device=voxel_feats.device) < self.masking_ratio
+        masked_idx, unmasked_idx = mask.nonzero(), (~mask).nonzero()
+        n_masked_voxels, n_unmasked_voxels = len(masked_idx), len(unmasked_idx)
 
-        mask = mask[shuffle_inds]
-        unmasked_idx = shuffle_inds[:n_unmasked_voxels]
-        masked_idx = shuffle_inds[n_unmasked_voxels:]
-
-        unmasked_voxels = voxel_feats[unmasked_idx]
-        unmasked_voxel_coors = voxel_coors[unmasked_idx]
-
-        # Might drop voxels
+        # Get info for decoder input, Might drop voxels
         voxel_info_decoder = super().forward(voxel_feats, voxel_coors, batch_size=None)
         assert len(voxel_info_decoder["voxel_feats"]) == len(voxel_feats), "Dropping is not allowed for reconstruction"
 
-        voxel_info_decoder["n_unmasked"] = n_unmasked_voxels
-        voxel_info_decoder["n_masked"] = len(voxel_feats) - n_unmasked_voxels
-        voxel_info_decoder["mask"] = mask
-        voxel_info_decoder["unmasked_idx"] = unmasked_idx
-        voxel_info_decoder["masked_idx"] = masked_idx
-
+        unmasked_voxels = voxel_feats[unmasked_idx]
+        unmasked_voxel_coors = voxel_coors[unmasked_idx]
+        # Get info for encoder input, Might drop voxels
         voxel_info_encoder = super().forward(unmasked_voxels, unmasked_voxel_coors, batch_size=None)
         assert len(voxel_info_encoder["voxel_feats"]) == n_unmasked_voxels, "Dropping is not allowed for reconstruction"
 
+        voxel_info_decoder["mask"] = mask
+        voxel_info_decoder["n_unmasked"] = n_unmasked_voxels
+        voxel_info_decoder["n_masked"] = n_masked_voxels
+        voxel_info_decoder["unmasked_idx"] = unmasked_idx
+        voxel_info_decoder["masked_idx"] = masked_idx
+
+        # Index mapping from decoder output to other
         dec2dec_input_idx = torch.argsort(voxel_info_decoder["original_index"])
         dec2masked_idx = dec2dec_input_idx[masked_idx]
         dec2unmasked_idx = dec2dec_input_idx[unmasked_idx]
         dec2enc_idx = dec2unmasked_idx[voxel_info_encoder["original_index"]]
-        voxel_info_decoder["dec2input_idx"] = dec2dec_input_idx
 
+        voxel_info_decoder["dec2input_idx"] = dec2dec_input_idx
         voxel_info_decoder["dec2unmasked_idx"] = dec2unmasked_idx
         voxel_info_decoder["dec2masked_idx"] = dec2masked_idx
         voxel_info_decoder["dec2enc_idx"] = dec2enc_idx
 
         # Debug - sanity check
-        decoder_feats = voxel_info_decoder["voxel_feats"]
-        decoder_coors = voxel_info_decoder["voxel_coors"]
+        if self.debug:
+            decoder_feats = voxel_info_decoder["voxel_feats"]
+            decoder_coors = voxel_info_decoder["voxel_coors"]
 
-        encoder_feats = voxel_info_encoder["voxel_feats"]
-        encoder_coors = voxel_info_encoder["voxel_coors"]
+            encoder_feats = voxel_info_encoder["voxel_feats"]
+            encoder_coors = voxel_info_encoder["voxel_coors"]
 
-        assert torch.allclose(decoder_feats[dec2dec_input_idx], voxel_feats), \
-            "The mapping from decoder to decoder input is invalid"
-        assert torch.allclose(decoder_coors[dec2dec_input_idx], voxel_coors.long()), \
-            "The mapping from decoder to decoder input is invalid"
+            assert torch.allclose(decoder_feats[dec2dec_input_idx], voxel_feats), \
+                "The mapping from decoder to decoder input is invalid"
+            assert torch.allclose(decoder_coors[dec2dec_input_idx], voxel_coors.long()), \
+                "The mapping from decoder to decoder input is invalid"
 
-        assert torch.allclose(decoder_feats[dec2masked_idx], voxel_feats[masked_idx]), \
-            "The mapping from decoder to masked input is invalid"
-        assert torch.allclose(decoder_coors[dec2masked_idx], voxel_coors[masked_idx].long()), \
-            "The mapping from decoder to masked input is invalid"
+            assert torch.allclose(decoder_feats[dec2masked_idx], voxel_feats[masked_idx]), \
+                "The mapping from decoder to masked input is invalid"
+            assert torch.allclose(decoder_coors[dec2masked_idx], voxel_coors[masked_idx].long()), \
+                "The mapping from decoder to masked input is invalid"
 
-        assert torch.allclose(decoder_feats[dec2unmasked_idx], unmasked_voxels), \
-            "The mapping from decoder to encoder input is invalid"
-        assert torch.allclose(decoder_coors[dec2unmasked_idx], unmasked_voxel_coors.long()), \
-            "The mapping from decoder to encoder input is invalid"
+            assert torch.allclose(decoder_feats[dec2unmasked_idx], unmasked_voxels), \
+                "The mapping from decoder to encoder input is invalid"
+            assert torch.allclose(decoder_coors[dec2unmasked_idx], unmasked_voxel_coors.long()), \
+                "The mapping from decoder to encoder input is invalid"
 
-        assert torch.allclose(decoder_feats[dec2enc_idx], encoder_feats), \
-            "The mapping from decoder to encoder output is invalid"
-        assert torch.allclose(decoder_coors[dec2enc_idx], encoder_coors.long()), \
-            "The mapping from decoder to encoder output is invalid"
+            assert torch.allclose(decoder_feats[dec2enc_idx], encoder_feats), \
+                "The mapping from decoder to encoder output is invalid"
+            assert torch.allclose(decoder_coors[dec2enc_idx], encoder_coors.long()), \
+                "The mapping from decoder to encoder output is invalid"
 
         voxel_info_decoder["gt_dict"] = gt_dict
         voxel_info_encoder["voxel_info_decoder"] = voxel_info_decoder
 
         return voxel_info_encoder
-
-    def set_drop_info(self):
-        if hasattr(self, 'drop_info'):
-            return
-        meta = self.meta_drop_info
-        if isinstance(meta, tuple):
-            if self.training:
-                self.drop_info = meta[0]
-            else:
-                self.drop_info = meta[1]
-        else:
-            self.drop_info = meta
-        print(f'drop_info is set to {self.drop_info}, in input_layer')
