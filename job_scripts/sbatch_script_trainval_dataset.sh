@@ -35,7 +35,7 @@ echo ""
 
 echo ""
 echo "Start copying nusenes info to '$TMPDIR/SST_$GPU_TYPE/'"
-unzip -q -d $TMPDIR/SST_$GPU_TYPE /cephyr/NOBACKUP/groups/snic2021-7-127/eliassv/nuscenes_info/nuscenes_infos.zip
+unzip -q -d $TMPDIR/SST_$GPU_TYPE /cephyr/NOBACKUP/groups/snic2021-7-127/eliassv/nuscenes_info/nuscenes_infos_v2.zip
 echo ""
 echo "Copying of nusenes info to repo in tempdir is now done."
 echo ""
