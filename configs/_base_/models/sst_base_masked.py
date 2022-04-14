@@ -1,0 +1,4 @@
+model = dict(
+    type='DynamicVoxelNet',
+
+)

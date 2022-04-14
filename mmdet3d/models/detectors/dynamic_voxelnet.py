@@ -37,9 +37,13 @@ class DynamicVoxelNet(VoxelNet):
     def extract_feat(self, points, img_metas):
         """Extract features from points."""
         voxels, coors = self.voxelize(points)
-        voxel_features, feature_coors = self.voxel_encoder(voxels, coors)
         batch_size = coors[-1, 0].item() + 1
-        x = self.middle_encoder(voxel_features, feature_coors, batch_size)
+        if self.voxel_encoder.return_gt_points:
+            voxel_features, feature_coors, low_level_point_feature, indices = self.voxel_encoder(voxels, coors)
+            x = self.middle_encoder(voxel_features, feature_coors, low_level_point_feature, indices, batch_size)
+        else:
+            voxel_features, feature_coors = self.voxel_encoder(voxels, coors)
+            x = self.middle_encoder(voxel_features, feature_coors, batch_size)
         x = self.backbone(x)
         if self.with_neck:
             x = self.neck(x)

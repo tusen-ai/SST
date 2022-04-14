@@ -6,7 +6,7 @@ _base_ = [
 ]
 
 voxel_size = (0.25, 0.25, 8)
-window_shape = (12, 12, 1) # 12 * 0.32m
+window_shape = (16, 16, 1) # 12 * 0.32m
 point_cloud_range = [-50, -50, -5, 50, 50, 3]
 drop_info_training ={
     0:{'max_tokens':30, 'drop_range':(0, 30)},
@@ -57,10 +57,10 @@ model = dict(
 
     backbone=dict(
         type='SSTv2',
-        d_model=[128,] * 1,
-        nhead=[1, ] * 1,
-        num_blocks=1,
-        dim_feedforward=[128, ] * 1,
+        d_model=[128,] * 6,
+        nhead=[8, ] * 6,
+        num_blocks=6,
+        dim_feedforward=[256, ] * 6,
         output_shape=[400, 400],
         num_attached_conv=3,
         conv_kwargs=[
@@ -76,17 +76,12 @@ model = dict(
 )
 
 # runtime settings
+workflow = [("train", 1), ("val", 1)]  # Calculate val loss after each epoch
 runner = dict(type='EpochBasedRunner', max_epochs=12)
 evaluation = dict(interval=12)
 
 fp16 = dict(loss_scale=32.0)
-"""data = dict(
-    samples_per_gpu=1,
+data = dict(
+    samples_per_gpu=4,
     workers_per_gpu=4,
-    train=dict(
-        type='RepeatDataset',
-        times=1,
-        dataset=dict(
-            load_interval=5)
-    ),
-)"""
+)
