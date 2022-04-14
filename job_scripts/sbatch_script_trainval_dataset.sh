@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 #SBATCH -A SNIC2021-7-127 -p alvis
-#SBATCH -t 12:00:00
+#SBATCH -t 16:00:00
 #SBATCH --gpus-per-node=A40:4
 #SBATCH -N 1
 #SBATCH --output=/cephyr/NOBACKUP/groups/snic2021-7-127/eliassv/slurm-out/slurm-%j.out
-#SBATCH -J "MNMG PyTorch"  # multi node, multi GPU
+#SBATCH -J "Some job name"  # multi node, multi GPU
 CONFIG=${1:-sst_nuscenesD5_1x_3class_8heads_v2}
 echo $CONFIG
 GPUS_PER_NODE=4
