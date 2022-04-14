@@ -10,6 +10,7 @@ echo $CONFIG
 GPUS_PER_NODE=4
 export GPU_TYPE=A40
 # Options for GPU type are T4 or A40. Choose A40 also when running on V100, A100 or A100fat.
+export OMP_NUM_THREADS=16  # cores per gpu (16 cores per A40)
 
 echo $HOSTNAME
 echo $SLURM_JOB_NODELIST
