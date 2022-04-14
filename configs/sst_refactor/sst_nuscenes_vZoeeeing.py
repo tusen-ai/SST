@@ -89,6 +89,9 @@ data = dict(
     samples_per_gpu=4,
     workers_per_gpu=4,
 )
+
+workflow = [('train', 1), ('val', 1)]  # Includes validation at same frequency as training.
+
 """train=dict(
         type='RepeatDataset',
         times=1,
