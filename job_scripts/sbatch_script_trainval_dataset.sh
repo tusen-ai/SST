@@ -1,15 +1,16 @@
 #!/usr/bin/env bash
 #SBATCH -A SNIC2021-7-127 -p alvis
-#SBATCH -t 12:00:00
+#SBATCH -t 16:00:00
 #SBATCH --gpus-per-node=A40:4
 #SBATCH -N 1
 #SBATCH --output=/cephyr/NOBACKUP/groups/snic2021-7-127/eliassv/slurm-out/slurm-%j.out
-#SBATCH -J "MNMG PyTorch"  # multi node, multi GPU
+#SBATCH -J "Some job name"  # multi node, multi GPU
 CONFIG=${1:-sst_nuscenesD5_1x_3class_8heads_v2}
 echo $CONFIG
 GPUS_PER_NODE=4
 export GPU_TYPE=A40
 # Options for GPU type are T4 or A40. Choose A40 also when running on V100, A100 or A100fat.
+export OMP_NUM_THREADS=16  # cores per gpu (16 cores per A40)
 
 echo $HOSTNAME
 echo $SLURM_JOB_NODELIST
@@ -34,7 +35,7 @@ echo ""
 
 echo ""
 echo "Start copying nusenes info to '$TMPDIR/SST_$GPU_TYPE/'"
-unzip -q -d $TMPDIR/SST_$GPU_TYPE /cephyr/NOBACKUP/groups/snic2021-7-127/eliassv/nuscenes_info/nuscenes_infos.zip
+unzip -q -d $TMPDIR/SST_$GPU_TYPE /cephyr/NOBACKUP/groups/snic2021-7-127/eliassv/nuscenes_info/nuscenes_infos_v2.zip
 echo ""
 echo "Copying of nusenes info to repo in tempdir is now done."
 echo ""
