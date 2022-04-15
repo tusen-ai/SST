@@ -59,7 +59,8 @@ class SSTInputLayerV2Masked(SSTInputLayerV2):
         Args:
             voxel_feats: shape=[N, C], N is the voxel num in the batch.
             voxel_coors: shape=[N, 4], [b, z, y, x], voxel coordinate for each voxel
-            low_level_point_feature: shape=[Np, 10], Np is the point num in the batch.
+            low_level_point_feature: shape=[Np, 10] [x, y, z, I, cl_x, cl_y, cl_z, ce_x, ce_y, ce_z],
+             Np is the point num in the batch, cl_* and ce_*  is position relative to the cluster and center resp.
             point_coors: shape=[Np, 4], [b, z, y, x], voxel coordinate for each point
         Returns:
             feat_3d_dict: contains region features (feat_3d) of each region batching level. Shape of feat_3d is [num_windows, num_max_tokens, C].
@@ -67,6 +68,7 @@ class SSTInputLayerV2Masked(SSTInputLayerV2):
             voxel_info: dict containing extra information of each voxel for usage in the backbone.
         '''
         batch_size = voxel_coors[:, 0].max() + 1
+        device = voxel_feats.device
 
         # TODO: Potentially add fake voxels
         gt_dict = {}
@@ -95,8 +97,28 @@ class SSTInputLayerV2Masked(SSTInputLayerV2):
         assert (point_indices_unique == voxel_indices.sort()).all(), \
             "There is a mismatch between point indices and voxel indices"
 
+        # Get points per voxel
+        n_points = 100
+        pred_dims = 3
+        points_rel_center = low_level_point_feature[:, -3:]
+        assert pred_dims in [2, 3], "Either use x and y or x, y, and z"
+        points_rel_center = points_rel_center[:, :pred_dims]
+        shuffle = torch.argsort(torch.rand(len(point_indices)))  # Shuffle to drop random points
+        restore = torch.argsort(shuffle)
+        inner_voxel_inds = get_inner_win_inds(point_indices[shuffle])[restore]  # fixes one index per point per voxel
+        drop_mask = inner_voxel_inds < n_points
+        points_rel_center = points_rel_center[drop_mask]
+        inner_voxel_inds = inner_voxel_inds[drop_mask].long()
+        dropped_point_indices = point_indices.long()
+        gt_points = torch.zeros((len(voxel_feats), n_points, 3), device=device, dtype=points_rel_center.dtype)
+        gt_points_padding = torch.zeros((len(voxel_feats), n_points), device=device, dtype=torch.long)
+        gt_points[dropped_point_indices, inner_voxel_inds] = points_rel_center
+        gt_points_padding[dropped_point_indices, inner_voxel_inds] = 1  # padded -> 0, not_padded -> 1
+        gt_dict["points_per_voxel"] = gt_points
+        gt_dict["points_per_voxel_padding"] = gt_points_padding
+
         # Masking voxels: True -> masked, False -> unmasked
-        mask = torch.rand(len(voxel_feats), device=voxel_feats.device) < self.masking_ratio
+        mask = torch.rand(len(voxel_feats), device=device) < self.masking_ratio
         masked_idx, unmasked_idx = mask.nonzero(), (~mask).nonzero()
         n_masked_voxels, n_unmasked_voxels = len(masked_idx), len(unmasked_idx)
 
