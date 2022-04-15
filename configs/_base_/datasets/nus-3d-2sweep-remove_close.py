@@ -40,7 +40,8 @@ train_pipeline = [
         file_client_args=file_client_args,
         pad_empty_sweeps=True,
         remove_close=True,
-        close_radius=2.0),
+        close_radius=2.0,
+        test_mode=True,),
     dict(type='LoadAnnotations3D', with_bbox_3d=True, with_label_3d=True),
     dict(
         type='GlobalRotScaleTrans',
@@ -68,7 +69,8 @@ test_pipeline = [
         file_client_args=file_client_args,
         pad_empty_sweeps=True,
         remove_close=True,
-        close_radius=2.0),
+        close_radius=2.0,
+        test_mode=True,),
     dict(
         type='MultiScaleFlipAug3D',
         img_scale=(1333, 800),
@@ -105,7 +107,8 @@ eval_pipeline = [
         file_client_args=file_client_args,
         pad_empty_sweeps=True,
         remove_close=True,
-        close_radius=2.0),
+        close_radius=2.0,
+        test_mode=True,),
     dict(
         type='DefaultFormatBundle3D',
         class_names=class_names,
