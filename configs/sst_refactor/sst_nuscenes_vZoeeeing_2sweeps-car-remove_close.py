@@ -1,7 +1,7 @@
 # Used to try same settings as Zoeeeing as presented here: https://github.com/TuSimple/SST/issues/18
 _base_ = [
     '../_base_/models/sst_base.py',
-    '../_base_/datasets/nus-3d-1sweep-car-remove_close.py',
+    '../_base_/datasets/nus-3d-2sweep-car-remove_close.py',
     '../_base_/schedules/cosine_2x.py',
     '../_base_/default_runtime.py',
 ]
@@ -24,7 +24,7 @@ drop_info_test = {
     4: {'max_tokens': 256, 'drop_range': (200, 100000)},  # 16*16=256
 }
 drop_info = (drop_info_training, drop_info_test)
-shifts_list = [(0, 0), (window_shape[0] // 2, window_shape[1] // 2)]
+shifts_list = [(0, 0), (window_shape[0]//2, window_shape[1]//2)]
 
 model = dict(
     type='DynamicVoxelNet',
