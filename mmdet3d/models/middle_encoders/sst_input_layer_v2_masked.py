@@ -34,12 +34,15 @@ class SSTInputLayerV2Masked(SSTInputLayerV2):
         drop_info,
         window_shape,
         sparse_shape,
+        voxel_size,
         shuffle_voxels=True,
         debug=True,
         normalize_pos=False,
         pos_temperature=10000,
         mute=False,
-        masking_ratio=0.7
+        masking_ratio=0.7,
+        drop_points_th=100,
+        pred_dims=3
         ):
         super().__init__(
             drop_info,
@@ -52,6 +55,9 @@ class SSTInputLayerV2Masked(SSTInputLayerV2):
             mute=mute,
         )
         self.masking_ratio = masking_ratio
+        self.drop_points_th = drop_points_th
+        self.pred_dims = pred_dims
+        self.voxel_size = voxel_size
 
     @auto_fp16(apply_to=('voxel_feat', ))
     def forward(self, voxel_feats, voxel_coors, low_level_point_feature, point_coors, batch_size=None):
@@ -99,30 +105,34 @@ class SSTInputLayerV2Masked(SSTInputLayerV2):
             "There is a mismatch between point indices and voxel indices"
 
         # Get points per voxel
-        n_points = 100
-        pred_dims = 3
         points_rel_center = low_level_point_feature[:, -3:]
-        assert pred_dims in [2, 3], "Either use x and y or x, y, and z"
-        points_rel_center = points_rel_center[:, :pred_dims]
+        assert self.pred_dims in [2, 3], "Either use x and y or x, y, and z"
+        points_rel_center = points_rel_center[:, :self.pred_dims].clone()
+        pointr_rel_norm = 1/torch.tensor(self.voxel_size, device=device).view(1, -1)
+        points_rel_center = points_rel_center*pointr_rel_norm  # x,y,z all in range [-1, 1]
+
         shuffle = torch.argsort(torch.rand(len(point_indices)))  # Shuffle to drop random points
         restore = torch.argsort(shuffle)
         inner_voxel_inds = get_inner_win_inds(point_indices[shuffle])[restore]  # fixes one index per point per voxel
-        drop_mask = inner_voxel_inds < n_points
+        drop_mask = inner_voxel_inds < self.drop_points_th
+
         points_rel_center = points_rel_center[drop_mask]
         inner_voxel_inds = inner_voxel_inds[drop_mask].long()
         dropped_point_indices = point_indices[drop_mask].long()
-        gt_points = torch.zeros((max_num_voxels, n_points, 3), device=device, dtype=points_rel_center.dtype)
-        gt_points_padding = torch.zeros((max_num_voxels, n_points), device=device, dtype=torch.long)
+
+        gt_points = torch.zeros((max_num_voxels, self.drop_points_th, 3), device=device, dtype=points_rel_center.dtype)
+        gt_points_padding = torch.zeros((max_num_voxels, self.drop_points_th), device=device, dtype=torch.long)
         gt_points[dropped_point_indices, inner_voxel_inds] = points_rel_center
         gt_points_padding[dropped_point_indices, inner_voxel_inds] = 1  # padded -> 0, not_padded -> 1
         gt_dict["points_per_voxel"] = gt_points[voxel_indices]
         gt_dict["points_per_voxel_padding"] = gt_points_padding[voxel_indices]
-        assert len(gt_dict["points_per_voxel"]) == len(voxel_feats), "Wrong number of point collections"
+
         test_mask = n_points_per_voxel < 100
         _n_points_per_voxel = gt_dict["points_per_voxel_padding"].sum(1)
+        assert len(gt_dict["points_per_voxel"]) == len(voxel_feats), "Wrong number of point collections"
         assert (_n_points_per_voxel[test_mask] == n_points_per_voxel[test_mask]).all(), \
             "Mismatch between counted points per voxel and found points per voxel"
-        assert (_n_points_per_voxel[~test_mask] >= 100).all(), \
+        assert (_n_points_per_voxel[~test_mask] == 100).all(), \
             "Error when dropping points for voxels with to many points"
 
         # Masking voxels: True -> masked, False -> unmasked

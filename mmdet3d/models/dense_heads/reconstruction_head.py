@@ -1,10 +1,10 @@
 import torch
-from torch.nn.functional import smooth_l1_loss, binary_cross_entropy_with_logits
+from torch.nn.functional import smooth_l1_loss, binary_cross_entropy_with_logits, tanh
 from mmcv.runner import BaseModule, force_fp32
 from torch import nn as nn
 from mmdet.models import HEADS
 
-from mmdet3d.models import ChamferDistance
+from mmdet3d.models.losses.chamfer_distance import ChamferDistance
 
 
 @HEADS.register_module()
@@ -40,12 +40,14 @@ class ReconstructionHead(BaseModule):
                  test_cfg,
                  feat_channels=256,
                  num_reg_points=20,
+                 pred_dims=3,
                  only_masked=True,
                  init_cfg=None):
         super().__init__(init_cfg=init_cfg)
         self.in_channels = in_channels
         self.feat_channels = feat_channels
         self.num_reg_points = num_reg_points
+        self.pred_dims = pred_dims
         self.train_cfg = train_cfg
         self.test_cfg = test_cfg
         self.fp16_enabled = False
@@ -69,7 +71,7 @@ class ReconstructionHead(BaseModule):
         """Initialize neural network layers of the head."""
         self.conv_occupied = nn.Conv1d(self.feat_channels, 1, 1)
         self.conv_num_points = nn.Conv1d(self.feat_channels, 1, 1)
-        self.conv_reg = nn.Conv1d(self.feat_channels, self.num_reg_points * 3, 1)
+        self.conv_chamfer = nn.Conv1d(self.feat_channels, self.num_reg_points * self.pred_dims, 1)
 
     def _apply_1dconv(self, conv, x):
         x = x.unsqueeze(0).transpose(1, 2)
@@ -99,39 +101,47 @@ class ReconstructionHead(BaseModule):
         gt_occupied = torch.ones_like(pred_occupied, dtype=pred_occupied.dtype, device=pred_occupied.device)
 
         # Predict number of points loss
-        pred_num_points_masked = self._apply_1dconv(self.conv_num_points, masked_predictions).view(-1)
-        pred_num_points_unmasked = self._apply_1dconv(self.conv_num_points, unmasked_predictions).view(-1)
-
         gt_num_points = gt_dict["num_points_per_voxel"]
+
+        pred_num_points_masked = self._apply_1dconv(self.conv_num_points, masked_predictions).view(-1)
         gt_num_points_masked = gt_num_points[voxel_info_decoder["masked_idx"]]
-        gt_num_points_unmasked = gt_num_points[voxel_info_decoder["unmasked_idx"]]
+
+        if not self.only_masked:
+            pred_num_points_unmasked = self._apply_1dconv(self.conv_num_points, unmasked_predictions).view(-1)
+            gt_num_points_unmasked = gt_num_points[voxel_info_decoder["unmasked_idx"]]
 
         # Chamfer loss
-        pred_points_masked = self._apply_1dconv(self.conv_reg, masked_predictions).view(
-            len(masked_predictions), self.num_reg_points, 3)
-        pred_points_unmasked = self._apply_1dconv(self.conv_reg, unmasked_predictions).view(
-            len(unmasked_predictions), self.num_reg_points, 3)
         gt_points_per_voxel = gt_dict["points_per_voxel"]
+        gt_points_padding = gt_dict["points_per_voxel_padding"]
+
+        pred_points_masked = self._apply_1dconv(self.conv_reg, masked_predictions).view(
+            len(masked_predictions), self.num_reg_points, self.pred_dims)
+        pred_points_masked = tanh(pred_points_masked)  # map to [-1, 1]
         gt_points_masked = gt_points_per_voxel[voxel_info_decoder["masked_idx"]]
         gt_points_unmasked = gt_points_per_voxel[voxel_info_decoder["unmasked_idx"]]
-        gt_points_padding = gt_dict["points_per_voxel_padding"]
-        gt_point_padding_masked = gt_points_padding[voxel_info_decoder["masked_idx"]]
-        gt_point_padding_unmasked = gt_points_padding[voxel_info_decoder["unmasked_idx"]]
+
+        if not self.only_masked:
+            pred_points_unmasked = self._apply_1dconv(self.conv_reg, unmasked_predictions).view(
+                len(unmasked_predictions), self.num_reg_points, self.pred_dims)
+            pred_points_unmasked = tanh(pred_points_unmasked)  # map to [-1, 1]
+            gt_point_padding_masked = gt_points_padding[voxel_info_decoder["masked_idx"]]
+            gt_point_padding_unmasked = gt_points_padding[voxel_info_decoder["unmasked_idx"]]
 
         pred_dict = {
             "pred_occupied": pred_occupied,
             "gt_occupied": gt_occupied,
             "pred_num_points_masked": pred_num_points_masked,
-            "pred_num_points_unmasked": pred_num_points_unmasked,
             "gt_num_points_masked": gt_num_points_masked,
-            "gt_num_points_unmasked": gt_num_points_unmasked,
             "pred_points_masked": pred_points_masked,
-            "pred_points_unmasked": pred_points_unmasked,
             "gt_points_masked": gt_points_masked,
             "gt_points_unmasked": gt_points_unmasked,
-            "gt_point_padding_masked": gt_point_padding_masked,
-            "gt_point_padding_unmasked": gt_point_padding_unmasked,
         }
+        if not self.only_masked:
+            pred_dict["pred_num_points_unmasked"] = pred_num_points_unmasked
+            pred_dict["gt_num_points_unmasked"] = gt_num_points_unmasked
+            pred_dict["pred_points_unmasked"] = pred_points_unmasked
+            pred_dict["gt_point_padding_masked"] = gt_point_padding_masked
+            pred_dict["gt_point_padding_unmasked"] = gt_point_padding_unmasked
 
         return (pred_dict, ) # Output needs to be tuple
 
@@ -170,28 +180,34 @@ class ReconstructionHead(BaseModule):
         loss_occupied = binary_cross_entropy_with_logits(pred_occupied, gt_occupied)
 
         pred_num_points_masked = pred_dict["pred_num_points_masked"]
-        pred_num_points_unmasked = pred_dict["pred_num_points_unmasked"]
         gt_num_points_masked = pred_dict["gt_num_points_masked"]
-        gt_num_points_unmasked = pred_dict["gt_num_points_unmasked"]
         loss_num_points_masked = smooth_l1_loss(pred_num_points_masked, gt_num_points_masked.float(), reduction="mean")
-        loss_num_points_unmasked = smooth_l1_loss(pred_num_points_unmasked, gt_num_points_unmasked.float(), reduction="mean")
+        if not self.only_masked:
+            pred_num_points_unmasked = pred_dict["pred_num_points_unmasked"]
+            gt_num_points_unmasked = pred_dict["gt_num_points_unmasked"]
+            loss_num_points_unmasked = smooth_l1_loss(pred_num_points_unmasked, gt_num_points_unmasked.float(), reduction="mean")
 
         pred_points_masked = pred_dict["pred_points_masked"]
-        pred_points_unmasked = pred_dict["pred_points_unmasked"]
         gt_points_masked = pred_dict["gt_points_masked"]
-        gt_points_unmasked = pred_dict["gt_points_unmasked"]
         gt_point_padding_masked = pred_dict["gt_point_padding_masked"]
-        gt_point_padding_unmasked = pred_dict["gt_point_padding_unmasked"]
-        loss_chamfer_masked = self.chamfer_loss(
-            source=pred_points_masked, target=gt_points_masked, src_weight=gt_point_padding_masked)
-        loss_chamfer_unmasked = self.chamfer_loss(
-            source=pred_points_unmasked, target=gt_points_unmasked, src_weight=gt_point_padding_unmasked)
+        loss_chamfer_src_masked, loss_chamfer_dst_masked = self.chamfer_loss(
+            source=pred_points_masked, target=gt_points_masked, dst_weight=gt_point_padding_masked)
+        if not self.only_masked:
+            pred_points_unmasked = pred_dict["pred_points_unmasked"]
+            gt_points_unmasked = pred_dict["gt_points_unmasked"]
+            gt_point_padding_unmasked = pred_dict["gt_point_padding_unmasked"]
+            loss_chamfer_src_unmasked, loss_chamfer_dst_unmasked = self.chamfer_loss(
+                source=pred_points_unmasked, target=gt_points_unmasked, dst_weight=gt_point_padding_unmasked)
 
-        return dict(
+        loss_dict = dict(
             loss_occupied=loss_occupied,
             loss_num_points_masked=loss_num_points_masked,
-            loss_num_points_unmasked=loss_num_points_unmasked,
-            loss_chamfer_masked=loss_chamfer_masked,
-            loss_chamfer_unmasked=loss_chamfer_unmasked
-        )
+            loss_chamfer_src_masked=loss_chamfer_src_masked,
+            loss_chamfer_dst_masked=loss_chamfer_dst_masked,)
+        if not self.only_masked:
+            loss_dict["loss_num_points_unmasked"] = loss_num_points_unmasked
+            loss_dict["loss_chamfer_src_unmasked"] = loss_chamfer_src_unmasked
+            loss_dict["loss_chamfer_dst_unmasked"] = loss_chamfer_dst_unmasked
+
+        return loss_dict
 
