@@ -76,97 +76,43 @@ class SSTInputLayerV2Masked(SSTInputLayerV2):
         batch_size = int(voxel_coors[:, 0].max().item()) + 1
         device = voxel_feats.device
 
-        # TODO: Potentially add fake voxels
-        gt_dict = {}
+        gt_dict = self.get_ground_truth(
+            batch_size, device, low_level_point_feature, point_coors, voxel_coors, voxel_feats)
 
-        # Points per voxel
-        vx, vy, vz = self.sparse_shape
-        max_num_voxels = batch_size * vx * vy * vz
-        point_indices = (
-            point_coors[:, 0] * vz * vy * vx +  # batch
-            point_coors[:, 1] * vy * vx +  # z
-            point_coors[:, 2] * vx +  # y
-            point_coors[:, 3]  # x
-        ).long()
-        voxel_indices = (
-            voxel_coors[:, 0] * vz * vy * vx +  # batch
-            voxel_coors[:, 1] * vy * vx +  # z
-            voxel_coors[:, 2] * vx +  # y
-            voxel_coors[:, 3]  # x
-        ).long()
-        n_points_per_voxel_with_zeros = torch.bincount(point_indices)
-        point_indices_unique = n_points_per_voxel_with_zeros.nonzero()
-        n_points_per_voxel = n_points_per_voxel_with_zeros[voxel_indices]
-        gt_dict["num_points_per_voxel"] = n_points_per_voxel
-        assert (n_points_per_voxel > 0).all(), "Exists voxel without connected points"
-        assert len(point_indices_unique) == len(voxel_indices), \
-            "There is a mismatch between point indices and voxel indices"
-        assert (point_indices_unique == voxel_indices.sort()).all(), \
-            "There is a mismatch between point indices and voxel indices"
+        voxel_info_decoder, voxel_info_encoder = self.mask_voxels(device, voxel_coors, voxel_feats)
 
-        # Get points per voxel
-        points_rel_center = low_level_point_feature[:, -3:]
-        assert self.pred_dims in [2, 3], "Either use x and y or x, y, and z"
-        points_rel_center = points_rel_center[:, :self.pred_dims].clone()
-        pointr_rel_norm = 1/torch.tensor(self.voxel_size, device=device).view(1, -1)
-        points_rel_center = points_rel_center*pointr_rel_norm  # x,y,z all in range [-1, 1]
+        voxel_info_decoder["gt_dict"] = gt_dict
+        voxel_info_encoder["voxel_info_decoder"] = voxel_info_decoder
 
-        shuffle = torch.argsort(torch.rand(len(point_indices)))  # Shuffle to drop random points
-        restore = torch.argsort(shuffle)
-        inner_voxel_inds = get_inner_win_inds(point_indices[shuffle])[restore]  # fixes one index per point per voxel
-        drop_mask = inner_voxel_inds < self.drop_points_th
+        return voxel_info_encoder
 
-        points_rel_center = points_rel_center[drop_mask]
-        inner_voxel_inds = inner_voxel_inds[drop_mask].long()
-        dropped_point_indices = point_indices[drop_mask].long()
-
-        gt_points = torch.zeros((max_num_voxels, self.drop_points_th, 3), device=device, dtype=points_rel_center.dtype)
-        gt_points_padding = torch.zeros((max_num_voxels, self.drop_points_th), device=device, dtype=torch.long)
-        gt_points[dropped_point_indices, inner_voxel_inds] = points_rel_center
-        gt_points_padding[dropped_point_indices, inner_voxel_inds] = 1  # padded -> 0, not_padded -> 1
-        gt_dict["points_per_voxel"] = gt_points[voxel_indices]
-        gt_dict["points_per_voxel_padding"] = gt_points_padding[voxel_indices]
-
-        test_mask = n_points_per_voxel < 100
-        _n_points_per_voxel = gt_dict["points_per_voxel_padding"].sum(1)
-        assert len(gt_dict["points_per_voxel"]) == len(voxel_feats), "Wrong number of point collections"
-        assert (_n_points_per_voxel[test_mask] == n_points_per_voxel[test_mask]).all(), \
-            "Mismatch between counted points per voxel and found points per voxel"
-        assert (_n_points_per_voxel[~test_mask] == 100).all(), \
-            "Error when dropping points for voxels with to many points"
-
+    def mask_voxels(self, device, voxel_coors, voxel_feats):
         # Masking voxels: True -> masked, False -> unmasked
         mask = torch.rand(len(voxel_feats), device=device) < self.masking_ratio
         masked_idx, unmasked_idx = mask.nonzero().ravel(), (~mask).nonzero().ravel()
         n_masked_voxels, n_unmasked_voxels = len(masked_idx), len(unmasked_idx)
-
         # Get info for decoder input, Might drop voxels
         voxel_info_decoder = super().forward(voxel_feats, voxel_coors, batch_size=None)
         assert len(voxel_info_decoder["voxel_feats"]) == len(voxel_feats), "Dropping is not allowed for reconstruction"
-
         unmasked_voxels = voxel_feats[unmasked_idx]
         unmasked_voxel_coors = voxel_coors[unmasked_idx]
         # Get info for encoder input, Might drop voxels
         voxel_info_encoder = super().forward(unmasked_voxels, unmasked_voxel_coors, batch_size=None)
         assert len(voxel_info_encoder["voxel_feats"]) == n_unmasked_voxels, "Dropping is not allowed for reconstruction"
-
         voxel_info_decoder["mask"] = mask
         voxel_info_decoder["n_unmasked"] = n_unmasked_voxels
         voxel_info_decoder["n_masked"] = n_masked_voxels
         voxel_info_decoder["unmasked_idx"] = unmasked_idx
         voxel_info_decoder["masked_idx"] = masked_idx
-
         # Index mapping from decoder output to other
         dec2dec_input_idx = torch.argsort(voxel_info_decoder["original_index"])
         dec2masked_idx = dec2dec_input_idx[masked_idx]
         dec2unmasked_idx = dec2dec_input_idx[unmasked_idx]
         dec2enc_idx = dec2unmasked_idx[voxel_info_encoder["original_index"]]
-
         voxel_info_decoder["dec2input_idx"] = dec2dec_input_idx
         voxel_info_decoder["dec2unmasked_idx"] = dec2unmasked_idx
         voxel_info_decoder["dec2masked_idx"] = dec2masked_idx
         voxel_info_decoder["dec2enc_idx"] = dec2enc_idx
-
         # Debug - sanity check
         if self.debug:
             decoder_feats = voxel_info_decoder["voxel_feats"]
@@ -194,8 +140,59 @@ class SSTInputLayerV2Masked(SSTInputLayerV2):
                 "The mapping from decoder to encoder output is invalid"
             assert torch.allclose(decoder_coors[dec2enc_idx], encoder_coors.long()), \
                 "The mapping from decoder to encoder output is invalid"
+        return voxel_info_decoder, voxel_info_encoder
 
-        voxel_info_decoder["gt_dict"] = gt_dict
-        voxel_info_encoder["voxel_info_decoder"] = voxel_info_decoder
-
-        return voxel_info_encoder
+    def get_ground_truth(self, batch_size, device, low_level_point_feature, point_coors, voxel_coors, voxel_feats):
+        # TODO: Potentially add fake voxels
+        gt_dict = {}
+        # Points per voxel
+        vx, vy, vz = self.sparse_shape
+        max_num_voxels = batch_size * vx * vy * vz
+        point_indices = (
+                point_coors[:, 0] * vz * vy * vx +  # batch
+                point_coors[:, 1] * vy * vx +  # z
+                point_coors[:, 2] * vx +  # y
+                point_coors[:, 3]  # x
+        ).long()
+        voxel_indices = (
+                voxel_coors[:, 0] * vz * vy * vx +  # batch
+                voxel_coors[:, 1] * vy * vx +  # z
+                voxel_coors[:, 2] * vx +  # y
+                voxel_coors[:, 3]  # x
+        ).long()
+        n_points_per_voxel_with_zeros = torch.bincount(point_indices)
+        point_indices_unique = n_points_per_voxel_with_zeros.nonzero()
+        n_points_per_voxel = n_points_per_voxel_with_zeros[voxel_indices]
+        gt_dict["num_points_per_voxel"] = n_points_per_voxel
+        assert (n_points_per_voxel > 0).all(), "Exists voxel without connected points"
+        assert len(point_indices_unique) == len(voxel_indices), \
+            "There is a mismatch between point indices and voxel indices"
+        assert (point_indices_unique == voxel_indices.sort()).all(), \
+            "There is a mismatch between point indices and voxel indices"
+        # Get points per voxel
+        points_rel_center = low_level_point_feature[:, -3:]
+        assert self.pred_dims in [2, 3], "Either use x and y or x, y, and z"
+        points_rel_center = points_rel_center[:, :self.pred_dims].clone()
+        pointr_rel_norm = 1 / torch.tensor(self.voxel_size, device=device).view(1, -1)
+        points_rel_center = points_rel_center * pointr_rel_norm  # x,y,z all in range [-1, 1]
+        shuffle = torch.argsort(torch.rand(len(point_indices)))  # Shuffle to drop random points
+        restore = torch.argsort(shuffle)
+        inner_voxel_inds = get_inner_win_inds(point_indices[shuffle])[restore]  # fixes one index per point per voxel
+        drop_mask = inner_voxel_inds < self.drop_points_th
+        points_rel_center = points_rel_center[drop_mask]
+        inner_voxel_inds = inner_voxel_inds[drop_mask].long()
+        dropped_point_indices = point_indices[drop_mask].long()
+        gt_points = torch.zeros((max_num_voxels, self.drop_points_th, 3), device=device, dtype=points_rel_center.dtype)
+        gt_points_padding = torch.zeros((max_num_voxels, self.drop_points_th), device=device, dtype=torch.long)
+        gt_points[dropped_point_indices, inner_voxel_inds] = points_rel_center
+        gt_points_padding[dropped_point_indices, inner_voxel_inds] = 1  # padded -> 0, not_padded -> 1
+        gt_dict["points_per_voxel"] = gt_points[voxel_indices]
+        gt_dict["points_per_voxel_padding"] = gt_points_padding[voxel_indices]
+        test_mask = n_points_per_voxel < 100
+        _n_points_per_voxel = gt_dict["points_per_voxel_padding"].sum(1)
+        assert len(gt_dict["points_per_voxel"]) == len(voxel_feats), "Wrong number of point collections"
+        assert (_n_points_per_voxel[test_mask] == n_points_per_voxel[test_mask]).all(), \
+            "Mismatch between counted points per voxel and found points per voxel"
+        assert (_n_points_per_voxel[~test_mask] == 100).all(), \
+            "Error when dropping points for voxels with to many points"
+        return gt_dict
