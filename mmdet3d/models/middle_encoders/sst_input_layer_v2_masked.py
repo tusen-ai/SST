@@ -67,7 +67,7 @@ class SSTInputLayerV2Masked(SSTInputLayerV2):
             flat2win_inds_list: two dict containing transformation information for non-shifted grouping and shifted grouping, respectively. The two dicts are used in function flat2window and window2flat.
             voxel_info: dict containing extra information of each voxel for usage in the backbone.
         '''
-        batch_size = voxel_coors[:, 0].max() + 1
+        batch_size = int(voxel_coors[:, 0].max().item()) + 1
         device = voxel_feats.device
 
         # TODO: Potentially add fake voxels
@@ -75,6 +75,7 @@ class SSTInputLayerV2Masked(SSTInputLayerV2):
 
         # Points per voxel
         vx, vy, vz = self.sparse_shape
+        max_num_voxels = batch_size * vx * vy * vz
         point_indices = (
             point_coors[:, 0] * vz * vy * vx +  # batch
             point_coors[:, 1] * vy * vx +  # z
@@ -109,13 +110,20 @@ class SSTInputLayerV2Masked(SSTInputLayerV2):
         drop_mask = inner_voxel_inds < n_points
         points_rel_center = points_rel_center[drop_mask]
         inner_voxel_inds = inner_voxel_inds[drop_mask].long()
-        dropped_point_indices = point_indices.long()
-        gt_points = torch.zeros((len(voxel_feats), n_points, 3), device=device, dtype=points_rel_center.dtype)
-        gt_points_padding = torch.zeros((len(voxel_feats), n_points), device=device, dtype=torch.long)
+        dropped_point_indices = point_indices[drop_mask].long()
+        gt_points = torch.zeros((max_num_voxels, n_points, 3), device=device, dtype=points_rel_center.dtype)
+        gt_points_padding = torch.zeros((max_num_voxels, n_points), device=device, dtype=torch.long)
         gt_points[dropped_point_indices, inner_voxel_inds] = points_rel_center
         gt_points_padding[dropped_point_indices, inner_voxel_inds] = 1  # padded -> 0, not_padded -> 1
-        gt_dict["points_per_voxel"] = gt_points
-        gt_dict["points_per_voxel_padding"] = gt_points_padding
+        gt_dict["points_per_voxel"] = gt_points[voxel_indices]
+        gt_dict["points_per_voxel_padding"] = gt_points_padding[voxel_indices]
+        assert len(gt_dict["points_per_voxel"]) == len(voxel_feats), "Wrong number of point collections"
+        test_mask = n_points_per_voxel < 100
+        _n_points_per_voxel = gt_dict["points_per_voxel_padding"].sum(1)
+        assert (_n_points_per_voxel[test_mask] == n_points_per_voxel[test_mask]).all(), \
+            "Mismatch between counted points per voxel and found points per voxel"
+        assert (_n_points_per_voxel[~test_mask] >= 100).all(), \
+            "Error when dropping points for voxels with to many points"
 
         # Masking voxels: True -> masked, False -> unmasked
         mask = torch.rand(len(voxel_feats), device=device) < self.masking_ratio
