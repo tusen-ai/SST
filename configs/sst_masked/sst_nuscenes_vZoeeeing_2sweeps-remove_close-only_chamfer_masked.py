@@ -77,7 +77,7 @@ model = dict(
         num_chamfer_points=10,
         only_masked=True,
         pred_dims=3,
-        loss_weights=None,
+        loss_weights=loss_weights,
     )
 )
 
