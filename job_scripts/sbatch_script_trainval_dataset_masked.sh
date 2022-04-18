@@ -50,7 +50,7 @@ echo ""
 cd $TMPDIR/SST_$GPU_TYPE
 singularity exec --pwd $TMPDIR/SST_$GPU_TYPE \
   /cephyr/NOBACKUP/groups/snic2021-7-127/eliassv/sst_env/mmdetection3d_$GPU_TYPE.sif \
-  bash tools/dist_train.sh configs/sst_refactor/$CONFIG.py $GPUS_PER_NODE \
+  bash tools/dist_train.sh configs/sst_masked/$CONFIG.py $GPUS_PER_NODE \
   --work-dir /cephyr/NOBACKUP/groups/snic2021-7-127/eliassv/jobs/$JOB_ID \
   evaluation.metric=nuscenes
 
