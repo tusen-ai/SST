@@ -91,8 +91,4 @@ fp16 = dict(loss_scale=32.0)
 data = dict(
     samples_per_gpu=4,
     workers_per_gpu=4,
-    val=dict(
-        type="NuScenesDataset",
-        load_interval=5
-    )
 )

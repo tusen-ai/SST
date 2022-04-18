@@ -5,7 +5,7 @@
 #SBATCH -N 1
 #SBATCH --output=/cephyr/NOBACKUP/groups/snic2021-7-127/eliassv/slurm-out/slurm-%j.out
 #SBATCH -J "Some job name"  # multi node, multi GPU
-CONFIG=${1:-sst_nuscenesD5_1x_3class_8heads_v2}
+CONFIG=${1:-sst_nuscenes_vZoeeeing_2sweeps-remove_close_masked}
 echo $CONFIG
 GPUS_PER_NODE=4
 export GPU_TYPE=A40
