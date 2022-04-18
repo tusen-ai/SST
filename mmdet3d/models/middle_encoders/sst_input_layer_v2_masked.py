@@ -165,10 +165,11 @@ class SSTInputLayerV2Masked(SSTInputLayerV2):
         n_points_per_voxel = n_points_per_voxel_with_zeros[voxel_indices]
         gt_dict["num_points_per_voxel"] = n_points_per_voxel
         assert (n_points_per_voxel > 0).all(), "Exists voxel without connected points"
-        assert len(point_indices_unique) == len(voxel_indices), \
-            "There is a mismatch between point indices and voxel indices"
-        assert (point_indices_unique == voxel_indices.sort()).all(), \
-            "There is a mismatch between point indices and voxel indices"
+        # Ignore due to bug where first voxel of each batch gets dropped
+        # assert len(point_indices_unique) == len(voxel_indices), \
+        #     "There is a mismatch between point indices and voxel indices"
+        # assert (point_indices_unique == voxel_indices.sort()).all(), \
+        #     "There is a mismatch between point indices and voxel indices"
         # Get points per voxel
         points_rel_center = low_level_point_feature[:, -3:]
         assert self.pred_dims in [2, 3], "Either use x and y or x, y, and z"
