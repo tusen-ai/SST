@@ -40,7 +40,8 @@ train_pipeline = [
         file_client_args=file_client_args,
         pad_empty_sweeps=True,
         remove_close=True,
-        close_radius=2.0),
+        close_radius=2.0,
+        test_mode=True,),
     dict(type='LoadAnnotations3D', with_bbox_3d=True, with_label_3d=True),
     dict(
         type='GlobalRotScaleTrans',
@@ -150,4 +151,3 @@ data = dict(
 # interval to be 24. Please change the interval accordingly if you do not
 # use a default schedule.
 evaluation = dict(interval=24, pipeline=eval_pipeline)
-c

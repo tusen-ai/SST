@@ -119,7 +119,7 @@ class SSTInputLayerV2Masked(SSTInputLayerV2):
 
         # Masking voxels: True -> masked, False -> unmasked
         mask = torch.rand(len(voxel_feats), device=device) < self.masking_ratio
-        masked_idx, unmasked_idx = mask.nonzero(), (~mask).nonzero()
+        masked_idx, unmasked_idx = mask.nonzero().ravel(), (~mask).nonzero().ravel()
         n_masked_voxels, n_unmasked_voxels = len(masked_idx), len(unmasked_idx)
 
         # Get info for decoder input, Might drop voxels

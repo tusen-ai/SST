@@ -93,7 +93,7 @@ class SSTv2Decoder(SSTv2):
         voxel_info_decoder['voxel_feats'] = voxel_feat
 
         if self.debug:
-            test_mapping = -torch.ones(len(voxel_feat))
+            test_mapping = -torch.ones(len(voxel_feat), device=voxel_feat.device)
             test_mapping[dec2enc_idx] = 0
             test_mapping[dec2masked_idx] = 1
             assert not (test_mapping == -1).any(), "All voxels are not covered by the enc_idx and masked_idx"
