@@ -22,8 +22,10 @@ export JOB_ID=$SLURM_JOB_ID
 export NGPUS_PER_NODE=$(echo "$SLURM_GPUS_PER_NODE" | sed 's/[A-Z0-9]*:\([0-9]*\)*/\1/')
 
 echo ""
-echo "This job $JOB_ID was started as: --dataroot $TMPDIR/SST_$GPU_TYPE/data/nuscenes
- --storage-dir /cephyr/NOBACKUP/groups/snic2021-7-127/eliassv/jobs/$JOB_ID --dataset=v1.0-trainval $@"
+echo "This job $JOB_ID was started as:
+  bash tools/dist_train.sh configs/sst_refactor/$CONFIG.py $GPUS_PER_NODE \
+    --work-dir /cephyr/NOBACKUP/groups/snic2021-7-127/eliassv/jobs/$JOB_ID \
+    ${@:2} --cfg-options evaluation.metric=nuscenes"
 echo ""
 
 echo ""
@@ -51,7 +53,7 @@ cd $TMPDIR/SST_$GPU_TYPE
 singularity exec --pwd $TMPDIR/SST_$GPU_TYPE \
   /cephyr/NOBACKUP/groups/snic2021-7-127/eliassv/sst_env/mmdetection3d_$GPU_TYPE.sif \
   bash tools/dist_train.sh configs/sst_refactor/$CONFIG.py $GPUS_PER_NODE \
-  --work-dir /cephyr/NOBACKUP/groups/snic2021-7-127/eliassv/jobs/$JOB_ID \
+  --work-dir /cephyr/NOBACKUP/groups/snic2021-7-127/eliassv/jobs/$JOB_ID ${@:2} \  # ${@:2} grabs everything after the second argument see examples here https://mmdetection3d.readthedocs.io/en/latest/1_exist_data_model.html#train-with-multiple-gpus
   --cfg-options evaluation.metric=nuscenes
 
 cp /cephyr/NOBACKUP/groups/snic2021-7-127/eliassv/slurm-out/slurm-$JOB_ID.out /cephyr/NOBACKUP/groups/snic2021-7-127/eliassv/jobs/$JOB_ID

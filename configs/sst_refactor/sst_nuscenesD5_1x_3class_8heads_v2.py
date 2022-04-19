@@ -79,6 +79,7 @@ model = dict(
 workflow = [("train", 1), ("val", 1)]  # Calculate val loss after each epoch
 runner = dict(type='EpochBasedRunner', max_epochs=12)
 evaluation = dict(interval=12)
+checkpoint_config = dict(interval=6)
 
 fp16 = dict(loss_scale=32.0)
 data = dict(
