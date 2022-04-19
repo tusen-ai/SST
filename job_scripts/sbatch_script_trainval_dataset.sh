@@ -25,7 +25,7 @@ echo ""
 echo "This job $JOB_ID was started as:
   bash tools/dist_train.sh configs/sst_refactor/$CONFIG.py $GPUS_PER_NODE \
     --work-dir /cephyr/NOBACKUP/groups/snic2021-7-127/eliassv/jobs/$JOB_ID \
-    ${@:2} --cfg-options evaluation.metric=nuscenes"
+    --cfg-options evaluation.metric=nuscenes" ${@:2}
 echo ""
 
 echo ""
@@ -53,7 +53,7 @@ cd $TMPDIR/SST_$GPU_TYPE
 singularity exec --pwd $TMPDIR/SST_$GPU_TYPE \
   /cephyr/NOBACKUP/groups/snic2021-7-127/eliassv/sst_env/mmdetection3d_$GPU_TYPE.sif \
   bash tools/dist_train.sh configs/sst_refactor/$CONFIG.py $GPUS_PER_NODE \
-  --work-dir /cephyr/NOBACKUP/groups/snic2021-7-127/eliassv/jobs/$JOB_ID ${@:2} \  # ${@:2} grabs everything after the second argument see examples here https://mmdetection3d.readthedocs.io/en/latest/1_exist_data_model.html#train-with-multiple-gpus
-  --cfg-options evaluation.metric=nuscenes
+  --work-dir /cephyr/NOBACKUP/groups/snic2021-7-127/eliassv/jobs/$JOB_ID \
+  --cfg-options evaluation.metric=nuscenes ${@:2}  # Uses sends everything after the first argument to overwrite cfg options
 
 cp /cephyr/NOBACKUP/groups/snic2021-7-127/eliassv/slurm-out/slurm-$JOB_ID.out /cephyr/NOBACKUP/groups/snic2021-7-127/eliassv/jobs/$JOB_ID

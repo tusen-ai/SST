@@ -86,6 +86,7 @@ model = dict(
 # optimizer
 lr = 0.0005  # max learning rate
 optimizer = dict(
+    _delete_=True,
     type='AdamW',
     lr=lr,
     betas=(0.95, 0.99),  # the momentum is change during training
@@ -93,6 +94,7 @@ optimizer = dict(
 optimizer_config = dict(grad_clip=dict(max_norm=10, norm_type=2))
 
 lr_config = dict(
+    _delete_=True,
     policy='CosineAnnealing',
     warmup='linear',
     warmup_iters=1000,
