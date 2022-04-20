@@ -82,14 +82,14 @@ model = dict(
 # runtime settings
 runner = dict(type='EpochBasedRunner', max_epochs=24)
 evaluation = dict(interval=24)
+workflow = [('train', 1), ('val', 1)]  # Includes validation at same frequency as training.
+checkpoint_config = dict(interval=6)
 
 fp16 = dict(loss_scale=32.0)
 data = dict(
     samples_per_gpu=4,
     workers_per_gpu=4,
 )
-
-workflow = [('train', 1), ('val', 1)]  # Includes validation at same frequency as training.
 
 """train=dict(
         type='RepeatDataset',
