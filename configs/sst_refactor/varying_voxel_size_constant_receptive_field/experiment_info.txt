@@ -4,6 +4,6 @@ Using 2 merged sweeps to stay constant with Johans resent trials, though we coul
 
 We have a receptive field equivalent to 0.25*16=4m.
 
-We decreased the batch size from 4 to 2 when we have have voxel size of 0.1.
+We decreased the batch size from 4 to 2 when we have have voxel size of 0.1. Though it crashed also with batch size 2.
 
-
+We will decrease the batch size from 4 to 1 when considering all classes and we have have voxel size of 0.1.
