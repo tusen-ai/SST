@@ -6,6 +6,7 @@
 #SBATCH --output=/cephyr/NOBACKUP/groups/snic2021-7-127/eliassv/slurm-out/slurm-%j.out
 #SBATCH -J "Some job name"  # multi node, multi GPU
 CONFIG=${1:-sst_nuscenes_vZoeeeing_2sweeps-remove_close_masked}
+REPO_NUMBER=${2:-1}  # Choose between repo 1 or 2
 echo $CONFIG
 GPUS_PER_NODE=4
 export GPU_TYPE=A40
@@ -30,7 +31,11 @@ echo ""
 
 echo ""
 echo "Start copying repo to '$TMPDIR'"
-cp -r /cephyr/NOBACKUP/groups/snic2021-7-127/eliassv/SST_$GPU_TYPE/ $TMPDIR/
+if [$REPO_NUMBER == 1]
+then
+   cp -r /cephyr/NOBACKUP/groups/snic2021-7-127/eliassv/SST_${GPU_TYPE}/ $TMPDIR/SST_${GPU_TYPE}
+else
+   cp -r /cephyr/NOBACKUP/groups/snic2021-7-127/eliassv/SST_${GPU_TYPE}_2/ $TMPDIR/SST_${GPU_TYPE}
 echo ""
 echo "Copying of repo to tempdir is now done."
 echo ""
@@ -54,8 +59,8 @@ singularity exec --pwd $TMPDIR/SST_$GPU_TYPE \
   /cephyr/NOBACKUP/groups/snic2021-7-127/eliassv/sst_env/mmdetection3d_$GPU_TYPE.sif \
   bash tools/dist_train.sh configs/sst_masked/$CONFIG.py $GPUS_PER_NODE \
   --work-dir /cephyr/NOBACKUP/groups/snic2021-7-127/eliassv/jobs/$JOB_ID \
-  --cfg-options evaluation.metric=nuscenes ${@:2}
-# ${@:2} grabs everything after the second argument these are used to overwrite settings in the config file
+  --cfg-options evaluation.metric=nuscenes ${@:3}
+# ${@:3} grabs everything after the third argument these are used to overwrite settings in the config file
 # e.g. load_from="config/path/epoch_n.pth" loads the weights from the provided model
 
 cp /cephyr/NOBACKUP/groups/snic2021-7-127/eliassv/slurm-out/slurm-$JOB_ID.out /cephyr/NOBACKUP/groups/snic2021-7-127/eliassv/jobs/$JOB_ID
