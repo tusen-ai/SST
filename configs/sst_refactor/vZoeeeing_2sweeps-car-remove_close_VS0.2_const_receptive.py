@@ -6,8 +6,8 @@ _base_ = [
     '../_base_/default_runtime.py',
 ]
 
-voxel_size = (0.1, 0.1, 8)
-window_shape = (16, 16, 1)  # 12 * 0.32m
+voxel_size = (0.2, 0.2, 8)
+window_shape = (20, 20, 1)  # 20 * 0.2 = 4m
 point_cloud_range = [-50, -50, -5, 50, 50, 3]
 drop_info_training = {
     0: {'max_tokens': 30, 'drop_range': (0, 30)},
@@ -51,7 +51,7 @@ model = dict(
     middle_encoder=dict(
         type='SSTInputLayerV2',
         window_shape=window_shape,
-        sparse_shape=(1000, 1000, 1),   # tot_point_cloud_range / voxel_size (50+50)/0.1
+        sparse_shape=(500, 500, 1),   # tot_point_cloud_range / voxel_size (50+50)/0.2
         shuffle_voxels=True,
         debug=True,
         drop_info=drop_info,
@@ -66,7 +66,7 @@ model = dict(
         nhead=[8, ] * 6,
         num_blocks=6,
         dim_feedforward=[256, ] * 6,
-        output_shape=[1000, 1000],   # tot_point_cloud_range / voxel_size (50+50)/0.1
+        output_shape=[500, 500],   # tot_point_cloud_range / voxel_size (50+50)/0.2
         num_attached_conv=3,
         conv_kwargs=[
             dict(kernel_size=3, dilation=1, padding=1, stride=1),
@@ -87,7 +87,7 @@ checkpoint_config = dict(interval=6)
 
 fp16 = dict(loss_scale=32.0)
 data = dict(
-    samples_per_gpu=2,  # aka batch_size
+    samples_per_gpu=4,
     workers_per_gpu=4,
 )
 

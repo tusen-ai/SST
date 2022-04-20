@@ -7,7 +7,7 @@ _base_ = [
 ]
 
 voxel_size = (0.1, 0.1, 8)
-window_shape = (16, 16, 1)  # 12 * 0.32m
+window_shape = (40, 40, 1)  # 40 * 0.1 = 4m
 point_cloud_range = [-50, -50, -5, 50, 50, 3]
 drop_info_training = {
     0: {'max_tokens': 30, 'drop_range': (0, 30)},
