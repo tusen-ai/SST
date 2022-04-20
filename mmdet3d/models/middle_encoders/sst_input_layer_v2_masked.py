@@ -203,7 +203,7 @@ class SSTInputLayerV2Masked(SSTInputLayerV2):
             points_rel_center = low_level_point_feature[:, -3:]
             assert self.pred_dims in [2, 3], "Either use x and y or x, y, and z"
             points_rel_center = points_rel_center[:, :self.pred_dims].clone()
-            pointr_rel_norm = 1 / torch.tensor(self.voxel_size, device=device).view(1, -1)
+            pointr_rel_norm = 2 / torch.tensor(self.voxel_size, device=device).view(1, -1)
             points_rel_center = points_rel_center * pointr_rel_norm  # x,y,z all in range [-1, 1]
 
             shuffle = torch.argsort(torch.rand(len(point_indices)))  # Shuffle to drop random points
