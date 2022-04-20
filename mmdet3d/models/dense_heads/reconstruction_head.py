@@ -1,5 +1,5 @@
 import torch
-from torch.nn.functional import smooth_l1_loss, binary_cross_entropy_with_logits
+from torch.nn.functional import smooth_l1_loss, binary_cross_entropy_with_logits, l1_loss
 from mmcv.runner import BaseModule, force_fp32
 from torch import nn as nn
 from mmdet.models import HEADS
@@ -42,7 +42,11 @@ class ReconstructionHead(BaseModule):
                  num_chamfer_points=20,
                  pred_dims=3,
                  only_masked=True,
+                 relative_error=True,
                  loss_weights=None,
+                 use_chamfer=True,
+                 use_num_points=True,
+                 use_fake_voxels=True,
                  init_cfg=None):
         super().__init__(init_cfg=init_cfg)
         self.in_channels = in_channels
@@ -58,10 +62,16 @@ class ReconstructionHead(BaseModule):
         self.fp16_enabled = False
         self.chamfer_loss = ChamferDistance(mode='l2', reduction='mean')
         self.loss_weights = loss_weights
+        self.num_points_loss = self.rel_error_loss if relative_error else smooth_l1_loss
+        self.use_chamfer = use_chamfer
+        self.use_num_points = use_num_points
+        self.use_fake_voxels = use_fake_voxels
+        assert use_chamfer or use_num_points or use_fake_voxels, \
+            "Need to use at least one of chamfer, num_points, and fake_voxels"
 
         self._init_layers()
 
-        if init_cfg is None:
+        if init_cfg is None and use_fake_voxels:
             self.init_cfg = dict(
                 type='Normal',
                 layer='Conv1d',
@@ -71,14 +81,16 @@ class ReconstructionHead(BaseModule):
 
     def _init_layers(self):
         """Initialize neural network layers of the head."""
-        self.conv_occupied = nn.Conv1d(self.feat_channels, 1, 1)
-        self.conv_num_points = nn.Conv1d(self.feat_channels, 1, 1)
-        self.conv_chamfer = nn.Conv1d(self.feat_channels, self.num_chamfer_points * self.pred_dims, 1)
+        self.conv_occupied = nn.Conv1d(self.feat_channels, 1, 1) if self.use_fake_voxels else None
+        self.conv_num_points = nn.Conv1d(self.feat_channels, 1, 1) if self.use_num_points else None
+        self.conv_chamfer = nn.Conv1d(self.feat_channels, self.num_chamfer_points * self.pred_dims, 1) \
+            if self.use_chamfer else None
 
     def _apply_1dconv(self, conv, x):
-        x = x.unsqueeze(0).transpose(1, 2)
-        x = conv(x).transpose(1, 2).squeeze(0)
-        return x
+        if conv is not None:
+            x = x.unsqueeze(0).transpose(1, 2)
+            x = conv(x).transpose(1, 2).squeeze(0)
+            return x
 
     def forward(self, x):
         """Forward pass.
@@ -94,58 +106,65 @@ class ReconstructionHead(BaseModule):
         voxel_info, voxel_info_decoder, voxel_info_encoder = x
         dec_out = voxel_info_decoder["output"]  # [N, C]
         gt_dict = voxel_info_decoder["gt_dict"]
+        pred_dict = {}
 
         masked_predictions = dec_out[voxel_info_decoder["dec2masked_idx"]]
         unmasked_predictions = dec_out[voxel_info_decoder["dec2unmasked_idx"]]
 
-        # TODO: Do occupied loss
-        pred_occupied = self._apply_1dconv(self.conv_occupied, dec_out).view(-1)
-        gt_occupied = torch.ones_like(pred_occupied, dtype=pred_occupied.dtype, device=pred_occupied.device)
+        # Occupied loss
+        if self.use_fake_voxels:
+            pred_occupied = self._apply_1dconv(self.conv_occupied, dec_out).view(-1)
+            gt_occupied = gt_dict["fake_voxel_mask"]
+            gt_occupied = gt_occupied[voxel_info_decoder["original_index"]]  # Maps the input to decoder output index
+            pred_dict["pred_occupied"] = pred_occupied
+            pred_dict["gt_occupied"] = gt_occupied
 
         # Predict number of points loss
-        gt_num_points = gt_dict["num_points_per_voxel"]
+        if self.use_num_points:
+            gt_num_points = gt_dict["num_points_per_voxel"]
 
-        pred_num_points_masked = self._apply_1dconv(self.conv_num_points, masked_predictions).view(-1)
-        gt_num_points_masked = gt_num_points[voxel_info_decoder["masked_idx"]]
+            pred_num_points_masked = self._apply_1dconv(self.conv_num_points, masked_predictions).view(-1)
+            gt_num_points_masked = gt_num_points[voxel_info_decoder["masked_idx"]]
+            pred_dict["pred_num_points_masked"] = pred_num_points_masked
+            pred_dict["gt_num_points_masked"] = gt_num_points_masked
 
-        if not self.only_masked:
-            pred_num_points_unmasked = self._apply_1dconv(self.conv_num_points, unmasked_predictions).view(-1)
-            gt_num_points_unmasked = gt_num_points[voxel_info_decoder["unmasked_idx"]]
+            if not self.only_masked:
+                pred_num_points_unmasked = self._apply_1dconv(self.conv_num_points, unmasked_predictions).view(-1)
+                gt_num_points_unmasked = gt_num_points[voxel_info_decoder["unmasked_idx"]]
+                pred_dict["pred_num_points_unmasked"] = pred_num_points_unmasked
+                pred_dict["gt_num_points_unmasked"] = gt_num_points_unmasked
 
         # Chamfer loss
-        gt_points_per_voxel = gt_dict["points_per_voxel"]
-        gt_points_padding = gt_dict["points_per_voxel_padding"]
+        if self.use_chamfer:
+            gt_points_per_voxel = gt_dict["points_per_voxel"]
+            gt_points_padding = gt_dict["points_per_voxel_padding"]
 
-        pred_points_masked = self._apply_1dconv(self.conv_chamfer, masked_predictions).view(
-            len(masked_predictions), self.num_chamfer_points, self.pred_dims)
-        pred_points_masked = torch.tanh(pred_points_masked)  # map to [-1, 1]
-        gt_points_masked = gt_points_per_voxel[voxel_info_decoder["masked_idx"]]
-        gt_point_padding_masked = gt_points_padding[voxel_info_decoder["masked_idx"]]
+            pred_points_masked = self._apply_1dconv(self.conv_chamfer, masked_predictions).view(
+                len(masked_predictions), self.num_chamfer_points, self.pred_dims)
+            pred_points_masked = torch.tanh(pred_points_masked)  # map to [-1, 1]
+            gt_points_masked = gt_points_per_voxel[voxel_info_decoder["masked_idx"]]
+            gt_point_padding_masked = gt_points_padding[voxel_info_decoder["masked_idx"]]
+            pred_dict["pred_points_masked"] = pred_points_masked
+            pred_dict["gt_points_masked"] = gt_points_masked
+            pred_dict["gt_point_padding_masked"] = gt_point_padding_masked
 
-        if not self.only_masked:
-            pred_points_unmasked = self._apply_1dconv(self.conv_chamfer, unmasked_predictions).view(
-                len(unmasked_predictions), self.num_chamfer_points, self.pred_dims)
-            pred_points_unmasked = torch.tanh(pred_points_unmasked)  # map to [-1, 1]
-            gt_points_unmasked = gt_points_per_voxel[voxel_info_decoder["unmasked_idx"]]
-            gt_point_padding_unmasked = gt_points_padding[voxel_info_decoder["unmasked_idx"]]
+            if not self.only_masked:
+                pred_points_unmasked = self._apply_1dconv(self.conv_chamfer, unmasked_predictions).view(
+                    len(unmasked_predictions), self.num_chamfer_points, self.pred_dims)
+                pred_points_unmasked = torch.tanh(pred_points_unmasked)  # map to [-1, 1]
+                gt_points_unmasked = gt_points_per_voxel[voxel_info_decoder["unmasked_idx"]]
+                gt_point_padding_unmasked = gt_points_padding[voxel_info_decoder["unmasked_idx"]]
+                pred_dict["pred_points_unmasked"] = pred_points_unmasked
+                pred_dict["gt_points_unmasked"] = gt_points_unmasked
+                pred_dict["gt_point_padding_unmasked"] = gt_point_padding_unmasked
 
-        pred_dict = {
-            "pred_occupied": pred_occupied,
-            "gt_occupied": gt_occupied,
-            "pred_num_points_masked": pred_num_points_masked,
-            "gt_num_points_masked": gt_num_points_masked,
-            "pred_points_masked": pred_points_masked,
-            "gt_points_masked": gt_points_masked,
-            "gt_point_padding_masked": gt_point_padding_masked
-        }
-        if not self.only_masked:
-            pred_dict["pred_num_points_unmasked"] = pred_num_points_unmasked
-            pred_dict["gt_num_points_unmasked"] = gt_num_points_unmasked
-            pred_dict["pred_points_unmasked"] = pred_points_unmasked
-            pred_dict["gt_points_unmasked"] = gt_points_unmasked
-            pred_dict["gt_point_padding_unmasked"] = gt_point_padding_unmasked
+        return pred_dict,  # Output needs to be tuple which the ',' achieves
 
-        return (pred_dict, ) # Output needs to be tuple
+    @staticmethod
+    def rel_error_loss(src, trg):
+        loss = l1_loss(src, trg, reduction="none")
+        loss = torch.sqrt(loss/trg).mean()
+        return loss
 
     def loss(self,
              pred_dict,
@@ -179,37 +198,41 @@ class ReconstructionHead(BaseModule):
         """
         pred_occupied = pred_dict["pred_occupied"]
         gt_occupied = pred_dict["gt_occupied"]
-        loss_occupied = binary_cross_entropy_with_logits(pred_occupied, gt_occupied)
+        loss_dict = {}
 
-        pred_num_points_masked = pred_dict["pred_num_points_masked"]
-        gt_num_points_masked = pred_dict["gt_num_points_masked"]
-        loss_num_points_masked = smooth_l1_loss(pred_num_points_masked, gt_num_points_masked.float(), reduction="mean")
-        if not self.only_masked:
-            pred_num_points_unmasked = pred_dict["pred_num_points_unmasked"]
-            gt_num_points_unmasked = pred_dict["gt_num_points_unmasked"]
-            loss_num_points_unmasked = smooth_l1_loss(pred_num_points_unmasked, gt_num_points_unmasked.float(), reduction="mean")
+        if self.use_fake_voxels:
+            loss_occupied = binary_cross_entropy_with_logits(pred_occupied, gt_occupied)
+            loss_dict["loss_occupied"] = loss_occupied
 
-        pred_points_masked = pred_dict["pred_points_masked"]
-        gt_points_masked = pred_dict["gt_points_masked"]
-        gt_point_padding_masked = pred_dict["gt_point_padding_masked"]
-        loss_chamfer_src_masked, loss_chamfer_dst_masked = self.chamfer_loss(
-            source=pred_points_masked, target=gt_points_masked, dst_weight=gt_point_padding_masked)
-        if not self.only_masked:
-            pred_points_unmasked = pred_dict["pred_points_unmasked"]
-            gt_points_unmasked = pred_dict["gt_points_unmasked"]
-            gt_point_padding_unmasked = pred_dict["gt_point_padding_unmasked"]
-            loss_chamfer_src_unmasked, loss_chamfer_dst_unmasked = self.chamfer_loss(
-                source=pred_points_unmasked, target=gt_points_unmasked, dst_weight=gt_point_padding_unmasked)
+        if self.use_num_points:
+            pred_num_points_masked = pred_dict["pred_num_points_masked"]
+            gt_num_points_masked = pred_dict["gt_num_points_masked"]
+            loss_num_points_masked = self.num_points_loss(pred_num_points_masked, gt_num_points_masked.float())
+            loss_dict["loss_num_points_masked"] = loss_num_points_masked
+            if not self.only_masked:
+                pred_num_points_unmasked = pred_dict["pred_num_points_unmasked"]
+                gt_num_points_unmasked = pred_dict["gt_num_points_unmasked"]
+                loss_num_points_unmasked = self.num_points_loss(
+                    pred_num_points_unmasked, gt_num_points_unmasked.float())
+                loss_dict["loss_num_points_unmasked"] = loss_num_points_unmasked
 
-        loss_dict = dict(
-            loss_occupied=loss_occupied,
-            loss_num_points_masked=loss_num_points_masked,
-            loss_chamfer_src_masked=loss_chamfer_src_masked,
-            loss_chamfer_dst_masked=loss_chamfer_dst_masked,)
-        if not self.only_masked:
-            loss_dict["loss_num_points_unmasked"] = loss_num_points_unmasked
-            loss_dict["loss_chamfer_src_unmasked"] = loss_chamfer_src_unmasked
-            loss_dict["loss_chamfer_dst_unmasked"] = loss_chamfer_dst_unmasked
+        if self.use_chamfer:
+            pred_points_masked = pred_dict["pred_points_masked"]
+            gt_points_masked = pred_dict["gt_points_masked"]
+            gt_point_padding_masked = pred_dict["gt_point_padding_masked"]
+            loss_chamfer_src_masked, loss_chamfer_dst_masked = self.chamfer_loss(
+                source=pred_points_masked, target=gt_points_masked, dst_weight=gt_point_padding_masked)
+            loss_dict["loss_chamfer_src_masked"] = loss_chamfer_src_masked
+            loss_dict["loss_chamfer_dst_masked"] = loss_chamfer_dst_masked
+            if not self.only_masked:
+                pred_points_unmasked = pred_dict["pred_points_unmasked"]
+                gt_points_unmasked = pred_dict["gt_points_unmasked"]
+                gt_point_padding_unmasked = pred_dict["gt_point_padding_unmasked"]
+                loss_chamfer_src_unmasked, loss_chamfer_dst_unmasked = self.chamfer_loss(
+                    source=pred_points_unmasked, target=gt_points_unmasked, dst_weight=gt_point_padding_unmasked)
+                loss_dict["loss_chamfer_src_unmasked"] = loss_chamfer_src_unmasked
+                loss_dict["loss_chamfer_dst_unmasked"] = loss_chamfer_dst_unmasked
+
         if self.loss_weights:
             for key in loss_dict:
                 loss_dict[key] *= self.loss_weights.get(key, 0)  # ignore loss if not mentioned
