@@ -6,11 +6,13 @@
 #SBATCH --output=/cephyr/NOBACKUP/groups/snic2021-7-127/eliassv/slurm-out/slurm-%j.out
 #SBATCH -J "Some job name"  # multi node, multi GPU
 CONFIG=${1:-sst_nuscenesD5_1x_3class_8heads_v2}
+REPO_NUMBER=${2:-1}  # Choose between repo 1 or 2
 echo $CONFIG
 GPUS_PER_NODE=4
 export GPU_TYPE=A40
 # Options for GPU type are T4 or A40. Choose A40 also when running on V100, A100 or A100fat.
 export OMP_NUM_THREADS=16  # cores per gpu (16 cores per A40)
+
 
 echo $HOSTNAME
 echo $SLURM_JOB_NODELIST
@@ -30,7 +32,11 @@ echo ""
 
 echo ""
 echo "Start copying repo to '$TMPDIR'"
-cp -r /cephyr/NOBACKUP/groups/snic2021-7-127/eliassv/SST_$GPU_TYPE/ $TMPDIR/
+if [$REPO_NUMBER == 1]
+then
+   cp -r /cephyr/NOBACKUP/groups/snic2021-7-127/eliassv/SST_${GPU_TYPE}/ $TMPDIR/SST_${GPU_TYPE}
+else
+   cp -r /cephyr/NOBACKUP/groups/snic2021-7-127/eliassv/SST_${GPU_TYPE}_2/ $TMPDIR/SST_${GPU_TYPE}
 echo ""
 echo "Copying of repo to tempdir is now done."
 echo ""
