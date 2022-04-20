@@ -5,14 +5,13 @@
 #SBATCH -N 1
 #SBATCH --output=/cephyr/NOBACKUP/groups/snic2021-7-127/eliassv/slurm-out/slurm-%j.out
 #SBATCH -J "Some job name"  # multi node, multi GPU
-CONFIG=${1:-sst_nuscenesD5_1x_3class_8heads_v2}
+CONFIG=${1:-sst_nuscenes_vZoeeeing_2sweeps-remove_close_masked}
 REPO_NUMBER=${2:-1}  # Choose between repo 1 or 2
 echo $CONFIG
 GPUS_PER_NODE=4
 export GPU_TYPE=A40
 # Options for GPU type are T4 or A40. Choose A40 also when running on V100, A100 or A100fat.
 export OMP_NUM_THREADS=16  # cores per gpu (16 cores per A40)
-
 
 echo $HOSTNAME
 echo $SLURM_JOB_NODELIST
@@ -27,7 +26,7 @@ echo ""
 echo "This job $JOB_ID was started as:
   bash tools/dist_train.sh configs/sst_refactor/$CONFIG.py $GPUS_PER_NODE \
     --work-dir /cephyr/NOBACKUP/groups/snic2021-7-127/eliassv/jobs/$JOB_ID \
-    --cfg-options evaluation.metric=nuscenes" ${@:3}
+    --cfg-options evaluation.metric=nuscenes ${@:3}"
 echo ""
 
 echo ""
@@ -58,7 +57,7 @@ echo ""
 cd $TMPDIR/SST_$GPU_TYPE
 singularity exec --pwd $TMPDIR/SST_$GPU_TYPE \
   /cephyr/NOBACKUP/groups/snic2021-7-127/eliassv/sst_env/mmdetection3d_$GPU_TYPE.sif \
-  bash tools/dist_train.sh configs/sst_refactor/$CONFIG.py $GPUS_PER_NODE \
+  bash tools/dist_train.sh configs/sst_masked/$CONFIG.py $GPUS_PER_NODE \
   --work-dir /cephyr/NOBACKUP/groups/snic2021-7-127/eliassv/jobs/$JOB_ID \
   --cfg-options evaluation.metric=nuscenes ${@:3}
 # ${@:3} grabs everything after the third argument these are used to overwrite settings in the config file
