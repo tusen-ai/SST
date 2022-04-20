@@ -1,0 +1,4 @@
+We do trials with various learning rates, and schedulars.
+We perform the initial trials with 2 merged sweeps, and remove the close points up to 2 meters from the car.
+Using 2 merged sweeps to stay constant with resent trials, though we could also investigate other merge sizes as well.
+
