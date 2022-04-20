@@ -26,7 +26,7 @@ echo ""
 echo "This job $JOB_ID was started as:
   bash tools/dist_train.sh configs/sst_refactor/$CONFIG.py $GPUS_PER_NODE \
     --work-dir /cephyr/NOBACKUP/groups/snic2021-7-127/eliassv/jobs/$JOB_ID \
-    ${@:2} --cfg-options evaluation.metric=nuscenes"
+    --cfg-options evaluation.metric=nuscenes ${@:3}"
 echo ""
 
 echo ""
