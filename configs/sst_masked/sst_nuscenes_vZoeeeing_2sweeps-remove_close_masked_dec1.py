@@ -50,7 +50,10 @@ model = dict(
         mute=True,
         masking_ratio=masking_ratio,
         drop_points_th=100,
-        pred_dims=3  # x, y, z
+        pred_dims=3,  # x, y, z
+        use_chamfer=True,
+        use_num_points=True,
+        use_fake_voxels=False,
     ),
 
     backbone=dict(
@@ -76,9 +79,13 @@ model = dict(
         in_channels=128,
         feat_channels=128,
         num_chamfer_points=10,
-        only_masked=True,
         pred_dims=3,
+        only_masked=True,
+        relative_error=False,
         loss_weights=loss_weights,
+        use_chamfer=True,
+        use_num_points=True,
+        use_fake_voxels=False,
     )
 )
 
