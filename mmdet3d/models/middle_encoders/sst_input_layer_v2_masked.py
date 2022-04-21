@@ -246,7 +246,7 @@ class SSTInputLayerV2Masked(SSTInputLayerV2):
 
             fake_voxel_idxs = [torch.where(~occupied[b])[0]+(b*max_num_voxels_per_batch) for b in range(batch_size)]
             fake_voxel_idxs = torch.cat([
-                idx[torch.randperm(len(idx), device=device)][n_fake]  # Shuffle and take n_fake first indices
+                idx[torch.randperm(len(idx), device=device)][:n_fake]  # Shuffle and take n_fake first indices
                 for i, (idx, n_fake) in enumerate(zip(fake_voxel_idxs, n_fake_voxels_per_batch))
             ])
             fake_voxel_coors = torch.zeros((n_fake_voxels, voxel_coors.shape[1]), device=device, dtype=voxel_coors.dtype)
