@@ -255,8 +255,8 @@ class SSTInputLayerV2Masked(SSTInputLayerV2):
             fake_voxel_coors[:, 2] = (fake_voxel_idxs % (vy * vx)) // vx  # y index
             fake_voxel_coors[:, 3] = fake_voxel_idxs % vx  # x index
 
-            mask = torch.zeros((len(voxel_coors)+len(fake_voxel_coors)), device=device, dtype=torch.long)
-            mask[len(voxel_coors):] = 1
+            mask = torch.zeros((len(voxel_coors)+len(fake_voxel_coors)), device=device, dtype=torch.float)
+            mask[len(voxel_coors):] = 1.
             gt_dict["fake_voxel_mask"] = mask
 
         return gt_dict, fake_voxel_coors
