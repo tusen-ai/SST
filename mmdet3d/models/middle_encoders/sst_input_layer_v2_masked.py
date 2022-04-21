@@ -236,7 +236,7 @@ class SSTInputLayerV2Masked(SSTInputLayerV2):
         fake_voxel_coors = None
         if self.use_fake_voxels:
             max_num_voxels_per_batch = vx*vy*vz
-            voxels_per_batch = torch.bincount(voxel_coors[:, 0])  # e.g [5000, 6020, 4920, 5107] for batch_size=4
+            voxels_per_batch = torch.bincount(voxel_coors[:, 0].long())  # e.g [5000, 6020, 4920, 5107] for batch_size=4
             n_fake_voxels_per_batch = (voxels_per_batch * self.fake_voxel_ratio).long()  # e.g [500, 602, 492, 510] for fake_voxel_ratio=0.1
             n_fake_voxels = int(n_fake_voxels_per_batch.sum())  # e.g 2104
 
