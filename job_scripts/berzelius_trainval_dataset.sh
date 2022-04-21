@@ -26,7 +26,7 @@ echo "This job $JOB_ID was started as:
     --cfg-options evaluation.metric=nuscenes" ${@:3}
 echo ""
 
-singularity exec --pwd /proj/deep-mot/eliassv/SST_${REPO_NUMBER} \
+singularity exec --nv --pwd /proj/deep-mot/eliassv/SST_${REPO_NUMBER} \
   /proj/deep-mot/eliassv/sst_env/mmdetection3d_A40.sif \
   bash tools/dist_train.sh configs/sst_refactor/$CONFIG.py $GPUS_PER_NODE \
   --work-dir /proj/deep-mot/eliassv/jobs/$JOB_ID \
