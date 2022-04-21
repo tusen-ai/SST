@@ -42,6 +42,7 @@ class SSTv2Decoder(SSTv2):
         in_channel=None,
         checkpoint_blocks=[],
         layer_cfg=dict(),
+        use_fake_voxels=True,
         ):
 
         super().__init__(
@@ -62,6 +63,7 @@ class SSTv2Decoder(SSTv2):
             self.enc2dec_projection = nn.Linear(in_channel, d_model[0])
         self._reset_parameters()
 
+        self.use_fake_voxels = use_fake_voxels
         self.mask_token = nn.Parameter(torch.zeros(1, d_model[0]))
         torch.nn.init.normal_(self.mask_token, std=.02)
 
@@ -90,12 +92,20 @@ class SSTv2Decoder(SSTv2):
         n_masked = voxel_info_decoder["n_masked"]
         masked_tokens = self.mask_token.repeat(n_masked, 1)
         voxel_feat[dec2masked_idx] = masked_tokens
+        if self.use_fake_voxels:
+            # replace fake voxels with masking token
+            dec2fake_idx = voxel_info_decoder["dec2fake_idx"]
+            n_fake = voxel_info_decoder["n_fake"]
+            masked_tokens = self.mask_token.repeat(n_fake, 1)
+            voxel_feat[dec2fake_idx] = masked_tokens
         voxel_info_decoder['voxel_feats'] = voxel_feat
 
         if self.debug:
             test_mapping = -torch.ones(len(voxel_feat), device=voxel_feat.device)
             test_mapping[dec2enc_idx] = 0
             test_mapping[dec2masked_idx] = 1
+            if self.use_fake_voxels:
+                test_mapping[dec2fake_idx] = 0
             assert not (test_mapping == -1).any(), "All voxels are not covered by the enc_idx and masked_idx"
             assert test_mapping.sum() == n_masked, \
                 f"The number of masked voxels differ {test_mapping.sum()} vs {n_masked}"

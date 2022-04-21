@@ -110,6 +110,7 @@ class SSTInputLayerV2Masked(SSTInputLayerV2):
                 (len(fake_voxel_coors), voxel_feats.shape[1]), device=device, dtype=voxel_feats.dtype)
             voxel_feats = torch.cat([voxel_feats, fake_voxel_feats], dim=0)
             mask = torch.cat([mask, torch.zeros(len(fake_voxel_coors), device=device, dtype=torch.bool)])
+            n_fake_voxels = len(fake_voxel_idx)
 
         # Get info for decoder input, Might drop voxels
         voxel_info_decoder = super().forward(voxel_feats, voxel_coors, batch_size=None)
@@ -128,6 +129,7 @@ class SSTInputLayerV2Masked(SSTInputLayerV2):
         voxel_info_decoder["masked_idx"] = masked_idx
         if self.use_fake_voxels:
             voxel_info_decoder["fake_voxel_idx"] = fake_voxel_idx
+            voxel_info_decoder["n_fake"] = n_fake_voxels
 
         # Index mapping from decoder output to other
         dec2dec_input_idx = torch.argsort(voxel_info_decoder["original_index"])
@@ -189,13 +191,13 @@ class SSTInputLayerV2Masked(SSTInputLayerV2):
         # Points per voxel
         if self.use_num_points:
             n_points_per_voxel_with_zeros = torch.bincount(point_indices)
-            point_indices_unique = n_points_per_voxel_with_zeros.nonzero()
+            point_indices_unique = n_points_per_voxel_with_zeros.nonzero().ravel()
             n_points_per_voxel = n_points_per_voxel_with_zeros[voxel_indices]
             gt_dict["num_points_per_voxel"] = n_points_per_voxel
             assert (n_points_per_voxel > 0).all(), "Exists voxel without connected points"
             assert len(point_indices_unique) == len(voxel_indices), \
                 "There is a mismatch between point indices and voxel indices"
-            assert (point_indices_unique == voxel_indices.sort()).all(), \
+            assert (point_indices_unique == voxel_indices.sort()[0]).all(), \
                 "There is a mismatch between point indices and voxel indices"
 
         # Get points per voxel
