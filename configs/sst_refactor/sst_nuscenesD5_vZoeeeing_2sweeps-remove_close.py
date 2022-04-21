@@ -1,7 +1,7 @@
 # Used to try same settings as Zoeeeing as presented here: https://github.com/TuSimple/SST/issues/18
 _base_ = [
     '../_base_/models/sst_base.py',
-    '../_base_/datasets/nus-3d-2sweep-remove_close.py',
+    '../_base_/datasets/nusD5-3d-2sweep-remove_close.py',
     '../_base_/schedules/cosine_2x.py',
     '../_base_/default_runtime.py',
 ]
@@ -88,10 +88,6 @@ fp16 = dict(loss_scale=32.0)
 data = dict(
     samples_per_gpu=4,
     workers_per_gpu=4,
-    train=dict(
-        type='NuScenesDataset',
-        load_interval=5
-    )
 )
 
 workflow = [('train', 1), ('val', 1)]  # Includes validation at same frequency as training.
