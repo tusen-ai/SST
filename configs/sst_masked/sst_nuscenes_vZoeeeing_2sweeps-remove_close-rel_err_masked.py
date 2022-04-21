@@ -2,7 +2,7 @@ _base_ = [
     '../sst_refactor/sst_nuscenes_vZoeeeing_2sweeps-remove_close.py'
 ]
 use_chamfer, use_num_points, use_fake_voxels = True, True, False
-relative_error = False
+relative_error = True
 masking_ratio = 0.7
 loss_weights = dict(
     loss_occupied=0.,

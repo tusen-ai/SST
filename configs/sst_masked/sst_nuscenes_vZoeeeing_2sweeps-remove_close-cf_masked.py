@@ -1,11 +1,12 @@
 _base_ = [
     '../sst_refactor/sst_nuscenes_vZoeeeing_2sweeps-remove_close.py'
 ]
-use_chamfer, use_num_points, use_fake_voxels = True, True, False
+use_chamfer, use_num_points, use_fake_voxels = True, False, True
 relative_error = False
 masking_ratio = 0.7
+fake_voxels_ratio = 0.1
 loss_weights = dict(
-    loss_occupied=0.,
+    loss_occupied=1.0,
     loss_num_points_masked=0.1,
     loss_chamfer_src_masked=1.,
     loss_chamfer_dst_masked=1.,
@@ -55,6 +56,7 @@ model = dict(
         use_chamfer=use_chamfer,
         use_num_points=use_num_points,
         use_fake_voxels=use_fake_voxels,
+        fake_voxels_ratio=fake_voxels_ratio
     ),
 
     backbone=dict(
