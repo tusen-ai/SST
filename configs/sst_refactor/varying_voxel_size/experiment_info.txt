@@ -4,4 +4,4 @@ Using 2 merged sweeps to stay constant with Johans resent trials, though we coul
 
 We decreased the batch size from 4 to 2 when only considering cars and we have have voxel size of 0.1. Though it crashed also with batch size 2.
 
-We decreased the batch size from 4 to 1 when considering all classes and we have have voxel size of 0.1.
+We decreased the batch size from 4 to 1 when considering all classes and we have have voxel size of 0.1. Though it still crashed.
