@@ -196,11 +196,11 @@ class ReconstructionHead(BaseModule):
                 - loss_dir (list[torch.Tensor]): Direction classification \
                     losses.
         """
-        pred_occupied = pred_dict["pred_occupied"]
-        gt_occupied = pred_dict["gt_occupied"]
         loss_dict = {}
 
         if self.use_fake_voxels:
+            pred_occupied = pred_dict["pred_occupied"]
+            gt_occupied = pred_dict["gt_occupied"]
             loss_occupied = binary_cross_entropy_with_logits(pred_occupied, gt_occupied)
             loss_dict["loss_occupied"] = loss_occupied
 
