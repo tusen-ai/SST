@@ -31,10 +31,12 @@ echo ""
 
 echo ""
 echo "Start copying repo to '$TMPDIR'"
-if [$REPO_NUMBER == 1]
+if [ $REPO_NUMBER == 1 ]
 then
+   echo "Taking SST_${GPU_TYPE}"
    cp -r /cephyr/NOBACKUP/groups/snic2021-7-127/eliassv/SST_${GPU_TYPE}/ $TMPDIR/SST_${GPU_TYPE}
 else
+   echo "Taking SST_${GPU_TYPE}_2"
    cp -r /cephyr/NOBACKUP/groups/snic2021-7-127/eliassv/SST_${GPU_TYPE}_2/ $TMPDIR/SST_${GPU_TYPE}
 fi
 echo ""
