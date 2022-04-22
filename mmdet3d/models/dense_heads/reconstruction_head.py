@@ -1,5 +1,5 @@
 import torch
-from torch.nn.functional import smooth_l1_loss, binary_cross_entropy_with_logits, l1_loss
+from torch.nn.functional import smooth_l1_loss, binary_cross_entropy_with_logits, l1_loss, mse_loss
 from mmcv.runner import BaseModule, force_fp32
 from torch import nn as nn
 from mmdet.models import HEADS
@@ -60,9 +60,9 @@ class ReconstructionHead(BaseModule):
         # build loss function
         self.only_masked = only_masked
         self.fp16_enabled = False
-        self.chamfer_loss = ChamferDistance(mode='l2', reduction='mean')
+        self.chamfer_loss = self.chamfer_distance_loss  # ChamferDistance(mode='l2', reduction='mean')
         self.loss_weights = loss_weights
-        self.num_points_loss = self.rel_error_loss if relative_error else smooth_l1_loss
+        self.num_points_loss = self.rel_error_loss2 if relative_error else smooth_l1_loss
         self.use_chamfer = use_chamfer
         self.use_num_points = use_num_points
         self.use_fake_voxels = use_fake_voxels
@@ -146,7 +146,7 @@ class ReconstructionHead(BaseModule):
             gt_point_padding_masked = gt_points_padding[voxel_info_decoder["masked_idx"]]
             pred_dict["pred_points_masked"] = pred_points_masked
             pred_dict["gt_points_masked"] = gt_points_masked
-            pred_dict["gt_point_padding_masked"] = gt_point_padding_masked
+            pred_dict["gt_point_padding_masked"] = gt_point_padding_masked.bool()
 
             if not self.only_masked:
                 pred_points_unmasked = self._apply_1dconv(self.conv_chamfer, unmasked_predictions).view(
@@ -156,7 +156,7 @@ class ReconstructionHead(BaseModule):
                 gt_point_padding_unmasked = gt_points_padding[voxel_info_decoder["unmasked_idx"]]
                 pred_dict["pred_points_unmasked"] = pred_points_unmasked
                 pred_dict["gt_points_unmasked"] = gt_points_unmasked
-                pred_dict["gt_point_padding_unmasked"] = gt_point_padding_unmasked
+                pred_dict["gt_point_padding_unmasked"] = gt_point_padding_unmasked.bool()
 
         return pred_dict,  # Output needs to be tuple which the ',' achieves
 
@@ -165,6 +165,59 @@ class ReconstructionHead(BaseModule):
         loss = l1_loss(src, trg, reduction="none")
         loss = torch.sqrt(loss/trg).mean()
         return loss
+
+    @staticmethod
+    def rel_error_loss_2(src, trg):
+        loss_l1 = l1_loss(src, trg, reduction="none")
+        loss_l2 = mse_loss(src, trg, reduction="none")
+
+        beta = torch.clip(trg*0.1, min=0.5)
+        threshold_mask = loss_l1 < beta
+
+        loss = loss_l1 - beta/2
+        loss[threshold_mask] = loss_l2/(2*beta)
+
+        loss.mean()
+        return loss
+
+    @staticmethod
+    def chamfer_distance_loss(src, trg, trg_padding, criterion_mode="l2"):
+        """
+
+        :param src: predicted point positions (B, N, C)
+        :param trg: gt point positions (B, M, C)
+        :param trg_padding: Which points are padded (B, M)
+        :type trg_padding: torch.Tensor([torch.bool])
+        :param criterion_mode: way of calculating distance, l1, l2, or smooth_l1
+        :return:
+        """
+        if criterion_mode == 'smooth_l1':
+            criterion = smooth_l1_loss
+        elif criterion_mode == 'l1':
+            criterion = l1_loss
+        elif criterion_mode == 'l2':
+            criterion = mse_loss
+        else:
+            raise NotImplementedError
+        # src->(B,N,C) dst->(B,M,C)
+        src_expand = src.unsqueeze(2).repeat(1, 1, trg.shape[1], 1)  # (B,N M,C)
+        trg_expand = trg.unsqueeze(1).repeat(1, src.shape[1], 1, 1)  # (B,N M,C)
+        trg_padding_expand = trg_padding.unsqueeze(1).repeat(1, src.shape[1], 1)  # (B,N M)
+
+        distance = criterion(src_expand, trg_expand, reduction='none').sum(-1)  # (B,N M)
+        distance[trg_padding_expand] = torch.inf
+
+        src2trg_distance, indices1 = torch.min(distance, dim=2)  # (B,N)
+        trg2src_distance, indices2 = torch.min(distance, dim=1)  # (B,M)
+        trg2src_distance[trg_expand] = 0
+
+        loss_src = torch.mean(src2trg_distance)
+        # Since there is different number of points in each voxel we want to have each voxel matter equally much
+        # and to not have voxels with more points be more important to mimic
+        loss_trg = trg2src_distance.sum(1) / (~trg_padding_expand).sum(1)  # B
+        loss_trg = loss_trg.mean()
+
+        return loss_src, loss_trg
 
     def loss(self,
              pred_dict,
@@ -221,7 +274,7 @@ class ReconstructionHead(BaseModule):
             gt_points_masked = pred_dict["gt_points_masked"]
             gt_point_padding_masked = pred_dict["gt_point_padding_masked"]
             loss_chamfer_src_masked, loss_chamfer_dst_masked = self.chamfer_loss(
-                source=pred_points_masked, target=gt_points_masked, dst_weight=gt_point_padding_masked)
+                pred_points_masked, gt_points_masked, trg_padding=gt_point_padding_masked)
             loss_dict["loss_chamfer_src_masked"] = loss_chamfer_src_masked
             loss_dict["loss_chamfer_dst_masked"] = loss_chamfer_dst_masked
             if not self.only_masked:
@@ -229,7 +282,7 @@ class ReconstructionHead(BaseModule):
                 gt_points_unmasked = pred_dict["gt_points_unmasked"]
                 gt_point_padding_unmasked = pred_dict["gt_point_padding_unmasked"]
                 loss_chamfer_src_unmasked, loss_chamfer_dst_unmasked = self.chamfer_loss(
-                    source=pred_points_unmasked, target=gt_points_unmasked, dst_weight=gt_point_padding_unmasked)
+                    pred_points_unmasked, gt_points_unmasked, trg_padding=gt_point_padding_unmasked)
                 loss_dict["loss_chamfer_src_unmasked"] = loss_chamfer_src_unmasked
                 loss_dict["loss_chamfer_dst_unmasked"] = loss_chamfer_dst_unmasked
 
