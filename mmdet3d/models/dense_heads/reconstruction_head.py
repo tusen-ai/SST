@@ -214,7 +214,7 @@ class ReconstructionHead(BaseModule):
         loss_src = torch.mean(src2trg_distance)
         # Since there is different number of points in each voxel we want to have each voxel matter equally much
         # and to not have voxels with more points be more important to mimic
-        loss_trg = trg2src_distance.sum(1) / (~trg_padding_expand).sum(1)  # B
+        loss_trg = trg2src_distance.sum(1) / (~trg_padding).sum(1)  # B
         loss_trg = loss_trg.mean()
 
         return loss_src, loss_trg
