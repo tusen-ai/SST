@@ -62,7 +62,7 @@ class ReconstructionHead(BaseModule):
         self.fp16_enabled = False
         self.chamfer_loss = self.chamfer_distance_loss  # ChamferDistance(mode='l2', reduction='mean')
         self.loss_weights = loss_weights
-        self.num_points_loss = self.rel_error_loss2 if relative_error else smooth_l1_loss
+        self.num_points_loss = self.rel_error_loss_2 if relative_error else smooth_l1_loss
         self.use_chamfer = use_chamfer
         self.use_num_points = use_num_points
         self.use_fake_voxels = use_fake_voxels
@@ -209,7 +209,7 @@ class ReconstructionHead(BaseModule):
 
         src2trg_distance, indices1 = torch.min(distance, dim=2)  # (B,N)
         trg2src_distance, indices2 = torch.min(distance, dim=1)  # (B,M)
-        trg2src_distance[trg_expand] = 0
+        trg2src_distance[trg_padding] = 0
 
         loss_src = torch.mean(src2trg_distance)
         # Since there is different number of points in each voxel we want to have each voxel matter equally much
