@@ -228,7 +228,7 @@ class SSTInputLayerV2Masked(SSTInputLayerV2):
 
         if self.use_chamfer and self.use_num_points:
             test_mask = n_points_per_voxel < self.drop_points_th
-            _n_points_per_voxel = gt_dict["points_per_voxel_padding"].sum(1)
+            _n_points_per_voxel = (~gt_dict["points_per_voxel_padding"]).sum(1)
             assert (_n_points_per_voxel[test_mask] == n_points_per_voxel[test_mask]).all(), \
                 "Mismatch between counted points per voxel and found points per voxel"
             assert (_n_points_per_voxel[~test_mask] == self.drop_points_th).all(), \
