@@ -218,9 +218,9 @@ class SSTInputLayerV2Masked(SSTInputLayerV2):
             dropped_point_indices = point_indices[drop_mask].long()
 
             gt_points = torch.zeros((max_num_voxels, self.drop_points_th, 3), device=device, dtype=points_rel_center.dtype)
-            gt_points_padding = torch.zeros((max_num_voxels, self.drop_points_th), device=device, dtype=torch.long)
+            gt_points_padding = torch.ones((max_num_voxels, self.drop_points_th), device=device, dtype=torch.long)
             gt_points[dropped_point_indices, inner_voxel_inds] = points_rel_center
-            gt_points_padding[dropped_point_indices, inner_voxel_inds] = 1  # padded -> 0, not_padded -> 1
+            gt_points_padding[dropped_point_indices, inner_voxel_inds] = 0  # not_padded -> 0, padded -> 1
             gt_dict["points_per_voxel"] = gt_points[voxel_indices]
             gt_dict["points_per_voxel_padding"] = gt_points_padding[voxel_indices]
 
