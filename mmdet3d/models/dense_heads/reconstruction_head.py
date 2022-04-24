@@ -175,7 +175,7 @@ class ReconstructionHead(BaseModule):
         threshold_mask = loss_l1 < beta
 
         loss = loss_l1 - beta/2
-        loss[threshold_mask] = loss_l2/(2*beta)
+        loss[threshold_mask] = loss_l2[threshold_mask]/(2*beta[threshold_mask])
 
         loss.mean()
         return loss
