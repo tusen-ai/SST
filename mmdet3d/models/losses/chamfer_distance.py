@@ -46,37 +46,13 @@ def chamfer_distance(src,
         criterion = mse_loss
     else:
         raise NotImplementedError
-    # src->(B,N,C) dst->(B,M,C)
-    src_expand = src.unsqueeze(2).repeat(1, 1, dst.shape[1], 1)  # (B,N M,C)
-    dst_expand = dst.unsqueeze(1).repeat(1, src.shape[1], 1, 1)  # (B,N M,C)
 
-    distance = criterion(src_expand, dst_expand, reduction='none').sum(-1)  # (B,N M)
-    B, N, M = distance.shape
-    src_is_padded = type(src_weight) is torch.Tensor and src_weight.dtype == torch.bool and src_weight.dim() > 0
-    dst_is_padded = type(dst_weight) is torch.Tensor and dst_weight.dtype == torch.bool and dst_weight.dim() > 0
-    if src_is_padded:
-        # make dimensions match B,N,M
-        if src_weight.dim() == 1:
-            src_weight.view(1, -1, 1).repeat(B, 1, M)
-        elif src_weight.dim() == 2:
-            src_weight.unsqueeze(-1).repeat(1, 1, M)
-        assert src_weight.dim() == 3, "Weights can't have more than three dimensions"
-        distance[~src_weight] = torch.inf
-    if dst_is_padded:
-        # make dimensions match B,N,M
-        if dst_weight.dim() == 1:
-            dst_weight.view(1, 1, -1).repeat(B, N, 1)
-        elif dst_weight.dim() == 2:
-            dst_weight.unsqueeze(1).repeat(1, N, 1)
-        assert dst_weight.dim() == 3, "Weights can't have more than three dimensions"
-        distance[~dst_weight] = torch.inf
+    src_expand = src.unsqueeze(2).repeat(1, 1, dst.shape[1], 1)
+    dst_expand = dst.unsqueeze(1).repeat(1, src.shape[1], 1, 1)
+
+    distance = criterion(src_expand, dst_expand, reduction='none').sum(-1)
     src2dst_distance, indices1 = torch.min(distance, dim=2)  # (B,N)
     dst2src_distance, indices2 = torch.min(distance, dim=1)  # (B,M)
-
-    if src_is_padded:
-        src2dst_distance[~src_weight[..., 0]] = 0
-    if dst_is_padded:
-        dst2src_distance[~dst_weight[:, 0, :]] = 0
 
     loss_src = (src2dst_distance * src_weight)
     loss_dst = (dst2src_distance * dst_weight)
@@ -108,7 +84,7 @@ class ChamferDistance(nn.Module):
         loss_dst_weight (float): Weight of loss_target.
     """
 
-    def f__init__(self,
+    def __init__(self,
                  mode='l2',
                  reduction='mean',
                  loss_src_weight=1.0,
