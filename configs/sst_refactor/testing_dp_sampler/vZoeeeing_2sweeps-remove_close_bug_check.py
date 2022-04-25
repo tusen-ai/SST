@@ -9,6 +9,7 @@ _base_ = [
 voxel_size = (0.25, 0.25, 8)
 window_shape = (16, 16, 1) # 12 * 0.32m
 point_cloud_range = [-50, -50, -5, 50, 50, 3]
+use_dimension = [0,1,2,4]
 drop_info_training ={
     0:{'max_tokens':30, 'drop_range':(0, 30)},
     1:{'max_tokens':60, 'drop_range':(30, 60)},
@@ -77,60 +78,7 @@ model = dict(
         conv_out_channel=128,
         debug=True,
     ),
-)
 
-#### DB sampler related code:
-dataset_type = 'NuScenesDataset'
-data_root = 'data/nuscenes/'
-file_client_args = dict(backend='disk')
-class_names = [
-    'car', 'truck', 'construction_vehicle', 'bus', 'trailer', 'barrier',
-    'motorcycle', 'bicycle', 'pedestrian', 'traffic_cone'
-]
-number_of_sweeps = 1
-input_modality = dict(
-    use_lidar=True,
-    use_camera=False,
-    use_radar=False,
-    use_map=False,
-    use_external=False)
-
-
-db_sampler = dict(
-    data_root=data_root,
-    info_path=data_root + 'nuscenes_dbinfos_train.pkl',
-    rate=1.0,
-    prepare=dict(
-        filter_by_difficulty=[-1],
-        filter_by_min_points=dict(
-            car=5,
-            truck=5,
-            bus=5,
-            trailer=5,
-            construction_vehicle=5,
-            traffic_cone=5,
-            barrier=5,
-            motorcycle=5,
-            bicycle=5,
-            pedestrian=5)),
-    classes=class_names,
-    sample_groups=dict(
-        car=2,
-        truck=3,
-        construction_vehicle=7,
-        bus=4,
-        trailer=6,
-        barrier=2,
-        motorcycle=6,
-        bicycle=6,
-        pedestrian=2,
-        traffic_cone=2),
-    points_loader=dict(
-        type='LoadPointsFromFile',
-        coord_type='LIDAR',
-        load_dim=5,
-        use_dim=[0, 1, 2, 4], # maybe use [0, 1, 2, 3, 4] if it will be changed in the loading.py
-        file_client_args=file_client_args)
 )
 
 train_pipeline = [
@@ -138,7 +86,7 @@ train_pipeline = [
         type='LoadPointsFromFile',
         coord_type='LIDAR',
         load_dim=5,
-        use_dim=5,
+        use_dim=use_dimension,
         file_client_args=file_client_args),
     dict(
         type='LoadPointsFromMultiSweeps',
@@ -149,7 +97,6 @@ train_pipeline = [
         close_radius=2.0,
         test_mode=True,),
     dict(type='LoadAnnotations3D', with_bbox_3d=True, with_label_3d=True),
-    dict(type='ObjectSample', db_sampler=db_sampler),
     dict(
         type='GlobalRotScaleTrans',
         rot_range=[-0.3925, 0.3925],
@@ -168,7 +115,7 @@ test_pipeline = [
         type='LoadPointsFromFile',
         coord_type='LIDAR',
         load_dim=5,
-        use_dim=5,
+        use_dim=use_dimension,
         file_client_args=file_client_args),
     dict(
         type='LoadPointsFromMultiSweeps',
@@ -206,7 +153,7 @@ eval_pipeline = [
         type='LoadPointsFromFile',
         coord_type='LIDAR',
         load_dim=5,
-        use_dim=5,
+        use_dim=use_dimension,
         file_client_args=file_client_args),
     dict(
         type='LoadPointsFromMultiSweeps',
@@ -222,7 +169,6 @@ eval_pipeline = [
         with_label=False),
     dict(type='Collect3D', keys=['points'])
 ]
-
 # runtime settings
 runner = dict(type='EpochBasedRunner', max_epochs=24)
 evaluation = dict(interval=24)
@@ -232,21 +178,7 @@ fp16 = dict(loss_scale=32.0)
 data = dict(
     samples_per_gpu=4,
     workers_per_gpu=4,
-    train=dict(
-        type=dataset_type,
-        data_root=data_root,
-        ann_file=data_root + 'nuscenes_infos_train.pkl',
-        pipeline=train_pipeline,
-        classes=class_names,
-        modality=input_modality,
-        test_mode=False,
-        # we use box_type_3d='LiDAR' in kitti and nuscenes dataset
-        # and box_type_3d='Depth' in sunrgbd and scannet dataset.
-        box_type_3d='LiDAR'),
-        val=dict(pipeline=test_pipeline, classes=class_names),
-        test=dict(pipeline=test_pipeline, classes=class_names)
 )
-evaluation = dict(interval=20, pipeline=eval_pipeline)
 
 workflow = [('train', 1), ('val', 1)]  # Includes validation at same frequency as training.
 
