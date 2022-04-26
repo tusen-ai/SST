@@ -246,7 +246,7 @@ data = dict(
         val=dict(pipeline=test_pipeline, classes=class_names),
         test=dict(pipeline=test_pipeline, classes=class_names)
 )
-evaluation = dict(interval=20, pipeline=eval_pipeline)
+evaluation = dict(interval=24, pipeline=eval_pipeline)
 
 workflow = [('train', 1), ('val', 1)]  # Includes validation at same frequency as training.
 
