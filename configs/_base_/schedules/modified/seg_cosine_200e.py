@@ -6,4 +6,4 @@ lr_config = dict(policy='CosineAnnealing', warmup=None, min_lr=1e-5)
 momentum_config = None
 
 # runtime settings
-runner = dict(type='EpochBasedRunner', max_epochs=200)
+runner = dict(type='EpochBasedRunner', max_epochs=24)

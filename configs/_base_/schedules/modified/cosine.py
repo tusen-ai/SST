@@ -17,4 +17,4 @@ lr_config = dict(
 
 momentum_config = None
 
-runner = dict(type='EpochBasedRunner', max_epochs=40)
+runner = dict(type='EpochBasedRunner', max_epochs=24)

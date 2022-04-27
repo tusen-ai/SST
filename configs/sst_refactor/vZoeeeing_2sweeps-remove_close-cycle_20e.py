@@ -2,7 +2,7 @@
 _base_ = [
     '../_base_/models/sst_base.py',
     '../_base_/datasets/nus-3d-2sweep-remove_close.py',
-    '../_base_/schedules/cosine.py',
+    '../_base_/schedules/modified/cycle_20e.py',
     '../_base_/default_runtime.py',
 ]
 

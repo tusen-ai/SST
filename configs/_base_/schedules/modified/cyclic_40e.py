@@ -28,4 +28,4 @@ momentum_config = dict(
 # Although the max_epochs is 40, this schedule is usually used we
 # RepeatDataset with repeat ratio N, thus the actual max epoch
 # number could be Nx40
-runner = dict(type='EpochBasedRunner', max_epochs=40)
+runner = dict(type='EpochBasedRunner', max_epochs=24)
