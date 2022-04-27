@@ -11,7 +11,8 @@ def single_gpu_test(model,
                     data_loader,
                     show=False,
                     out_dir=None,
-                    show_score_thr=0.3):
+                    show_score_thr=0.3,
+                    show_pretrain=False):
     """Test model with single gpu.
 
     This method tests model with single gpu and gives the 'show' option.
@@ -35,7 +36,7 @@ def single_gpu_test(model,
     prog_bar = mmcv.ProgressBar(len(dataset))
     for i, data in enumerate(data_loader):
         with torch.no_grad():
-            result = model(return_loss=False, rescale=True, **data)
+            result = model(return_loss=False, rescale=True, pretrain=show_pretrain, **data)
 
         if show:
             # Visualize the results of MMDetection3D model
@@ -75,6 +76,58 @@ def single_gpu_test(model,
                         show=show,
                         out_file=out_file,
                         score_thr=show_score_thr)
+
+        if show_pretrain:
+            import matplotlib.pyplot as plt
+            import numpy as np
+            xticks = np.arange(result["point_cloud_range"][0], result["point_cloud_range"][3] + 0.000001, step=result["voxel_shape"][0])
+            xmask = np.diff((xticks / 10).astype(int), append=0.0) > 0
+            xlabels = [round(xticks[i], 2) if xmask[i] else None for i in range(xticks.size)]
+
+            yticks = np.arange(result["point_cloud_range"][1], result["point_cloud_range"][3] + 0.000001, step=result["voxel_shape"][1])
+            ymask = np.diff((yticks / 10).astype(int), append=0.0) > 0
+            ylabels = [round(yticks[i], 2) if ymask[i] else None for i in range(yticks.size)]
+
+            if result["occupied_bev"] is not None:
+                batch_size = result["occupied_bev"].shape[0]
+                for b in range(batch_size):
+                    plt.figure()
+                    plt.imshow(result["occupied_bev"][b].detach().numpy(), extent=result["point_cloud_range"])
+                    plt.title(f"Occupied prediction, Datapoint {i}, batch {b}")
+                    plt.savefig(f"occ_pred_{i}_{b}.png")
+                    plt.xticks(xticks)
+                    plt.close()
+            if result["gt_num_points_bev"] is not None:
+                batch_size = result["gt_num_points_bev"].shape[0]
+                for b in range(batch_size):
+                    plt.figure()
+                    plt.imshow(result["gt_num_points_bev"][b].detach().numpy(), extent=result["point_cloud_range"])
+                    plt.title(f"Number of points per voxel BEV, Datapoint {i}, batch {b}")
+                    plt.savefig(f"gt_num_points_bev{i}_{b}.png")
+                    plt.close()
+            if result["diff_num_points_bev"] is not None:
+                batch_size = result["diff_num_points_bev"].shape[0]
+                for b in range(batch_size):
+                    plt.figure()
+                    plt.imshow(result["diff_num_points_bev"][b].detach().numpy(), extent=result["point_cloud_range"])
+                    plt.title(f"Diff in predicted number of points per voxel BEV, Datapoint {i}, batch {b}")
+                    plt.savefig(f"diff_num_points_bev{i}_{b}.png")
+                    plt.close()
+            if result["points"] is not None:
+                batch = result["points_batch"]
+                for b in range(batch_size):
+                    points = result["points"][torch.where(batch==b)].detach().numpy()
+                    color = points[:, 2] - points[:, 2].min()
+                    color = color / color.max()
+                    plt.figure(figsize=(100, 100))
+                    plt.scatter(points[:, 0], points[:, 1], c=color, marker="x", label="GT")
+                    plt.scatter(points[:, 0], points[:, 1], c=color, label="Predicted")
+                    plt.title(f"Predicted point locations, Datapoint {i}, batch {b}")
+                    plt.xticks(xticks, xlabels)
+                    plt.yticks(yticks, ylabels)
+                    plt.savefig(f"diff_num_points_bev{i}_{b}.png")
+                    plt.close()
+
         results.extend(result)
 
         batch_size = len(result)

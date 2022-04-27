@@ -72,3 +72,78 @@ class DynamicVoxelNet(VoxelNet):
             coors_batch.append(coor_pad)
         coors_batch = torch.cat(coors_batch, dim=0)
         return points, coors_batch
+
+    def test_pretrain(self, points, img_metas, imgs=None, rescale=False):
+        """Test function without augmentaiton."""
+        batch_size = len(points)
+        vx, vy, vz = self.middle_encoder.sparse_shape
+        n_points = self.bbox_head.num_chamfer_points
+        occupied = torch.zeros((batch_size, vx, vy), dtype=torch.long)
+
+        x = self.extract_feat(points, img_metas)
+        outs = self.bbox_head(x, show=True)
+        pred_dict = outs[0]
+        voxel_coors = pred_dict["voxel_coors"]
+        masked_voxel_coors = pred_dict["masked_voxel_coors"]
+        unmasked_voxel_coors = pred_dict["unmasked_voxel_coors"]
+
+        occupied = None
+        if "pred_occupied" in pred_dict:
+            occupied = -torch.ones((batch_size, vx, vy), dtype=torch.long)
+            index = (voxel_coors[:, 0], voxel_coors[:, 3], voxel_coors[:, 2])  # b ,x, y
+            occupied[index] = 2 * pred_dict["gt_occupied"].long()  # 0 -> fake voxel, 2 -> real voxel
+            occupied[index] = (torch.sigmoid(pred_dict["pred_occupied"]) + 0.5).long()
+            # 0 -> fake voxel predicted as fake,
+            # 1 -> fake voxel predicted as real,
+            # 2 -> real voxel predicted as fake,
+            # 3 -> real voxel predicted as real
+
+        gt_num_points = None
+        diff_num_points = None
+        if "pred_num_points_masked" in pred_dict:
+            gt_num_points = torch.zeros((batch_size, vx, vy), dtype=torch.long)
+            diff_num_points = torch.zeros((batch_size, vx, vy), dtype=torch.float)
+            index = (masked_voxel_coors[:, 0], masked_voxel_coors[:, 3], masked_voxel_coors[:, 2])  # b ,x, y
+            pred_num_points_masked = pred_dict["pred_num_points_masked"]
+            gt_num_points_masked = pred_dict["gt_num_points_masked"]
+            gt_num_points[index] = gt_num_points_masked.long()
+            diff_num_points[index] = gt_num_points_masked.float()-pred_num_points_masked
+        if "pred_num_points_unmasked" in pred_dict:
+            gt_num_points = torch.zeros((batch_size, vx, vy), dtype=torch.long) if gt_num_points is None else gt_num_points
+            diff_num_points = torch.zeros((batch_size, vx, vy), dtype=torch.float) if diff_num_points is None else diff_num_points
+            index = (unmasked_voxel_coors[:, 0], unmasked_voxel_coors[:, 3], unmasked_voxel_coors[:, 2])  # b ,x, y
+            pred_num_points_unmasked = pred_dict["pred_num_points_unmasked"]
+            gt_num_points_unmasked = pred_dict["gt_num_points_unmasked"]
+            gt_num_points[index] = gt_num_points_unmasked.long()
+            diff_num_points[index] = gt_num_points_unmasked.float() - pred_num_points_unmasked
+
+        points = []
+        batch = []
+        if "pred_points_masked" in pred_dict:
+            pred_points_masked = pred_dict["pred_points_masked"]  # M, num_chamfer_points, 3
+            x_shift = masked_voxel_coors[:, 3].type_as(pred_points_masked) * self.voxel_encoder.vx + self.voxel_encoder.x_offset  # M
+            y_shift = masked_voxel_coors[:, 2].type_as(pred_points_masked) * self.voxel_encoder.vy + self.voxel_encoder.y_offset  # M
+            z_shift = masked_voxel_coors[:, 1].type_as(pred_points_masked) * self.voxel_encoder.vz + self.voxel_encoder.z_offset  # M
+            shift = torch.cat([x_shift.unsqueeze(-1), y_shift.unsqueeze(-1), z_shift.unsqueeze(-1)], dim=1).view(-1, 1, 3)
+            batch.append(masked_voxel_coors[:, 0])
+            points.append((pred_points_masked + shift).view(-1, 3))
+        if "pred_points_unmasked" in pred_dict:
+            pred_points_unmasked = pred_dict["pred_points_unmasked"]  # M, num_chamfer_points, 3
+            x_shift = unmasked_voxel_coors[:, 3].type_as(pred_points_unmasked) * self.voxel_encoder.vx + self.voxel_encoder.x_offset  # M
+            y_shift = unmasked_voxel_coors[:, 2].type_as(pred_points_unmasked) * self.voxel_encoder.vy + self.voxel_encoder.y_offset  # M
+            z_shift = unmasked_voxel_coors[:, 1].type_as(pred_points_unmasked) * self.voxel_encoder.vz + self.voxel_encoder.z_offset  # M
+            shift = torch.cat([x_shift.unsqueeze(-1), y_shift.unsqueeze(-1), z_shift.unsqueeze(-1)], dim=1).view(-1, 1, 3)
+            batch.append(unmasked_voxel_coors[:, 0])
+            points.append((pred_points_unmasked + shift).view(-1, 3))
+        points = torch.cat(points, dim=0) if points else None
+        batch = torch.cat(batch, dim=0) if points else None
+
+        return {
+            "occupied_bev": occupied,
+            "gt_num_points_bev": gt_num_points,
+            "diff_num_points_bev": diff_num_points,
+            "points": points,
+            "points_batch": batch,
+            "point_cloud_range": self.voxel_encoder.point_cloud_range,
+            "voxel_shape": (self.voxel_encoder.vx, self.voxel_encoder.vy, self.voxel_encoder.vz)
+        }

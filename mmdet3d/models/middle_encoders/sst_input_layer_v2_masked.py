@@ -46,7 +46,8 @@ class SSTInputLayerV2Masked(SSTInputLayerV2):
         fake_voxels_ratio=0.1,
         use_chamfer=True,
         use_num_points=True,
-        use_fake_voxels=True
+        use_fake_voxels=True,
+        masked_window_shape=None
         ):
         super().__init__(
             drop_info,
@@ -66,6 +67,8 @@ class SSTInputLayerV2Masked(SSTInputLayerV2):
         self.use_chamfer = use_chamfer
         self.use_num_points = use_num_points
         self.use_fake_voxels = use_fake_voxels
+        self.masked_window_shape = masked_window_shape
+        self.unmasked_window_shape = window_shape
         assert use_chamfer or use_num_points or use_fake_voxels, \
             "Need to use at least one of chamfer, num_points, and fake_voxels"
 
@@ -118,9 +121,16 @@ class SSTInputLayerV2Masked(SSTInputLayerV2):
         unmasked_voxels = voxel_feats[unmasked_idx]
         unmasked_voxel_coors = voxel_coors[unmasked_idx]
 
+        if self.masked_window_shape is not None:
+            # Change window size for masked encoder
+            assert self.unmasked_window_shape is not None, "Cannot restore the window shape"
+            self.window_shape = self.masked_window_shape
         # Get info for encoder input, Might drop voxels
         voxel_info_encoder = super().forward(unmasked_voxels, unmasked_voxel_coors, batch_size=None)
         assert len(voxel_info_encoder["voxel_feats"]) == n_unmasked_voxels, "Dropping is not allowed for reconstruction"
+        if self.masked_window_shape:
+            # Change back the window size for the next iteration
+            self.window_shape = self.unmasked_window_shape
 
         voxel_info_decoder["mask"] = mask
         voxel_info_decoder["n_unmasked"] = n_unmasked_voxels

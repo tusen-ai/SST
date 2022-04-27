@@ -92,7 +92,7 @@ class ReconstructionHead(BaseModule):
             x = conv(x).transpose(1, 2).squeeze(0)
             return x
 
-    def forward(self, x):
+    def forward(self, x, show=None):
         """Forward pass.
 
         Args:r
@@ -157,6 +157,13 @@ class ReconstructionHead(BaseModule):
                 pred_dict["pred_points_unmasked"] = pred_points_unmasked
                 pred_dict["gt_points_unmasked"] = gt_points_unmasked
                 pred_dict["gt_point_padding_unmasked"] = gt_point_padding_unmasked.bool()
+
+        if show is not None:
+            pred_dict["voxel_coors"] = voxel_info_decoder["voxel_coors"]
+            pred_dict["masked_voxel_coors"] = voxel_info_decoder["voxel_coors"][voxel_info_decoder["dec2masked_idx"]]  # b, z, y, x
+            if not self.only_masked:
+                pred_dict["unmasked_voxel_coors"] = voxel_info_decoder["voxel_coors"][
+                    voxel_info_decoder["dec2masked_idx"]]  # b, z, y, x
 
         return pred_dict,  # Output needs to be tuple which the ',' achieves
 
