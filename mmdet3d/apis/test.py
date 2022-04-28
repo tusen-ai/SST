@@ -96,11 +96,12 @@ def single_gpu_test(model,
                     fig = plt.figure(figsize=(100, 100))
                     im = plt.imshow(result["occupied_bev"][b].detach().cpu().numpy(), extent=extent)
                     plt.title(f"Occupied prediction, Datapoint {i}, batch {b}")
-                    plt.savefig(f"occ_pred_{i}_{b}.png")
-                    plt.xticks(xticks)
+                    plt.xticks(xticks, xlabels)
+                    plt.yticks(yticks, ylabels)
                     fig.subplots_adjust(right=0.85)
                     cbar_ax = fig.add_axes([0.88, 0.15, 0.04, 0.7])
                     fig.colorbar(im, cax=cbar_ax)
+                    plt.savefig(f"occ_pred_{i}_{b}.png")
                     plt.close()
             if result["gt_num_points_bev"] is not None:
                 batch_size = result["gt_num_points_bev"].shape[0]
@@ -108,10 +109,12 @@ def single_gpu_test(model,
                     fig = plt.figure(figsize=(100, 100))
                     plt.imshow(result["gt_num_points_bev"][b].detach().cpu().numpy(), extent=extent)
                     plt.title(f"Number of points per voxel BEV, Datapoint {i}, batch {b}")
-                    plt.savefig(f"gt_num_points_bev{i}_{b}.png")
+                    plt.xticks(xticks, xlabels)
+                    plt.yticks(yticks, ylabels)
                     fig.subplots_adjust(right=0.85)
                     cbar_ax = fig.add_axes([0.88, 0.15, 0.04, 0.7])
                     fig.colorbar(im, cax=cbar_ax)
+                    plt.savefig(f"gt_num_points_bev{i}_{b}.png")
                     plt.close()
             if result["diff_num_points_bev"] is not None:
                 batch_size = result["diff_num_points_bev"].shape[0]
@@ -119,10 +122,12 @@ def single_gpu_test(model,
                     fig = plt.figure(figsize=(100, 100))
                     plt.imshow(result["diff_num_points_bev"][b].detach().cpu().numpy(), extent=extent)
                     plt.title(f"Diff in predicted number of points per voxel BEV, Datapoint {i}, batch {b}")
-                    plt.savefig(f"diff_num_points_bev{i}_{b}.png")
+                    plt.xticks(xticks, xlabels)
+                    plt.yticks(yticks, ylabels)
                     fig.subplots_adjust(right=0.85)
                     cbar_ax = fig.add_axes([0.88, 0.15, 0.04, 0.7])
                     fig.colorbar(im, cax=cbar_ax)
+                    plt.savefig(f"diff_num_points_bev{i}_{b}.png")
                     plt.close()
             if result["points"] is not None:
                 batch = result["points_batch"]
