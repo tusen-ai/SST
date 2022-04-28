@@ -6,9 +6,10 @@ _base_ = [
     '../_base_/default_runtime.py',
 ]
 
-voxel_size = (0.1, 0.1, 8)
+voxel_size = (0.25, 0.25, 8)
 window_shape = (16, 16, 1)  # 12 * 0.32m
 point_cloud_range = [-50, -50, -5, 50, 50, 3]
+encoder_blocks = 2
 drop_info_training = {
     0: {'max_tokens': 30, 'drop_range': (0, 30)},
     1: {'max_tokens': 60, 'drop_range': (30, 60)},
@@ -51,7 +52,7 @@ model = dict(
     middle_encoder=dict(
         type='SSTInputLayerV2',
         window_shape=window_shape,
-        sparse_shape=(1000, 1000, 1),   # tot_point_cloud_range / voxel_size (50+50)/0.1
+        sparse_shape=(400, 400, 1),
         shuffle_voxels=True,
         debug=True,
         drop_info=drop_info,
@@ -62,11 +63,11 @@ model = dict(
 
     backbone=dict(
         type='SSTv2',
-        d_model=[128, ] * 6,
-        nhead=[8, ] * 6,
-        num_blocks=6,
-        dim_feedforward=[256, ] * 6,
-        output_shape=[1000, 1000],   # tot_point_cloud_range / voxel_size (50+50)/0.1
+        d_model=[128, ] * encoder_blocks,
+        nhead=[8, ] * encoder_blocks,
+        num_blocks=encoder_blocks,
+        dim_feedforward=[256, ] * encoder_blocks,
+        output_shape=[400, 400],
         num_attached_conv=3,
         conv_kwargs=[
             dict(kernel_size=3, dilation=1, padding=1, stride=1),
@@ -82,7 +83,6 @@ model = dict(
 # runtime settings
 runner = dict(type='EpochBasedRunner', max_epochs=24)
 evaluation = dict(interval=24)
-workflow = [('train', 1), ('val', 1)]  # Includes validation at same frequency as training.
 checkpoint_config = dict(interval=6)
 
 fp16 = dict(loss_scale=32.0)
@@ -90,6 +90,8 @@ data = dict(
     samples_per_gpu=4,
     workers_per_gpu=4,
 )
+
+workflow = [('train', 1), ('val', 1)]  # Includes validation at same frequency as training.
 
 """train=dict(
         type='RepeatDataset',

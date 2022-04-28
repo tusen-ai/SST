@@ -1,30 +1,31 @@
 # Used to try same settings as Zoeeeing as presented here: https://github.com/TuSimple/SST/issues/18
 _base_ = [
     '../_base_/models/sst_base.py',
-    '../_base_/datasets/nus-3d-2sweep-remove_close.py',
-    '../_base_/schedules/schedule_2x.py',
+    '../_base_/datasets/nus-3d-2sweep-car-remove_close.py',
+    '../_base_/schedules/cosine_2x.py',
     '../_base_/default_runtime.py',
 ]
 
 voxel_size = (0.25, 0.25, 8)
-window_shape = (16, 16, 1) # 12 * 0.32m
+window_shape = (16, 16, 1)  # 12 * 0.32m
 point_cloud_range = [-50, -50, -5, 50, 50, 3]
-drop_info_training ={
-    0:{'max_tokens':30, 'drop_range':(0, 30)},
-    1:{'max_tokens':60, 'drop_range':(30, 60)},
-    2:{'max_tokens':100, 'drop_range':(60, 100)},
-    3:{'max_tokens':200, 'drop_range':(100, 200)},
-    4:{'max_tokens':250, 'drop_range':(200, 100000)},
+encoder_blocks = 8
+drop_info_training = {
+    0: {'max_tokens': 30, 'drop_range': (0, 30)},
+    1: {'max_tokens': 60, 'drop_range': (30, 60)},
+    2: {'max_tokens': 100, 'drop_range': (60, 100)},
+    3: {'max_tokens': 200, 'drop_range': (100, 200)},
+    4: {'max_tokens': 250, 'drop_range': (200, 100000)},
 }
-drop_info_test ={
-    0:{'max_tokens':30, 'drop_range':(0, 30)},
-    1:{'max_tokens':60, 'drop_range':(30, 60)},
-    2:{'max_tokens':100, 'drop_range':(60, 100)},
-    3:{'max_tokens':200, 'drop_range':(100, 200)},
-    4:{'max_tokens':256, 'drop_range':(200, 100000)},  # 16*16=256
+drop_info_test = {
+    0: {'max_tokens': 30, 'drop_range': (0, 30)},
+    1: {'max_tokens': 60, 'drop_range': (30, 60)},
+    2: {'max_tokens': 100, 'drop_range': (60, 100)},
+    3: {'max_tokens': 200, 'drop_range': (100, 200)},
+    4: {'max_tokens': 256, 'drop_range': (200, 100000)},  # 16*16=256
 }
 drop_info = (drop_info_training, drop_info_test)
-shifts_list=[(0, 0), (window_shape[0]//2, window_shape[1]//2)]
+shifts_list = [(0, 0), (window_shape[0]//2, window_shape[1]//2)]
 
 model = dict(
     type='DynamicVoxelNet',
@@ -62,10 +63,10 @@ model = dict(
 
     backbone=dict(
         type='SSTv2',
-        d_model=[128,] * 6,
-        nhead=[8, ] * 6,
-        num_blocks=6,
-        dim_feedforward=[256, ] * 6,
+        d_model=[128, ] * encoder_blocks,
+        nhead=[8, ] * encoder_blocks,
+        num_blocks=encoder_blocks,
+        dim_feedforward=[256, ] * encoder_blocks,
         output_shape=[400, 400],
         num_attached_conv=3,
         conv_kwargs=[

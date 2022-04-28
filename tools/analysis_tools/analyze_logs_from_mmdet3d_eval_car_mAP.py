@@ -50,15 +50,31 @@ def plot_curve(log_dicts, args):
         epochs = list(log_dict.keys())
         for j, metric in enumerate(metrics):
             print(f'plot curve of {args.json_logs[i]}, metric is {metric}')
-            if metric not in log_dict[epochs[args.interval - 1]]:
+            if metric not in log_dict[epochs[args.interval - 1]] and metric != "car_mAP":
                 raise KeyError(
                     f'{args.json_logs[i]} does not contain metric {metric}')
 
             if args.mode == 'eval':
-                xs = [0] + epochs
+                if min(epochs) == args.interval:
+                    x0 = args.interval
+                else:
+                    # if current training is resumed from previous checkpoint
+                    # we lost information in early epochs
+                    # `xs` should start according to `min(epochs)`
+                    if min(epochs) % args.interval == 0:
+                        x0 = min(epochs)
+                    else:
+                        # find the first epoch that do eval
+                        x0 = min(epochs) + args.interval - \
+                            min(epochs) % args.interval
+                xs = np.arange(x0, max(epochs) + 1, args.interval)
+                xs = [0]
                 ys = [0]
                 for epoch in epochs[args.interval - 1::args.interval]:
-                    ys += log_dict[epoch][metric]
+                    if metric == "car_mAP":
+                        val = sum(log_dict[epoch]['pts_bbox_NuScenes/car_AP_dist_0.5'] + log_dict[epoch]['pts_bbox_NuScenes/car_AP_dist_1.0'] + log_dict[epoch]['pts_bbox_NuScenes/car_AP_dist_2.0'] + log_dict[epoch]['pts_bbox_NuScenes/car_AP_dist_4.0'])/4
+                        ys += [val]
+                        xs += [epoch]
 
                 ax = plt.gca()
                 ax.set_xticks(xs)
@@ -163,6 +179,7 @@ def load_json_logs(json_logs, args):
 def main():
     args = parse_args()
     args.mode = 'eval'
+    args.keys = ["car_mAP"]
 
     json_logs = args.json_logs
     for json_log in json_logs:
