@@ -109,7 +109,7 @@ def single_gpu_test(model,
             if result["gt_num_points_bev"] is not None:
                 batch_size = result["gt_num_points_bev"].shape[0]
                 vmin, vmax = result["gt_num_points_bev"].min().item(), result["gt_num_points_bev"].max().item()
-                cticks = np.arange(vmin, vmax, step=(vmax-vmin)/10).round(2).tolist()
+                cticks = np.arange(vmin, vmax, step=(vmax-vmin)/5).round(2).tolist()
                 for b in range(batch_size):
                     fig = plt.figure(figsize=(100, 100))
                     im = plt.imshow(result["gt_num_points_bev"][b].detach().cpu().numpy(), extent=extent, vmin=vmin, vmax=vmax)
@@ -117,7 +117,7 @@ def single_gpu_test(model,
                     plt.xticks(xticks, xlabels)
                     plt.yticks(yticks, ylabels)
                     fig.subplots_adjust(right=0.85)
-                    cbar_ax = fig.add_axes([0.88, 0.15, 0.04, 0.7])
+                    cbar_ax = fig.add_axes([0.88, 0.12, 0.04, 0.7])
                     fig.colorbar(im, cax=cbar_ax, ticks=cticks)
                     cb.set_ticklabels(list(map(str, cticks)))
                     plt.savefig(f"gt_num_points_bev{i}_{b}.png")
@@ -125,7 +125,7 @@ def single_gpu_test(model,
             if result["diff_num_points_bev"] is not None:
                 batch_size = result["diff_num_points_bev"].shape[0]
                 vmin, vmax = result["gt_num_points_bev"].min().item(), result["gt_num_points_bev"].max().item()
-                cticks = np.arange(vmin, vmax, step=(vmax-vmin)/10).round(2).tolist()
+                cticks = np.arange(vmin, vmax, step=(vmax-vmin)/5).round(2).tolist()
                 for b in range(batch_size):
                     fig = plt.figure(figsize=(100, 100))
                     im = plt.imshow(result["diff_num_points_bev"][b].detach().cpu().numpy(), extent=extent, vmin=vmin, vmax=vmax)
@@ -133,7 +133,7 @@ def single_gpu_test(model,
                     plt.xticks(xticks, xlabels)
                     plt.yticks(yticks, ylabels)
                     fig.subplots_adjust(right=0.85)
-                    cbar_ax = fig.add_axes([0.88, 0.15, 0.04, 0.7])
+                    cbar_ax = fig.add_axes([0.88, 0.12, 0.04, 0.7])
                     fig.colorbar(im, cax=cbar_ax, ticks=cticks)
                     cb.set_ticklabels(list(map(str, cticks)))
                     plt.savefig(f"diff_num_points_bev{i}_{b}.png")
