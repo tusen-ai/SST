@@ -1,8 +1,8 @@
 # Used to try same settings as Zoeeeing as presented here: https://github.com/TuSimple/SST/issues/18
 _base_ = [
     '../_base_/models/sst_base.py',
-    '../_base_/datasets/nus-3d-2sweep-remove_close.py',
-    '../_base_/schedules/modified/cycle_40e.py',
+    '../_base_/datasets/nus-3d-2sweep-car-remove_close.py',
+    '../_base_/schedules/modified/cyclic_40e.py',
     '../_base_/default_runtime.py',
 ]
 
