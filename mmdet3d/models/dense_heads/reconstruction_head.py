@@ -161,8 +161,7 @@ class ReconstructionHead(BaseModule):
         if show is not None:
             pred_dict["voxel_coors"] = voxel_info_decoder["voxel_coors"]
             pred_dict["masked_voxel_coors"] = voxel_info_decoder["voxel_coors"][voxel_info_decoder["dec2masked_idx"]]  # b, z, y, x
-            if not self.only_masked:
-                pred_dict["unmasked_voxel_coors"] = voxel_info_decoder["voxel_coors"][
+            pred_dict["unmasked_voxel_coors"] = voxel_info_decoder["voxel_coors"][
                     voxel_info_decoder["dec2masked_idx"]]  # b, z, y, x
 
         return pred_dict,  # Output needs to be tuple which the ',' achieves

@@ -65,7 +65,7 @@ class Base3DDetector(BaseDetector):
         return self.test_pretrain(points[0], img_metas[0], img[0], **kwargs)
 
     @auto_fp16(apply_to=('img', 'points'))
-    def forward(self, return_loss=True, **kwargs):
+    def forward(self, return_loss=True, pretrain=False, **kwargs):
         """Calls either forward_train or forward_test depending on whether
         return_loss=True.
 
@@ -78,7 +78,7 @@ class Base3DDetector(BaseDetector):
         """
         if return_loss:
             return self.forward_train(**kwargs)
-        elif kwargs.get("pretrain"):
+        elif pretrain:
             return self.forward_test_pretrain(**kwargs)
         else:
             return self.forward_test(**kwargs)

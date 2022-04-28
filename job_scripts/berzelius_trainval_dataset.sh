@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-#!/usr/bin/env bash
 #SBATCH -t 0-16:00:00
 #SBATCH --gpus=6
 #SBATCH -N 1
