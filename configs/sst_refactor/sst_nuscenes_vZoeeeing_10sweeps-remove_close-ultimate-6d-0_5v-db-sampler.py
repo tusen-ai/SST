@@ -62,10 +62,10 @@ model = dict(
 
     backbone=dict(
         type='SSTv2',
-        d_model=[128,] * 8,
-        nhead=[8, ] * 8,
-        num_blocks=8,
-        dim_feedforward=[256, ] * 8,
+        d_model=[128,] * 6,
+        nhead=[8, ] * 6,
+        num_blocks=6,
+        dim_feedforward=[256, ] * 6,
         output_shape=[200, 200],
         num_attached_conv=3,
         conv_kwargs=[
