@@ -108,7 +108,7 @@ def single_gpu_test(model,
                     plt.close()
             if result["gt_num_points_bev"] is not None:
                 batch_size = result["gt_num_points_bev"].shape[0]
-                vmin, vmax = result["gt_num_points_bev"].min(), result["gt_num_points_bev"].max()
+                vmin, vmax = result["gt_num_points_bev"].min().item(), result["gt_num_points_bev"].max().item()
                 cticks = np.arange(vmin, vmax, step=(vmax-vmin)/10).round(2).tolist()
                 for b in range(batch_size):
                     fig = plt.figure(figsize=(100, 100))
@@ -124,7 +124,7 @@ def single_gpu_test(model,
                     plt.close()
             if result["diff_num_points_bev"] is not None:
                 batch_size = result["diff_num_points_bev"].shape[0]
-                vmin, vmax = result["gt_num_points_bev"].min(), result["gt_num_points_bev"].max()
+                vmin, vmax = result["gt_num_points_bev"].min().item(), result["gt_num_points_bev"].max().item()
                 cticks = np.arange(vmin, vmax, step=(vmax-vmin)/10).round(2).tolist()
                 for b in range(batch_size):
                     fig = plt.figure(figsize=(100, 100))
