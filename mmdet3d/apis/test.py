@@ -92,41 +92,50 @@ def single_gpu_test(model,
 
             if result["occupied_bev"] is not None:
                 batch_size = result["occupied_bev"].shape[0]
+                vmin, vmax = -1, 3
+                cticks = [-1, 0, 1, 2, 3]
                 for b in range(batch_size):
                     fig = plt.figure(figsize=(100, 100))
-                    im = plt.imshow(result["occupied_bev"][b].detach().cpu().numpy(), extent=extent)
+                    im = plt.imshow(result["occupied_bev"][b].detach().cpu().numpy(), extent=extent, vmin=vmin, vmax=vmax)
                     plt.title(f"Occupied prediction, Datapoint {i}, batch {b}")
                     plt.xticks(xticks, xlabels)
                     plt.yticks(yticks, ylabels)
                     fig.subplots_adjust(right=0.85)
                     cbar_ax = fig.add_axes([0.88, 0.15, 0.04, 0.7])
-                    fig.colorbar(im, cax=cbar_ax)
+                    cb = fig.colorbar(im, cax=cbar_ax, ticks=cticks)
+                    cb.set_ticklabels(list(map(str, cticks)))
                     plt.savefig(f"occ_pred_{i}_{b}.png")
                     plt.close()
             if result["gt_num_points_bev"] is not None:
                 batch_size = result["gt_num_points_bev"].shape[0]
+                vmin, vmax = result["gt_num_points_bev"].min(), result["gt_num_points_bev"].max()
+                cticks = np.arange(vmin, vmax, step=(vmax-vmin)/10).round(2).tolist()
                 for b in range(batch_size):
                     fig = plt.figure(figsize=(100, 100))
-                    plt.imshow(result["gt_num_points_bev"][b].detach().cpu().numpy(), extent=extent)
+                    im = plt.imshow(result["gt_num_points_bev"][b].detach().cpu().numpy(), extent=extent, vmin=vmin, vmax=vmax)
                     plt.title(f"Number of points per voxel BEV, Datapoint {i}, batch {b}")
                     plt.xticks(xticks, xlabels)
                     plt.yticks(yticks, ylabels)
                     fig.subplots_adjust(right=0.85)
                     cbar_ax = fig.add_axes([0.88, 0.15, 0.04, 0.7])
                     fig.colorbar(im, cax=cbar_ax)
+                    cb.set_ticklabels(list(map(str, cticks)))
                     plt.savefig(f"gt_num_points_bev{i}_{b}.png")
                     plt.close()
             if result["diff_num_points_bev"] is not None:
                 batch_size = result["diff_num_points_bev"].shape[0]
+                vmin, vmax = result["gt_num_points_bev"].min(), result["gt_num_points_bev"].max()
+                cticks = np.arange(vmin, vmax, step=(vmax-vmin)/10).round(2).tolist()
                 for b in range(batch_size):
                     fig = plt.figure(figsize=(100, 100))
-                    plt.imshow(result["diff_num_points_bev"][b].detach().cpu().numpy(), extent=extent)
+                    im = plt.imshow(result["diff_num_points_bev"][b].detach().cpu().numpy(), extent=extent, vmin=vmin, vmax=vmax)
                     plt.title(f"Diff in predicted number of points per voxel BEV, Datapoint {i}, batch {b}")
                     plt.xticks(xticks, xlabels)
                     plt.yticks(yticks, ylabels)
                     fig.subplots_adjust(right=0.85)
                     cbar_ax = fig.add_axes([0.88, 0.15, 0.04, 0.7])
                     fig.colorbar(im, cax=cbar_ax)
+                    cb.set_ticklabels(list(map(str, cticks)))
                     plt.savefig(f"diff_num_points_bev{i}_{b}.png")
                     plt.close()
             if result["points"] is not None:
