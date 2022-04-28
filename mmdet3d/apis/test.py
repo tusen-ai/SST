@@ -80,9 +80,9 @@ def single_gpu_test(model,
         if show_pretrain:
             import matplotlib.pyplot as plt
 
-            SMALL_SIZE = 600
-            MEDIUM_SIZE = 600
-            BIGGER_SIZE = 600
+            SMALL_SIZE = 200
+            MEDIUM_SIZE = 300
+            BIGGER_SIZE = 400
 
             plt.rc('font', size=SMALL_SIZE)          # controls default text sizes
             plt.rc('axes', titlesize=SMALL_SIZE)     # fontsize of the axes title
@@ -92,6 +92,7 @@ def single_gpu_test(model,
             plt.rc('legend', fontsize=SMALL_SIZE)    # legend fontsize
             plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
             import numpy as np
+            import pandas as pd
             xticks = np.arange(result["point_cloud_range"][0], result["point_cloud_range"][3] + 0.000001, step=result["voxel_shape"][0])
             xmask = np.diff((xticks / 10).astype(int), append=0.0) > 0
             xlabels = [round(xticks[i], 2) if xmask[i] else None for i in range(xticks.size)]
@@ -106,9 +107,11 @@ def single_gpu_test(model,
                 batch_size = result["occupied_bev"].shape[0]
                 vmin, vmax = -1, 3
                 cticks = [-1, 0, 1, 2, 3]
+                data = []
                 for b in range(batch_size):
                     fig = plt.figure(figsize=(100, 100))
-                    im = plt.imshow(result["occupied_bev"][b].detach().cpu().numpy(), extent=extent, vmin=vmin, vmax=vmax)
+                    occ_bev =result["occupied_bev"][b].detach().cpu().numpy()
+                    im = plt.imshow(occ_bev, extent=extent, vmin=vmin, vmax=vmax)
                     plt.title(f"Occupied prediction, Datapoint {i}, batch {b}")
                     plt.xticks(xticks, xlabels)
                     plt.yticks(yticks, ylabels)
@@ -118,6 +121,20 @@ def single_gpu_test(model,
                     cb.set_ticklabels(list(map(str, cticks)))
                     plt.savefig(f"occ_pred_{i}_{b}.png")
                     plt.close()
+                    data_dict = {
+                        "n_points": (occ_bev > -1).sum(),
+                        "TN": (occ_bev == 0).sum(),
+                        "FN": (occ_bev == 1).sum(),
+                        "FP": (occ_bev == 2).sum(),
+                        "TP": (occ_bev == 3).sum(),
+                        "sample": i*batch_size+b,
+                    }
+                    data_dict["False positive rate"] = data_dict["FP"]/(data_dict["TN"]+data_dict["FP"])
+                    data_dict["False negative rate"] = data_dict["FN"]/(data_dict["TP"]+data_dict["FN"])
+                    data_dict["Recall"] = data_dict["TP"]/(data_dict["TP"]+data_dict["FN"])
+                    data_dict["Precision"] = data_dict["TP"]/(data_dict["TP"]+data_dict["FP"])
+                    data_dict["Accuracy"] = (data_dict["TP"] + data_dict["TN"]) / data_dict["n_points"]
+
             if result["gt_num_points_bev"] is not None:
                 batch_size = result["gt_num_points_bev"].shape[0]
                 for b in range(batch_size):
