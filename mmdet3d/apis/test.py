@@ -80,9 +80,9 @@ def single_gpu_test(model,
         if show_pretrain:
             import matplotlib.pyplot as plt
 
-            SMALL_SIZE = 20
-            MEDIUM_SIZE = 30
-            BIGGER_SIZE = 40
+            SMALL_SIZE = 600
+            MEDIUM_SIZE = 600
+            BIGGER_SIZE = 600
 
             plt.rc('font', size=SMALL_SIZE)          # controls default text sizes
             plt.rc('axes', titlesize=SMALL_SIZE)     # fontsize of the axes title
@@ -120,9 +120,9 @@ def single_gpu_test(model,
                     plt.close()
             if result["gt_num_points_bev"] is not None:
                 batch_size = result["gt_num_points_bev"].shape[0]
-                vmin, vmax = result["gt_num_points_bev"].min().item(), result["gt_num_points_bev"].max().item()
-                cticks = np.arange(vmin, vmax, step=(vmax-vmin)/5).round(2).tolist()
                 for b in range(batch_size):
+                    vmin, vmax = result["gt_num_points_bev"].min().item(), result["gt_num_points_bev"].max().item()
+                    cticks = np.arange(vmin, vmax, step=(vmax - vmin) / 5).round(2).tolist()
                     fig = plt.figure(figsize=(100, 100))
                     im = plt.imshow(result["gt_num_points_bev"][b].detach().cpu().numpy(), extent=extent, vmin=vmin, vmax=vmax)
                     plt.title(f"Number of points per voxel BEV, Datapoint {i}, batch {b}")
@@ -136,9 +136,9 @@ def single_gpu_test(model,
                     plt.close()
             if result["diff_num_points_bev"] is not None:
                 batch_size = result["diff_num_points_bev"].shape[0]
-                vmin, vmax = result["gt_num_points_bev"].min().item(), result["gt_num_points_bev"].max().item()
-                cticks = np.arange(vmin, vmax, step=(vmax-vmin)/5).round(2).tolist()
                 for b in range(batch_size):
+                    vmin, vmax = result["gt_num_points_bev"].min().item(), result["gt_num_points_bev"].max().item()
+                    cticks = np.arange(vmin, vmax, step=(vmax - vmin) / 5).round(2).tolist()
                     fig = plt.figure(figsize=(100, 100))
                     im = plt.imshow(result["diff_num_points_bev"][b].detach().cpu().numpy(), extent=extent, vmin=vmin, vmax=vmax)
                     plt.title(f"Diff in predicted number of points per voxel BEV, Datapoint {i}, batch {b}")
