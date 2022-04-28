@@ -66,7 +66,7 @@ model = dict(
         nhead=[8, ] * 6,
         num_blocks=6,
         dim_feedforward=[256, ] * 6,
-        output_shape=[250, 250],
+        output_shape=[334, 334],
         num_attached_conv=3,
         conv_kwargs=[
             dict(kernel_size=3, dilation=1, padding=1, stride=1),
