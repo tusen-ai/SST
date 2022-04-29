@@ -34,6 +34,8 @@ def single_gpu_test(model,
     results = []
     dataset = data_loader.dataset
     prog_bar = mmcv.ProgressBar(len(dataset))
+
+    data=[]
     for i, data in enumerate(data_loader):
         with torch.no_grad():
             result = model(return_loss=False, rescale=True, pretrain=show_pretrain, **data)
@@ -92,7 +94,6 @@ def single_gpu_test(model,
             plt.rc('legend', fontsize=SMALL_SIZE)    # legend fontsize
             plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
             import numpy as np
-            import pandas as pd
             xticks = np.arange(result["point_cloud_range"][0], result["point_cloud_range"][3] + 0.000001, step=result["voxel_shape"][0])
             xmask = np.diff((xticks / 10).astype(int), append=0.0) > 0
             xlabels = [round(xticks[i], 2) if xmask[i] else None for i in range(xticks.size)]
@@ -107,7 +108,6 @@ def single_gpu_test(model,
                 batch_size = result["occupied_bev"].shape[0]
                 vmin, vmax = -1, 3
                 cticks = [-1, 0, 1, 2, 3]
-                data = []
                 for b in range(batch_size):
                     fig = plt.figure(figsize=(100, 100))
                     occ_bev =result["occupied_bev"][b].detach().cpu().numpy()
@@ -134,6 +134,7 @@ def single_gpu_test(model,
                     data_dict["Recall"] = data_dict["TP"]/(data_dict["TP"]+data_dict["FN"])
                     data_dict["Precision"] = data_dict["TP"]/(data_dict["TP"]+data_dict["FP"])
                     data_dict["Accuracy"] = (data_dict["TP"] + data_dict["TN"]) / data_dict["n_points"]
+                    data.append(data_dict)
 
             if result["gt_num_points_bev"] is not None:
                 batch_size = result["gt_num_points_bev"].shape[0]
@@ -187,4 +188,28 @@ def single_gpu_test(model,
         batch_size = len(result)
         for _ in range(batch_size):
             prog_bar.update()
+        if show_pretrain and i % 10:
+            import matplotlib.pyplot as plt
+            import seaborn as sns
+            import pandas as pd
+            df = pd.DataFrame(data)
+            df[["TN", "TP", "FN", "FP"]] = df[["TN", "TP", "FN", "FP"]]/df["num_points"]
+            df_merge = pd.melt(df[[
+                "TN", "TP", "FN", "FP", "False positive rate", "False negative rate", "Recall", "Precision", "Accuracy"
+            ]])
+            sns.boxplot(x="variable", y="value", data=df_merge)
+            plt.savefig(f"occupied_metrics_{i}.png")
+            plt.close()
+    if show_pretrain:
+        import matplotlib.pyplot as plt
+        import seaborn as sns
+        import pandas as pd
+        df = pd.DataFrame(data)
+        df[["TN", "TP", "FN", "FP"]] = df[["TN", "TP", "FN", "FP"]] / df["num_points"]
+        df_merge = pd.melt(df[[
+            "TN", "TP", "FN", "FP", "False positive rate", "False negative rate", "Recall", "Precision", "Accuracy"
+        ]])
+        sns.boxplot(x="variable", y="value", data=df_merge)
+        plt.savefig(f"occupied_metrics.png")
+        plt.close()
     return results
