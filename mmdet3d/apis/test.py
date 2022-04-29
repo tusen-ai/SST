@@ -126,21 +126,21 @@ def single_gpu_test(model,
                     plt.close()
                     data_dict = {
                         "n_points": (occ_bev > -1).sum(),
-                        "TN": (occ_bev == 0).sum(),
-                        "FN": (occ_bev == 1).sum(),
-                        "FP": (occ_bev == 2).sum(),
-                        "TP": (occ_bev == 3).sum(),
+                        "TN": ((occ_bev == 0) | (occ_bev == 2)).sum(),
+                        "FP": ((occ_bev == 1) | (occ_bev == 3)).sum(),
+                        "FN": (occ_bev == 4).sum(),
+                        "TP": (occ_bev == 5).sum(),
                         "sample": i*batch_size+b,
                     }
-                    data_dict["False positive rate"] = data_dict["FP"]/(data_dict["TN"]+data_dict["FP"])
-                    data_dict["False negative rate"] = data_dict["FN"]/(data_dict["TP"]+data_dict["FN"])
-                    data_dict["Recall"] = data_dict["TP"]/(data_dict["TP"]+data_dict["FN"])
+                    data_dict["FPR"] = data_dict["FP"]/(data_dict["TN"]+data_dict["FP"])
+                    data_dict["FNR"] = data_dict["FN"]/(data_dict["TP"]+data_dict["FN"])
+                    data_dict["Recall"] = data_dict["TP"]/(data_dict["TP"]+data_dict["FN"])  # TPR
                     data_dict["Precision"] = data_dict["TP"]/(data_dict["TP"]+data_dict["FP"])
                     data_dict["Accuracy"] = (data_dict["TP"] + data_dict["TN"]) / data_dict["n_points"]
                     occ_data.append(data_dict)
 
-            x_range = np.arange(extent[0] + vx / 2, extent[0] - vx / 2, vx - 1e-16)
-            y_range = np.arange(extent[0] + vx / 2, extent[0] - vx / 2, vx - 1e-16)
+            x_range = np.arange(extent[0] + vx / 2, extent[1] - vx / 2, vx - 1e-16)
+            y_range = np.arange(extent[2] + vy / 2, extent[3] - vy / 2, vy - 1e-16)
             X, Y = np.meshgrid(x_range, y_range)
             if result["gt_num_points_bev"] is not None:
                 batch_size = result["gt_num_points_bev"].shape[0]
@@ -149,6 +149,7 @@ def single_gpu_test(model,
                     #cticks = np.arange(vmin, vmax, step=(vmax - vmin) / 7).round(2).tolist()
                     fig = plt.figure(figsize=(100, 100))
                     gt_num_points_bev = result["gt_num_points_bev"][b].detach().cpu().numpy()
+                    gt_num_points_bev = ma.masked_where(gt_num_points_bev == 0, gt_num_points_bev)
                     assert X.shape == gt_num_points_bev.shape
                     cs = plt.contourf(X, Y, gt_num_points_bev, locator=ticker.LogLocator(), cmap=cm.PuBu_r)
                     cbar = fig.colorbar(cs)
@@ -166,11 +167,12 @@ def single_gpu_test(model,
                 batch_size = result["diff_num_points_bev"].shape[0]
                 for b in range(batch_size):
                     fig = plt.figure(figsize=(100, 100))
-                    gt_num_points_bev = result["gt_num_points_bev"][b].detach().cpu().numpy()
-                    assert X.shape == gt_num_points_bev.shape
-                    cs = plt.contourf(X, Y, gt_num_points_bev, locator=ticker.LogLocator(), cmap=cm.PuBu_r)
+                    diff_num_points_bev = result["diff_num_points_bev"][b].detach().cpu().numpy().abs()
+                    diff_num_points_bev = ma.masked_where(diff_num_points_bev == 0, diff_num_points_bev)
+                    assert X.shape == diff_num_points_bev.shape
+                    cs = plt.contourf(X, Y, diff_num_points_bev, locator=ticker.LogLocator(), cmap=cm.PuBu_r)
                     cbar = fig.colorbar(cs)
-                    #vmin, vmax = result["gt_num_points_bev"].min().item(), result["gt_num_points_bev"].max().item()
+                    #vmin, vmax = result["diff_num_points_bev"].min().item(), result["diff_num_points_bev"].max().item()
                     #cticks = np.arange(vmin, vmax, step=(vmax - vmin) / 7).round(2).tolist()
                     #fig = plt.figure(figsize=(100, 100))
                     #im = plt.imshow(result["diff_num_points_bev"][b].detach().cpu().numpy(), extent=extent, vmin=vmin, vmax=vmax)
