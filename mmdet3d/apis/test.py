@@ -167,7 +167,7 @@ def single_gpu_test(model,
                 batch_size = result["diff_num_points_bev"].shape[0]
                 for b in range(batch_size):
                     fig = plt.figure(figsize=(100, 100))
-                    diff_num_points_bev = result["diff_num_points_bev"][b].detach().cpu().numpy().abs()
+                    diff_num_points_bev = np.abs(result["diff_num_points_bev"][b].detach().cpu().numpy())
                     diff_num_points_bev = ma.masked_where(diff_num_points_bev == 0, diff_num_points_bev)
                     assert X.shape == diff_num_points_bev.shape
                     cs = plt.contourf(X, Y, diff_num_points_bev, locator=ticker.LogLocator(), cmap=cm.PuBu_r)
@@ -244,7 +244,7 @@ def single_gpu_test(model,
         df = pd.DataFrame(occ_data)
         df[["TN", "TP", "FN", "FP"]] = df[["TN", "TP", "FN", "FP"]] / df["n_points"].to_numpy().reshape(-1, 1)
         df_merge = pd.melt(df[[
-            "TN", "TP", "FN", "FP", "False positive rate", "False negative rate", "Recall", "Precision", "Accuracy"
+            "TN", "TP", "FN", "FP", "FPR", "FNR", "Recall", "Precision", "Accuracy"
         ]])
         sns.boxplot(x="variable", y="value", data=df_merge)
         plt.savefig(f"occupied_metrics.png")
