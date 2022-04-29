@@ -172,6 +172,10 @@ def single_gpu_test(model,
                     assert X.shape == diff_num_points_bev.shape
                     cs = plt.contourf(X, Y, diff_num_points_bev, cmap=cm.RdBu_r)
                     cbar = fig.colorbar(cs)
+                    max_val = max(-np.fix(diff_num_points_bev.min()/10), np.fix(diff_num_points_bev.max()/10))*10
+                    lev_exp = np.arange(-max_val, max_val, 20)
+                    # levs = np.power(10, lev_exp)
+                    # cs = ax.contourf(X, Y, z, levs, norm=colors.LogNorm())
                     #vmin, vmax = result["diff_num_points_bev"].min().item(), result["diff_num_points_bev"].max().item()
                     #cticks = np.arange(vmin, vmax, step=(vmax - vmin) / 7).round(2).tolist()
                     #fig = plt.figure(figsize=(100, 100))
