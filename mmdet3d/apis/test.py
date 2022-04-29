@@ -178,11 +178,11 @@ def single_gpu_test(model,
                     zero = np.array([-1e-10, 1e-10])
                     levs_pos = np.logspace(-2, np.log10(max_val), 5).round(2)
                     levs = np.concatenate([levs_neg, zero, levs_pos])
-                    cs = plt.contourf(X, Y, diff_num_points_bev, levs, cmap=cm.RdBu_r)
+                    #cs = plt.contourf(X, Y, diff_num_points_bev, levs, cmap=cm.RdBu_r)
                     pcm = plt.pcolormesh(X, Y, diff_num_points_bev, norm=colors.SymLogNorm(linthresh=0.001, linscale=0.01,
                                                                   vmin=-max_val, vmax=max_val), cmap='RdBu_r')
                     fig.colorbar(pcm, extend='both')
-                    cbar = fig.colorbar(cs)
+                    #cbar = fig.colorbar(cs)
                     #vmin, vmax = result["diff_num_points_bev"].min().item(), result["diff_num_points_bev"].max().item()
                     #cticks = np.arange(vmin, vmax, step=(vmax - vmin) / 7).round(2).tolist()
                     #fig = plt.figure(figsize=(100, 100))
