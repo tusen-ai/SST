@@ -81,6 +81,8 @@ def single_gpu_test(model,
 
         if show_pretrain:
             import matplotlib.pyplot as plt
+            from matplotlib import ticker, cm
+            from numpy import ma
 
             SMALL_SIZE = 200
             MEDIUM_SIZE = 300
@@ -104,6 +106,7 @@ def single_gpu_test(model,
 
             extent = result["point_cloud_range"][::3] + result["point_cloud_range"][1::3]
 
+            vx, vy, vz = result["voxel_shape"]
             if result["occupied_bev"] is not None:
                 batch_size = result["occupied_bev"].shape[0]
                 vmin, vmax = -1, 5
@@ -136,36 +139,48 @@ def single_gpu_test(model,
                     data_dict["Accuracy"] = (data_dict["TP"] + data_dict["TN"]) / data_dict["n_points"]
                     occ_data.append(data_dict)
 
+            x_range = np.arange(extent[0] + vx / 2, extent[0] - vx / 2, vx - 1e-16)
+            y_range = np.arange(extent[0] + vx / 2, extent[0] - vx / 2, vx - 1e-16)
+            X, Y = np.meshgrid(x_range, y_range)
             if result["gt_num_points_bev"] is not None:
                 batch_size = result["gt_num_points_bev"].shape[0]
                 for b in range(batch_size):
-                    vmin, vmax = result["gt_num_points_bev"].min().item(), result["gt_num_points_bev"].max().item()
-                    cticks = np.arange(vmin, vmax, step=(vmax - vmin) / 5).round(2).tolist()
+                    #vmin, vmax = result["gt_num_points_bev"].min().item(), result["gt_num_points_bev"].max().item()
+                    #cticks = np.arange(vmin, vmax, step=(vmax - vmin) / 7).round(2).tolist()
                     fig = plt.figure(figsize=(100, 100))
-                    im = plt.imshow(result["gt_num_points_bev"][b].detach().cpu().numpy(), extent=extent, vmin=vmin, vmax=vmax)
+                    gt_num_points_bev = result["gt_num_points_bev"][b].detach().cpu().numpy()
+                    assert X.shape == gt_num_points_bev.shape
+                    cs = plt.contourf(X, Y, gt_num_points_bev, locator=ticker.LogLocator(), cmap=cm.PuBu_r)
+                    cbar = fig.colorbar(cs)
+                    # im = plt.imshow(result["gt_num_points_bev"][b].detach().cpu().numpy(), extent=extent, vmin=vmin, vmax=vmax)
                     plt.title(f"Number of points per voxel BEV, Datapoint {i}, batch {b}")
-                    plt.xticks(xticks, xlabels)
-                    plt.yticks(yticks, ylabels)
-                    fig.subplots_adjust(right=0.85)
-                    cbar_ax = fig.add_axes([0.88, 0.12, 0.04, 0.7])
-                    fig.colorbar(im, cax=cbar_ax, ticks=cticks)
-                    cb.set_ticklabels(list(map(str, cticks)))
+                    # plt.xticks(xticks, xlabels)
+                    # plt.yticks(yticks, ylabels)
+                    # fig.subplots_adjust(right=0.85)
+                    # cbar_ax = fig.add_axes([0.88, 0.12, 0.04, 0.7])
+                    # fig.colorbar(im, cax=cbar_ax, ticks=cticks)
+                    # cb.set_ticklabels(list(map(str, cticks)))
                     plt.savefig(f"gt_num_points_bev{i}_{b}.png")
                     plt.close()
             if result["diff_num_points_bev"] is not None:
                 batch_size = result["diff_num_points_bev"].shape[0]
                 for b in range(batch_size):
-                    vmin, vmax = result["gt_num_points_bev"].min().item(), result["gt_num_points_bev"].max().item()
-                    cticks = np.arange(vmin, vmax, step=(vmax - vmin) / 5).round(2).tolist()
                     fig = plt.figure(figsize=(100, 100))
-                    im = plt.imshow(result["diff_num_points_bev"][b].detach().cpu().numpy(), extent=extent, vmin=vmin, vmax=vmax)
+                    gt_num_points_bev = result["gt_num_points_bev"][b].detach().cpu().numpy()
+                    assert X.shape == gt_num_points_bev.shape
+                    cs = plt.contourf(X, Y, gt_num_points_bev, locator=ticker.LogLocator(), cmap=cm.PuBu_r)
+                    cbar = fig.colorbar(cs)
+                    #vmin, vmax = result["gt_num_points_bev"].min().item(), result["gt_num_points_bev"].max().item()
+                    #cticks = np.arange(vmin, vmax, step=(vmax - vmin) / 7).round(2).tolist()
+                    #fig = plt.figure(figsize=(100, 100))
+                    #im = plt.imshow(result["diff_num_points_bev"][b].detach().cpu().numpy(), extent=extent, vmin=vmin, vmax=vmax)
                     plt.title(f"Diff in predicted number of points per voxel BEV, Datapoint {i}, batch {b}")
-                    plt.xticks(xticks, xlabels)
-                    plt.yticks(yticks, ylabels)
-                    fig.subplots_adjust(right=0.85)
-                    cbar_ax = fig.add_axes([0.88, 0.12, 0.04, 0.7])
-                    fig.colorbar(im, cax=cbar_ax, ticks=cticks)
-                    cb.set_ticklabels(list(map(str, cticks)))
+                    #plt.xticks(xticks, xlabels)
+                    #plt.yticks(yticks, ylabels)
+                    #fig.subplots_adjust(right=0.85)
+                    #cbar_ax = fig.add_axes([0.88, 0.12, 0.04, 0.7])
+                    #fig.colorbar(im, cax=cbar_ax, ticks=cticks)
+                    #cb.set_ticklabels(list(map(str, cticks)))
                     plt.savefig(f"diff_num_points_bev{i}_{b}.png")
                     plt.close()
             if result["points"] is not None:
