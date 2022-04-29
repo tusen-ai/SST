@@ -35,7 +35,7 @@ def single_gpu_test(model,
     dataset = data_loader.dataset
     prog_bar = mmcv.ProgressBar(len(dataset))
 
-    data=[]
+    occ_data=[]
     for i, data in enumerate(data_loader):
         with torch.no_grad():
             result = model(return_loss=False, rescale=True, pretrain=show_pretrain, **data)
@@ -106,8 +106,8 @@ def single_gpu_test(model,
 
             if result["occupied_bev"] is not None:
                 batch_size = result["occupied_bev"].shape[0]
-                vmin, vmax = -1, 3
-                cticks = [-1, 0, 1, 2, 3]
+                vmin, vmax = -1, 5
+                cticks = [-1, 0, 1, 2, 3, 4, 5]
                 for b in range(batch_size):
                     fig = plt.figure(figsize=(100, 100))
                     occ_bev =result["occupied_bev"][b].detach().cpu().numpy()
@@ -134,7 +134,7 @@ def single_gpu_test(model,
                     data_dict["Recall"] = data_dict["TP"]/(data_dict["TP"]+data_dict["FN"])
                     data_dict["Precision"] = data_dict["TP"]/(data_dict["TP"]+data_dict["FP"])
                     data_dict["Accuracy"] = (data_dict["TP"] + data_dict["TN"]) / data_dict["n_points"]
-                    data.append(data_dict)
+                    occ_data.append(data_dict)
 
             if result["gt_num_points_bev"] is not None:
                 batch_size = result["gt_num_points_bev"].shape[0]
@@ -188,12 +188,22 @@ def single_gpu_test(model,
         batch_size = len(result)
         for _ in range(batch_size):
             prog_bar.update()
-        if show_pretrain and i % 10:
+        if show_pretrain and i % 10 == 0:
             import matplotlib.pyplot as plt
             import seaborn as sns
             import pandas as pd
-            df = pd.DataFrame(data)
-            df[["TN", "TP", "FN", "FP"]] = df[["TN", "TP", "FN", "FP"]]/df["num_points"]
+            SMALL_SIZE = 8
+            MEDIUM_SIZE = 10
+            BIGGER_SIZE = 12
+            plt.rc('font', size=SMALL_SIZE)  # controls default text sizes
+            plt.rc('axes', titlesize=SMALL_SIZE)  # fontsize of the axes title
+            plt.rc('axes', labelsize=MEDIUM_SIZE)  # fontsize of the x and y labels
+            plt.rc('xtick', labelsize=SMALL_SIZE)  # fontsize of the tick labels
+            plt.rc('ytick', labelsize=SMALL_SIZE)  # fontsize of the tick labels
+            plt.rc('legend', fontsize=SMALL_SIZE)  # legend fontsize
+            plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
+            df = pd.DataFrame(occ_data)
+            df[["TN", "TP", "FN", "FP"]] = df[["TN", "TP", "FN", "FP"]]/df["n_points"].to_numpy().reshape(-1, 1)
             df_merge = pd.melt(df[[
                 "TN", "TP", "FN", "FP", "False positive rate", "False negative rate", "Recall", "Precision", "Accuracy"
             ]])
@@ -204,8 +214,18 @@ def single_gpu_test(model,
         import matplotlib.pyplot as plt
         import seaborn as sns
         import pandas as pd
-        df = pd.DataFrame(data)
-        df[["TN", "TP", "FN", "FP"]] = df[["TN", "TP", "FN", "FP"]] / df["num_points"]
+        SMALL_SIZE = 8
+        MEDIUM_SIZE = 10
+        BIGGER_SIZE = 12
+        plt.rc('font', size=SMALL_SIZE)  # controls default text sizes
+        plt.rc('axes', titlesize=SMALL_SIZE)  # fontsize of the axes title
+        plt.rc('axes', labelsize=MEDIUM_SIZE)  # fontsize of the x and y labels
+        plt.rc('xtick', labelsize=SMALL_SIZE)  # fontsize of the tick labels
+        plt.rc('ytick', labelsize=SMALL_SIZE)  # fontsize of the tick labels
+        plt.rc('legend', fontsize=SMALL_SIZE)  # legend fontsize
+        plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
+        df = pd.DataFrame(occ_data)
+        df[["TN", "TP", "FN", "FP"]] = df[["TN", "TP", "FN", "FP"]] / df["n_points"].to_numpy().reshape(-1, 1)
         df_merge = pd.melt(df[[
             "TN", "TP", "FN", "FP", "False positive rate", "False negative rate", "Recall", "Precision", "Accuracy"
         ]])

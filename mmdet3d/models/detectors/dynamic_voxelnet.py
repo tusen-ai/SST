@@ -91,12 +91,18 @@ class DynamicVoxelNet(VoxelNet):
         if "pred_occupied" in pred_dict:
             occupied = -torch.ones((batch_size, vx, vy), dtype=torch.long, device=pred_dict["pred_occupied"].device)
             index = (voxel_coors[:, 0], voxel_coors[:, 3], voxel_coors[:, 2])  # b ,x, y
-            occupied[index] = 2 * pred_dict["gt_occupied"].long()  # 0 -> fake voxel, 2 -> real voxel
-            occupied[index] = (torch.sigmoid(pred_dict["pred_occupied"]) + 0.5).long()
-            # 0 -> fake voxel predicted as fake,
-            # 1 -> fake voxel predicted as real,
-            # 2 -> real voxel predicted as fake,
-            # 3 -> real voxel predicted as real
+            unmasked_index = (
+                unmasked_voxel_coors[:, 0], unmasked_voxel_coors[:, 3], unmasked_voxel_coors[:, 2])
+            gt_occupied = pred_dict["gt_occupied"].long()+1  # 1 -> real voxel, 2 -> fake voxel
+            occupied[index] = 2 * gt_occupied  # 2 -> real voxel, 4 -> fake voxel
+            occupied[unmasked_index] -= 2  # 0 -> unmasked voxels 2 -> masked voxel, 4 -> fake voxel
+            occupied[index] += (torch.sigmoid(pred_dict["pred_occupied"]) + 0.5).long()
+            # 0 -> unmasked voxel predicted as real,
+            # 1 -> unmasked voxel predicted as fake,
+            # 2 -> masked voxel predicted as real,
+            # 3 -> masked voxel predicted as fake,
+            # 4 -> fake voxel predicted as real,
+            # 5 -> fake voxel predicted as fake
 
         gt_num_points = None
         diff_num_points = None
