@@ -82,6 +82,8 @@ def single_gpu_test(model,
         if show_pretrain:
             import matplotlib.pyplot as plt
             from matplotlib import ticker, cm
+            import matplotlib.colors as colors
+            import matplotlib.cbook as cbook
             from numpy import ma
 
             SMALL_SIZE = 200
@@ -171,12 +173,16 @@ def single_gpu_test(model,
                     #diff_num_points_bev = ma.masked_where(diff_num_points_bev == 0, diff_num_points_bev)
                     assert X.shape == diff_num_points_bev.shape
                     #cs = plt.contourf(X, Y, diff_num_points_bev, cmap=cm.RdBu_r)
-                    cbar = fig.colorbar(cs)
                     max_val = (max(-np.fix(diff_num_points_bev.min()/10), np.fix(diff_num_points_bev.max()/10))+1)*10
-                    levs_neg = np.arange(-max_val, -1e-16, 10-1e-14)
-                    levs_pos = np.arange(1e-16, max_val, 10-1e-14)
-                    levs = np.append(levs_neg, levs_pos)
+                    levs_neg = -np.logspace(np.log10(max_val), -2, 5).round(2)
+                    zero = np.array([-1e-10, 1e-10])
+                    levs_pos = np.logspace(-2, np.log10(max_val), 5).round(2)
+                    levs = np.concatenate([levs_neg, zero, levs_pos])
                     cs = plt.contourf(X, Y, diff_num_points_bev, levs, cmap=cm.RdBu_r)
+                    pcm = plt.pcolormesh(X, Y, diff_num_points_bev, norm=colors.SymLogNorm(linthresh=0.001, linscale=0.01,
+                                                                  vmin=-max_val, vmax=max_val), cmap='RdBu_r')
+                    fig.colorbar(pcm, extend='both')
+                    cbar = fig.colorbar(cs)
                     #vmin, vmax = result["diff_num_points_bev"].min().item(), result["diff_num_points_bev"].max().item()
                     #cticks = np.arange(vmin, vmax, step=(vmax - vmin) / 7).round(2).tolist()
                     #fig = plt.figure(figsize=(100, 100))
