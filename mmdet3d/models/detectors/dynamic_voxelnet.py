@@ -114,7 +114,7 @@ class DynamicVoxelNet(VoxelNet):
             pred_num_points_masked = pred_dict["pred_num_points_masked"]
             gt_num_points_masked = pred_dict["gt_num_points_masked"]
             gt_num_points[index] = gt_num_points_masked.long()
-            diff_num_points[index] = (gt_num_points_masked.float()-pred_num_points_masked)/gt_num_points_masked.float()
+            diff_num_points[index] = gt_num_points_masked.float()-pred_num_points_masked
         if "pred_num_points_unmasked" in pred_dict:
             device = pred_dict["pred_num_points_unmasked"].device
             gt_num_points = torch.zeros((batch_size, vx, vy), dtype=torch.long, device=device) if gt_num_points is None else gt_num_points
@@ -123,7 +123,7 @@ class DynamicVoxelNet(VoxelNet):
             pred_num_points_unmasked = pred_dict["pred_num_points_unmasked"]
             gt_num_points_unmasked = pred_dict["gt_num_points_unmasked"]
             gt_num_points[index] = gt_num_points_unmasked.long()
-            diff_num_points[index] = (gt_num_points_unmasked.float() - pred_num_points_unmasked)/gt_num_points_unmasked.float()
+            diff_num_points[index] = gt_num_points_unmasked.float() - pred_num_points_unmasked
 
         points = []
         batch = []

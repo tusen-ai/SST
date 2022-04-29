@@ -167,10 +167,10 @@ def single_gpu_test(model,
                 batch_size = result["diff_num_points_bev"].shape[0]
                 for b in range(batch_size):
                     fig = plt.figure(figsize=(100, 100))
-                    diff_num_points_bev = np.abs(result["diff_num_points_bev"][b].detach().cpu().numpy())
-                    diff_num_points_bev = ma.masked_where(diff_num_points_bev == 0, diff_num_points_bev)
+                    diff_num_points_bev = result["diff_num_points_bev"][b].detach().cpu().numpy()
+                    #diff_num_points_bev = ma.masked_where(diff_num_points_bev == 0, diff_num_points_bev)
                     assert X.shape == diff_num_points_bev.shape
-                    cs = plt.contourf(X, Y, diff_num_points_bev, locator=ticker.LogLocator(), cmap=cm.PuBu_r)
+                    cs = plt.contourf(X, Y, diff_num_points_bev, cmap=cm.RdBu_r)
                     cbar = fig.colorbar(cs)
                     #vmin, vmax = result["diff_num_points_bev"].min().item(), result["diff_num_points_bev"].max().item()
                     #cticks = np.arange(vmin, vmax, step=(vmax - vmin) / 7).round(2).tolist()
