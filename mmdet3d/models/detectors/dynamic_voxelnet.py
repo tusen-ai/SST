@@ -73,6 +73,7 @@ class DynamicVoxelNet(VoxelNet):
         coors_batch = torch.cat(coors_batch, dim=0)
         return points, coors_batch
 
+    @torch.no_grad()
     def test_pretrain(self, points, img_metas, imgs=None, rescale=False):
         """Test function without augmentaiton."""
         batch_size = len(points)
@@ -128,11 +129,17 @@ class DynamicVoxelNet(VoxelNet):
         points = []
         batch = []
         if "pred_points_masked" in pred_dict:
-            pred_points_masked = pred_dict["pred_points_masked"]  # M, num_chamfer_points, 3
-            x_shift = masked_voxel_coors[:, 3].type_as(pred_points_masked) * self.voxel_encoder.vx + self.voxel_encoder.x_offset  # M
-            y_shift = masked_voxel_coors[:, 2].type_as(pred_points_masked) * self.voxel_encoder.vy + self.voxel_encoder.y_offset  # M
-            z_shift = masked_voxel_coors[:, 1].type_as(pred_points_masked) * self.voxel_encoder.vz + self.voxel_encoder.z_offset  # M
+            pred_points_masked = pred_dict["pred_points_masked"].clone()  # M, num_chamfer_points, 3
+            x_shift = pred_points_masked[..., 0] + (
+                masked_voxel_coors[:, 3].type_as(pred_points_masked) * self.voxel_encoder.vx + self.voxel_encoder.x_offset)  # M
+            y_shift = pred_points_masked[..., 1] + (
+                masked_voxel_coors[:, 2].type_as(pred_points_masked) * self.voxel_encoder.vy + self.voxel_encoder.y_offset)  # M
+            z_shift = pred_points_masked[..., 2] + (
+                masked_voxel_coors[:, 1].type_as(pred_points_masked) * self.voxel_encoder.vz + self.voxel_encoder.z_offset)  # M
             shift = torch.cat([x_shift.unsqueeze(-1), y_shift.unsqueeze(-1), z_shift.unsqueeze(-1)], dim=1).view(-1, 1, 3)
+            pred_points_masked[..., 0] = pred_points_masked[..., 0] * self.voxel_encoder.vx / 2  # [-1, 1] -> [voxel_encoder.vx/2, voxel_encoder.vx/2]
+            pred_points_masked[..., 1] = pred_points_masked[..., 1] * self.voxel_encoder.vy / 2  # [-1, 1] -> [voxel_encoder.vy/2, voxel_encoder.vy/2]
+            pred_points_masked[..., 2] = pred_points_masked[..., 2] * self.voxel_encoder.vz / 2  # [-1, 1] -> [voxel_encoder.vz/2, voxel_encoder.vz/2]
             batch.append(masked_voxel_coors[:, 0])
             points.append((pred_points_masked + shift).reshape(-1, 3))
         if "pred_points_unmasked" in pred_dict:
