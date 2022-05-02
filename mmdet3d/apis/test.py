@@ -123,7 +123,7 @@ def single_gpu_test(model,
                     occ_bev =result["occupied_bev"][b].detach().cpu().numpy()
 
                     # Even bounds give a contour-like effect:
-                    bounds = np.linspace(-0.5, 5.5, 7)
+                    bounds = np.linspace(-1.5, 5.5, 8)
                     norm = colors.BoundaryNorm(boundaries=bounds, ncolors=256)
                     pcm = plt.pcolormesh(X, Y, occ_bev, norm=norm, cmap='RdBu_r')
                     cb = fig.colorbar(pcm, orientation='vertical')
@@ -160,10 +160,10 @@ def single_gpu_test(model,
                     #cticks = np.arange(vmin, vmax, step=(vmax - vmin) / 7).round(2).tolist()
                     fig = plt.figure(figsize=(100, 100))
                     gt_num_points_bev = result["gt_num_points_bev"][b].detach().cpu().numpy()
-                    min = gt_num_points_bev[gt_num_points_bev != 0].min()
+                    vmin = gt_num_points_bev[gt_num_points_bev != 0].min()
                     assert X.shape == gt_num_points_bev.shape
                     pcm = plt.pcolor(X, Y, gt_num_points_bev,
-                                       norm=colors.LogNorm(vmin=min, vmax=gt_num_points_bev.max()),
+                                       norm=colors.LogNorm(vmin=vmin, vmax=gt_num_points_bev.max()),
                                        cmap='PuBu_r', shading='auto')
                     fig.colorbar(pcm, extend='both')
                     #gt_num_points_bev = ma.masked_where(gt_num_points_bev == 0, gt_num_points_bev)
@@ -190,7 +190,7 @@ def single_gpu_test(model,
                     zero = np.array([-1e-10, 1e-10])
                     levs_pos = np.logspace(-2, np.log10(max_val), 5).round(2)
                     levs = np.concatenate([levs_neg, zero, levs_pos])
-                    pcm = plt.pcolormesh(X, Y, diff_num_points_bev, norm=colors.SymLogNorm(linthresh=0.001, linscale=0.01,
+                    pcm = plt.pcolormesh(X, Y, diff_num_points_bev, norm=colors.SymLogNorm(linthresh=1, linscale=5,
                                                                   vmin=-max_val, vmax=max_val), cmap='RdBu_r')
                     fig.colorbar(pcm, extend='both')
                     plt.title(f"Diff in predicted number of points per voxel BEV, Datapoint {i}, batch {b}")
@@ -201,21 +201,25 @@ def single_gpu_test(model,
                 gt_batch = result["gt_points_batch"]
                 for b in range(batch_size):
                     points = result["points"][torch.where(batch == b)].detach().cpu().numpy()
-                    color = points[:, 2] - points[:, 2].min()
-                    color = color / color.max()
-
                     gt_points = result["gt_points"][torch.where(gt_batch == b)].detach().cpu().numpy()
-                    gt_color = gt_points[:, 2] - gt_points[:, 2].min()
-                    gt_color = gt_color / gt_color.max()
+
+                    cmin = min(points[:, 2].min(), gt_points[:, 2].min())
+                    cmax = min(points[:, 2].max(), gt_points[:, 2].max())
+                    color = (points[:, 2] - cmin)/(cmax - cmin)
+                    gt_color = (gt_points[:, 2] - cmin)/(cmax - cmin)
 
                     f, (ax1, ax2) = plt.subplots(1, 2, figsize=(100, 200))
-                    ax1.scatter(gt_points[:, 0], gt_points[:, 1], c=gt_color, marker="x", label="GT")
-                    ax1.title("Ground truth")
-                    ax2.scatter(points[:, 0], points[:, 1], c=color, label="Predicted")
-                    ax1.title("Predicted")
+                    ax1.scatter(gt_points[:, 0], gt_points[:, 1], s=0.75, c=gt_color, label="GT")
+                    ax1.set_title("Ground truth")
+                    ax1.set_xticks(xticks, xlabels)
+                    ax1.set_yticks(yticks, ylabels)
+                    ax1.grid()
+                    ax2.scatter(points[:, 0], points[:, 1], s=0.75, c=color, label="Predicted")
+                    ax2.set_title("Predicted")
+                    ax2.set_xticks(xticks, xlabels)
+                    ax2.set_yticks(yticks, ylabels)
+                    ax2.grid()
                     f.suptitle(f"Predicted point locations, Datapoint {i}, batch {b}")
-                    plt.xticks(xticks, xlabels)
-                    plt.yticks(yticks, ylabels)
                     plt.savefig(f"chamf_points_bev{i}_{b}.png")
                     plt.close()
 

@@ -164,8 +164,8 @@ class ReconstructionHead(BaseModule):
                 voxel_info_decoder["dec2masked_idx"]]  # b, z, y, x
             pred_dict["unmasked_voxel_coors"] = voxel_info_decoder["voxel_coors"][
                 voxel_info_decoder["dec2unmasked_idx"]]  # b, z, y, x
-            pred_dict["points"] = gt_dict["points"]
-            pred_dict["point_coors"] = gt_dict["point_coors"]
+            pred_dict["gt_points"] = gt_dict["gt_points"]
+            pred_dict["gt_point_coors"] = gt_dict["gt_point_coors"]
 
         return pred_dict,  # Output needs to be tuple which the ',' achieves
 
