@@ -3,7 +3,7 @@
 #SBATCH -t 16:00:00
 #SBATCH --gpus-per-node=A40:4
 #SBATCH -N 1
-#SBATCH --output=/cephyr/NOBACKUP/groups/snic2021-7-127/eliassv/slurm-out/slurm-%j.out
+#SBATCH --output=/mimer/NOBACKUP/groups/snic2021-7-127/eliassv/slurm-out/slurm-%j.out
 #SBATCH -J "Some job name"  # multi node, multi GPU
 CONFIG=${1:-sst_nuscenesD5_1x_3class_8heads_v2}
 REPO_NUMBER=${2:-1}  # Choose between repo 1 or 2
@@ -26,17 +26,17 @@ export NGPUS_PER_NODE=$(echo "$SLURM_GPUS_PER_NODE" | sed 's/[A-Z0-9]*:\([0-9]*\
 echo ""
 echo "This job $JOB_ID was started as:
   bash tools/dist_train.sh configs/sst_refactor/$CONFIG.py $GPUS_PER_NODE \
-    --work-dir /cephyr/NOBACKUP/groups/snic2021-7-127/eliassv/jobs/$JOB_ID \
+    --work-dir /mimer/NOBACKUP/groups/snic2021-7-127/eliassv/jobs/$JOB_ID \
     --cfg-options evaluation.metric=nuscenes" ${@:3}
 echo ""
 
 echo ""
 echo "Start copying repo to '$TMPDIR'"
-if [$REPO_NUMBER == 1]
+if [ $REPO_NUMBER == 1 ]
 then
-   cp -r /cephyr/NOBACKUP/groups/snic2021-7-127/eliassv/SST_${GPU_TYPE}/ $TMPDIR/SST_${GPU_TYPE}
+   cp -r /mimer/NOBACKUP/groups/snic2021-7-127/eliassv/SST_${GPU_TYPE}/ $TMPDIR/SST_${GPU_TYPE}
 else
-   cp -r /cephyr/NOBACKUP/groups/snic2021-7-127/eliassv/SST_${GPU_TYPE}_2/ $TMPDIR/SST_${GPU_TYPE}
+   cp -r /mimer/NOBACKUP/groups/snic2021-7-127/eliassv/SST_${GPU_TYPE}_2/ $TMPDIR/SST_${GPU_TYPE}
 fi
 echo ""
 echo "Copying of repo to tempdir is now done."
@@ -44,7 +44,7 @@ echo ""
 
 echo ""
 echo "Start copying nusenes info to '$TMPDIR/SST_$GPU_TYPE/'"
-unzip -q -d $TMPDIR/SST_$GPU_TYPE /cephyr/NOBACKUP/groups/snic2021-7-127/eliassv/nuscenes_info/nuscenes_infos_v2.zip
+unzip -q -d $TMPDIR/SST_$GPU_TYPE /mimer/NOBACKUP/groups/snic2021-7-127/eliassv/nuscenes_info/nuscenes_infos_v2.zip
 echo ""
 echo "Copying of nusenes info to repo in tempdir is now done."
 echo ""
@@ -57,12 +57,12 @@ echo "Copying of dataset to repo in tempdir is now done."
 echo ""
 
 cd $TMPDIR/SST_$GPU_TYPE
-singularity exec --pwd $TMPDIR/SST_$GPU_TYPE \
+singularity exec --bind /mimer:/mimer --pwd $TMPDIR/SST_$GPU_TYPE \
   /cephyr/NOBACKUP/groups/snic2021-7-127/eliassv/sst_env/mmdetection3d_$GPU_TYPE.sif \
   bash tools/dist_train.sh configs/sst_refactor/$CONFIG.py $GPUS_PER_NODE \
-  --work-dir /cephyr/NOBACKUP/groups/snic2021-7-127/eliassv/jobs/$JOB_ID \
+  --work-dir /mimer/NOBACKUP/groups/snic2021-7-127/eliassv/jobs/$JOB_ID \
   --cfg-options evaluation.metric=nuscenes ${@:3}
 # ${@:3} grabs everything after the third argument these are used to overwrite settings in the config file
 # e.g. load_from="config/path/epoch_n.pth" loads the weights from the provided model
 
-cp /cephyr/NOBACKUP/groups/snic2021-7-127/eliassv/slurm-out/slurm-$JOB_ID.out /cephyr/NOBACKUP/groups/snic2021-7-127/eliassv/jobs/$JOB_ID
+cp /mimer/NOBACKUP/groups/snic2021-7-127/eliassv/slurm-out/slurm-$JOB_ID.out /mimer/NOBACKUP/groups/snic2021-7-127/eliassv/jobs/$JOB_ID

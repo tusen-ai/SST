@@ -1,7 +1,7 @@
 _base_ = [
     '../_base_/models/sst_base.py',
-    '../_base_/datasets/nus-3d-10sweep-car-remove_close.py',
-    '../_base_/schedules/cosine_2x.py',
+    '../_base_/datasets/nus-3d-2sweep-car-remove_close.py',
+    '../_base_/schedules/modified/cosine_2x_lr0.00004.py',
     '../_base_/default_runtime.py',
 ]
 
