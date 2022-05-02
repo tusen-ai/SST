@@ -116,11 +116,11 @@ lr_config = dict(
 momentum_config = None
 
 # runtime settings
-epochs = 40
+epochs = 200
 runner = dict(type='EpochBasedRunner', max_epochs=epochs)
 evaluation = dict(interval=epochs+1)  # Don't evaluate when doing pretraining
 workflow = [("train", 1), ("val", 1)]  # But calculate val loss after each epoch
-checkpoint_config = dict(interval=epochs//4)
+checkpoint_config = dict(interval=20)
 
 fp16 = dict(loss_scale=32.0)
 data = dict(

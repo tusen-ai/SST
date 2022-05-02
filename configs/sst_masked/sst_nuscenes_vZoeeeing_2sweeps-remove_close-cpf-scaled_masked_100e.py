@@ -1,5 +1,5 @@
 _base_ = [
-    '../sst_refactor/sst_nuscenes_vZoeeeing_2sweeps-remove_close.py'
+    '../sst_refactor/sst_2sweeps_VS0.5_WS16_ED8_epochs288.py'
 ]
 use_chamfer, use_num_points, use_fake_voxels = True, True, True
 relative_error = False
@@ -120,7 +120,7 @@ epochs = 100
 runner = dict(type='EpochBasedRunner', max_epochs=epochs)
 evaluation = dict(interval=epochs+1)  # Don't evaluate when doing pretraining
 workflow = [("train", 1), ("val", 1)]  # But calculate val loss after each epoch
-checkpoint_config = dict(interval=epochs//4)
+checkpoint_config = dict(interval=20)
 
 fp16 = dict(loss_scale=32.0)
 data = dict(
