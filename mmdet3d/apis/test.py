@@ -203,7 +203,7 @@ def single_gpu_test(model,
                     color = points[:, 2] - points[:, 2].min()
                     color = color / color.max()
                     plt.figure(figsize=(100, 100))
-                    plt.scatter(points[:, 0], points[:, 1], c=color, marker="x", label="GT")
+                    # plt.scatter(points[:, 0], points[:, 1], c=color, marker="x", label="GT")
                     plt.scatter(points[:, 0], points[:, 1], c=color, label="Predicted")
                     plt.title(f"Predicted point locations, Datapoint {i}, batch {b}")
                     plt.xticks(xticks, xlabels)

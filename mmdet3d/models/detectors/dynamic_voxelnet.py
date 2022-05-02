@@ -130,25 +130,24 @@ class DynamicVoxelNet(VoxelNet):
         batch = []
         if "pred_points_masked" in pred_dict:
             pred_points_masked = pred_dict["pred_points_masked"].clone()  # M, num_chamfer_points, 3
-            x_shift = pred_points_masked[..., 0] + (
-                masked_voxel_coors[:, 3].type_as(pred_points_masked) * self.voxel_encoder.vx + self.voxel_encoder.x_offset)  # M
-            y_shift = pred_points_masked[..., 1] + (
-                masked_voxel_coors[:, 2].type_as(pred_points_masked) * self.voxel_encoder.vy + self.voxel_encoder.y_offset)  # M
-            z_shift = pred_points_masked[..., 2] + (
-                masked_voxel_coors[:, 1].type_as(pred_points_masked) * self.voxel_encoder.vz + self.voxel_encoder.z_offset)  # M
+            M, n, C = pred_points_masked.shape
+            x_shift = (masked_voxel_coors[:, 3].type_as(pred_points_masked) * self.voxel_encoder.vx + self.voxel_encoder.x_offset)  # M
+            y_shift = (masked_voxel_coors[:, 2].type_as(pred_points_masked) * self.voxel_encoder.vy + self.voxel_encoder.y_offset)  # M
+            z_shift = (masked_voxel_coors[:, 1].type_as(pred_points_masked) * self.voxel_encoder.vz + self.voxel_encoder.z_offset)  # M
             shift = torch.cat([x_shift.unsqueeze(-1), y_shift.unsqueeze(-1), z_shift.unsqueeze(-1)], dim=1).view(-1, 1, 3)
             pred_points_masked[..., 0] = pred_points_masked[..., 0] * self.voxel_encoder.vx / 2  # [-1, 1] -> [voxel_encoder.vx/2, voxel_encoder.vx/2]
             pred_points_masked[..., 1] = pred_points_masked[..., 1] * self.voxel_encoder.vy / 2  # [-1, 1] -> [voxel_encoder.vy/2, voxel_encoder.vy/2]
             pred_points_masked[..., 2] = pred_points_masked[..., 2] * self.voxel_encoder.vz / 2  # [-1, 1] -> [voxel_encoder.vz/2, voxel_encoder.vz/2]
-            batch.append(masked_voxel_coors[:, 0])
+            batch.append(masked_voxel_coors[:, 0].view(-1, 1).repeat(1, n).view(-1))
             points.append((pred_points_masked + shift).reshape(-1, 3))
         if "pred_points_unmasked" in pred_dict:
-            pred_points_unmasked = pred_dict["pred_points_unmasked"]  # M, num_chamfer_points, 3
+            pred_points_unmasked = pred_dict["pred_points_unmasked"]  # N-M, num_chamfer_points, 3
+            M, n, C = pred_points_unmasked.shape
             x_shift = unmasked_voxel_coors[:, 3].type_as(pred_points_unmasked) * self.voxel_encoder.vx + self.voxel_encoder.x_offset  # M
             y_shift = unmasked_voxel_coors[:, 2].type_as(pred_points_unmasked) * self.voxel_encoder.vy + self.voxel_encoder.y_offset  # M
             z_shift = unmasked_voxel_coors[:, 1].type_as(pred_points_unmasked) * self.voxel_encoder.vz + self.voxel_encoder.z_offset  # M
             shift = torch.cat([x_shift.unsqueeze(-1), y_shift.unsqueeze(-1), z_shift.unsqueeze(-1)], dim=1).view(-1, 1, 3)
-            batch.append(unmasked_voxel_coors[:, 0])
+            batch.append(unmasked_voxel_coors[:, 0].view(-1, 1).repeat(1, n).view(-1))
             points.append((pred_points_unmasked + shift).reshape(-1, 3))
         points = torch.cat(points, dim=0) if points else None
         batch = torch.cat(batch, dim=0) if batch else None
