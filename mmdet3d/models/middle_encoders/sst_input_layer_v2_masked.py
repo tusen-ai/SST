@@ -233,6 +233,8 @@ class SSTInputLayerV2Masked(SSTInputLayerV2):
             gt_points_padding[dropped_point_indices, inner_voxel_inds] = 0  # not_padded -> 0, padded -> 1
             gt_dict["points_per_voxel"] = gt_points[voxel_indices]
             gt_dict["points_per_voxel_padding"] = gt_points_padding[voxel_indices]
+            gt_dict["points"] = low_level_point_feature[:self.pred_dims]  # For visualization
+            gt_dict["point_coors"] = point_coors  # For visualization
 
             assert len(gt_dict["points_per_voxel"]) == len(voxel_feats), "Wrong number of point collections"
 

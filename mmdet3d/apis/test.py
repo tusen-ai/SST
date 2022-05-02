@@ -109,6 +109,11 @@ def single_gpu_test(model,
             extent = result["point_cloud_range"][::3] + result["point_cloud_range"][1::3]
 
             vx, vy, vz = result["voxel_shape"]
+
+            x_range = np.arange(extent[0] + vx / 2, extent[1] - vx / 2, vx - 1e-16)
+            y_range = np.arange(extent[2] + vy / 2, extent[3] - vy / 2, vy - 1e-16)
+            X, Y = np.meshgrid(x_range, y_range)
+
             if result["occupied_bev"] is not None:
                 batch_size = result["occupied_bev"].shape[0]
                 vmin, vmax = -1, 5
@@ -116,14 +121,21 @@ def single_gpu_test(model,
                 for b in range(batch_size):
                     fig = plt.figure(figsize=(100, 100))
                     occ_bev =result["occupied_bev"][b].detach().cpu().numpy()
-                    im = plt.imshow(occ_bev, extent=extent, vmin=vmin, vmax=vmax)
+
+                    # Even bounds give a contour-like effect:
+                    bounds = np.linspace(-0.5, 5.5, 7)
+                    norm = colors.BoundaryNorm(boundaries=bounds, ncolors=256)
+                    pcm = plt.pcolormesh(X, Y, occ_bev, norm=norm, cmap='RdBu_r')
+                    cb = fig.colorbar(pcm, orientation='vertical')
+
+                    #im = plt.imshow(occ_bev, extent=extent, vmin=vmin, vmax=vmax)
                     plt.title(f"Occupied prediction, Datapoint {i}, batch {b}")
-                    plt.xticks(xticks, xlabels)
-                    plt.yticks(yticks, ylabels)
-                    fig.subplots_adjust(right=0.85)
-                    cbar_ax = fig.add_axes([0.88, 0.15, 0.04, 0.7])
-                    cb = fig.colorbar(im, cax=cbar_ax, ticks=cticks)
-                    cb.set_ticklabels(list(map(str, cticks)))
+                    # plt.xticks(xticks, xlabels)
+                    # plt.yticks(yticks, ylabels)
+                    # fig.subplots_adjust(right=0.85)
+                    # cbar_ax = fig.add_axes([0.88, 0.15, 0.04, 0.7])
+                    # cb = fig.colorbar(im, cax=cbar_ax, ticks=cticks)
+                    # cb.set_ticklabels(list(map(str, cticks)))
                     plt.savefig(f"occ_pred_{i}_{b}.png")
                     plt.close()
                     data_dict = {
@@ -141,9 +153,6 @@ def single_gpu_test(model,
                     data_dict["Accuracy"] = (data_dict["TP"] + data_dict["TN"]) / data_dict["n_points"]
                     occ_data.append(data_dict)
 
-            x_range = np.arange(extent[0] + vx / 2, extent[1] - vx / 2, vx - 1e-16)
-            y_range = np.arange(extent[2] + vy / 2, extent[3] - vy / 2, vy - 1e-16)
-            X, Y = np.meshgrid(x_range, y_range)
             if result["gt_num_points_bev"] is not None:
                 batch_size = result["gt_num_points_bev"].shape[0]
                 for b in range(batch_size):
@@ -151,10 +160,15 @@ def single_gpu_test(model,
                     #cticks = np.arange(vmin, vmax, step=(vmax - vmin) / 7).round(2).tolist()
                     fig = plt.figure(figsize=(100, 100))
                     gt_num_points_bev = result["gt_num_points_bev"][b].detach().cpu().numpy()
-                    gt_num_points_bev = ma.masked_where(gt_num_points_bev == 0, gt_num_points_bev)
+                    min = gt_num_points_bev[gt_num_points_bev != 0].min()
                     assert X.shape == gt_num_points_bev.shape
-                    cs = plt.contourf(X, Y, gt_num_points_bev, locator=ticker.LogLocator(), cmap=cm.PuBu_r)
-                    cbar = fig.colorbar(cs)
+                    pcm = plt.pcolor(X, Y, gt_num_points_bev,
+                                       norm=colors.LogNorm(vmin=min, vmax=gt_num_points_bev.max()),
+                                       cmap='PuBu_r', shading='auto')
+                    fig.colorbar(pcm, extend='both')
+                    #gt_num_points_bev = ma.masked_where(gt_num_points_bev == 0, gt_num_points_bev)
+                    #cs = plt.contourf(X, Y, gt_num_points_bev, locator=ticker.LogLocator(), cmap=cm.PuBu_r)
+                    #cbar = fig.colorbar(cs)
                     # im = plt.imshow(result["gt_num_points_bev"][b].detach().cpu().numpy(), extent=extent, vmin=vmin, vmax=vmax)
                     plt.title(f"Number of points per voxel BEV, Datapoint {i}, batch {b}")
                     # plt.xticks(xticks, xlabels)
@@ -170,42 +184,36 @@ def single_gpu_test(model,
                 for b in range(batch_size):
                     fig = plt.figure(figsize=(100, 100))
                     diff_num_points_bev = result["diff_num_points_bev"][b].detach().cpu().numpy()
-                    #diff_num_points_bev = ma.masked_where(diff_num_points_bev == 0, diff_num_points_bev)
                     assert X.shape == diff_num_points_bev.shape
-                    #cs = plt.contourf(X, Y, diff_num_points_bev, cmap=cm.RdBu_r)
                     max_val = (max(-np.fix(diff_num_points_bev.min()/10), np.fix(diff_num_points_bev.max()/10))+1)*10
                     levs_neg = -np.logspace(np.log10(max_val), -2, 5).round(2)
                     zero = np.array([-1e-10, 1e-10])
                     levs_pos = np.logspace(-2, np.log10(max_val), 5).round(2)
                     levs = np.concatenate([levs_neg, zero, levs_pos])
-                    #cs = plt.contourf(X, Y, diff_num_points_bev, levs, cmap=cm.RdBu_r)
                     pcm = plt.pcolormesh(X, Y, diff_num_points_bev, norm=colors.SymLogNorm(linthresh=0.001, linscale=0.01,
                                                                   vmin=-max_val, vmax=max_val), cmap='RdBu_r')
                     fig.colorbar(pcm, extend='both')
-                    #cbar = fig.colorbar(cs)
-                    #vmin, vmax = result["diff_num_points_bev"].min().item(), result["diff_num_points_bev"].max().item()
-                    #cticks = np.arange(vmin, vmax, step=(vmax - vmin) / 7).round(2).tolist()
-                    #fig = plt.figure(figsize=(100, 100))
-                    #im = plt.imshow(result["diff_num_points_bev"][b].detach().cpu().numpy(), extent=extent, vmin=vmin, vmax=vmax)
                     plt.title(f"Diff in predicted number of points per voxel BEV, Datapoint {i}, batch {b}")
-                    #plt.xticks(xticks, xlabels)
-                    #plt.yticks(yticks, ylabels)
-                    #fig.subplots_adjust(right=0.85)
-                    #cbar_ax = fig.add_axes([0.88, 0.12, 0.04, 0.7])
-                    #fig.colorbar(im, cax=cbar_ax, ticks=cticks)
-                    #cb.set_ticklabels(list(map(str, cticks)))
                     plt.savefig(f"diff_num_points_bev{i}_{b}.png")
                     plt.close()
             if result["points"] is not None:
                 batch = result["points_batch"]
+                gt_batch = result["gt_points_batch"]
                 for b in range(batch_size):
-                    points = result["points"][torch.where(batch==b)].detach().cpu().numpy()
+                    points = result["points"][torch.where(batch == b)].detach().cpu().numpy()
                     color = points[:, 2] - points[:, 2].min()
                     color = color / color.max()
-                    plt.figure(figsize=(100, 100))
-                    # plt.scatter(points[:, 0], points[:, 1], c=color, marker="x", label="GT")
-                    plt.scatter(points[:, 0], points[:, 1], c=color, label="Predicted")
-                    plt.title(f"Predicted point locations, Datapoint {i}, batch {b}")
+
+                    gt_points = result["gt_points"][torch.where(gt_batch == b)].detach().cpu().numpy()
+                    gt_color = gt_points[:, 2] - gt_points[:, 2].min()
+                    gt_color = gt_color / gt_color.max()
+
+                    f, (ax1, ax2) = plt.subplots(1, 2, figsize=(100, 200))
+                    ax1.scatter(gt_points[:, 0], gt_points[:, 1], c=gt_color, marker="x", label="GT")
+                    ax1.title("Ground truth")
+                    ax2.scatter(points[:, 0], points[:, 1], c=color, label="Predicted")
+                    ax1.title("Predicted")
+                    f.suptitle(f"Predicted point locations, Datapoint {i}, batch {b}")
                     plt.xticks(xticks, xlabels)
                     plt.yticks(yticks, ylabels)
                     plt.savefig(f"chamf_points_bev{i}_{b}.png")

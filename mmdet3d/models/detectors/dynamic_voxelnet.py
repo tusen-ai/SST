@@ -158,6 +158,8 @@ class DynamicVoxelNet(VoxelNet):
             "diff_num_points_bev": diff_num_points,
             "points": points,
             "points_batch": batch,
+            "gt_points": pred_dict["points"],
+            "gt_points_batch":  pred_dict["point_coors"][:, 0],
             "point_cloud_range": self.voxel_encoder.point_cloud_range,
             "voxel_shape": (self.voxel_encoder.vx, self.voxel_encoder.vy, self.voxel_encoder.vz)
         }
