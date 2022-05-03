@@ -130,7 +130,7 @@ data = dict(
         # we use box_type_3d='LiDAR' in kitti and nuscenes dataset
         # and box_type_3d='Depth' in sunrgbd and scannet dataset.
         box_type_3d='LiDAR',
-        load_interval=5,  # 1/5
+        load_interval=2.5,  # 2/5
     ),
     val=dict(
         type=dataset_type,
