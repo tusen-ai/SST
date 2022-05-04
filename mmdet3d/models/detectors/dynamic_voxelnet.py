@@ -21,7 +21,8 @@ class DynamicVoxelNet(VoxelNet):
                  train_cfg=None,
                  test_cfg=None,
                  pretrained=None,
-                 init_cfg=None):
+                 init_cfg=None,
+                 freeze=None):
         super(DynamicVoxelNet, self).__init__(
             voxel_layer=voxel_layer,
             voxel_encoder=voxel_encoder,
@@ -33,6 +34,20 @@ class DynamicVoxelNet(VoxelNet):
             test_cfg=test_cfg,
             pretrained=pretrained,
             init_cfg=init_cfg)
+        self.freeze = freeze
+        if self.freeze:
+            assert type(self.freeze) == list, "The freeze input should be a list of the blocks to freeze"
+            # turn of voxel_encoder
+            for param in self.voxel_encoder.parameters():
+                param.requires_grad = False
+            if hasattr(self.backbone, "linear0"):
+                for param in self.backbone.linear0.parameters():
+                    param.requires_grad = False
+            for i, block in self.backbone.block_list:
+                if i in freeze:
+                    for param in block.parameters():
+                        param.requires_grad = False
+
 
     def extract_feat(self, points, img_metas):
         """Extract features from points."""
