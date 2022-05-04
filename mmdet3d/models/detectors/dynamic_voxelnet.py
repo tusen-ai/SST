@@ -43,7 +43,7 @@ class DynamicVoxelNet(VoxelNet):
             if hasattr(self.backbone, "linear0"):
                 for param in self.backbone.linear0.parameters():
                     param.requires_grad = False
-            for i, block in self.backbone.block_list:
+            for i, block in enumerate(self.backbone.block_list):
                 if i in freeze:
                     for param in block.parameters():
                         param.requires_grad = False
