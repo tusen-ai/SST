@@ -44,17 +44,11 @@ echo "Copying of repo to tempdir is now done."
 echo ""
 
 echo ""
-echo "Start copying nusenes info to '$TMPDIR/SST_$GPU_TYPE/'"
-unzip -q -d $TMPDIR/SST_$GPU_TYPE /cephyr/NOBACKUP/groups/snic2021-7-127/eliassv/nuscenes_info/nuscenes_infos_v2.zip
+echo "Linking data to tempdir."
 echo ""
-echo "Copying of nusenes info to repo in tempdir is now done."
+ln -s /mimer/NOBACKUP/groups/snic2021-7-127/eliassv/data/ $TMPDIR/SST_$GPU_TYPE/data
 echo ""
-
-echo ""
-echo "Start copying dataset to '$TMPDIR/SST_$GPU_TYPE/'"
-source ./unpack_trainval.sh
-echo ""
-echo "Copying of dataset to repo in tempdir is now done."
+echo "Linking data to tempdir is now done."
 echo ""
 
 cd $TMPDIR/SST_$GPU_TYPE
