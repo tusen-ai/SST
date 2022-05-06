@@ -1,5 +1,5 @@
 _base_ = [
-    '../sst_refactor/sst_2sweeps_VS0.5_WS16_ED8_epochs288.py'
+    '../sst_refactor/sst_2sweeps_VS0.5_WS16_ED4_epochs288.py'
 ]
 use_chamfer, use_num_points, use_fake_voxels = True, True, True
 relative_error = False

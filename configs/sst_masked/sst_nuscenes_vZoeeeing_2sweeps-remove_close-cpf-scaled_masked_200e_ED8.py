@@ -1,12 +1,12 @@
 _base_ = [
-    '../sst_refactor/sst_nuscenes_vZoeeeing_10sweeps-remove_close.py'
+    '../sst_refactor/sst_2sweeps_VS0.5_WS16_ED8_epochs288.py'
 ]
 use_chamfer, use_num_points, use_fake_voxels = True, True, True
 relative_error = False
 masking_ratio = 0.7
 fake_voxels_ratio = 0.1
 loss_weights = dict(
-    loss_occupied=1.,
+    loss_occupied=1.0,
     loss_num_points_masked=1.,
     loss_chamfer_src_masked=1.,
     loss_chamfer_dst_masked=1.,
@@ -116,11 +116,11 @@ lr_config = dict(
 momentum_config = None
 
 # runtime settings
-epochs = 100
+epochs = 200
 runner = dict(type='EpochBasedRunner', max_epochs=epochs)
 evaluation = dict(interval=epochs+1)  # Don't evaluate when doing pretraining
 workflow = [("train", 1), ("val", 1)]  # But calculate val loss after each epoch
-checkpoint_config = dict(interval=epochs//4)
+checkpoint_config = dict(interval=20)
 
 fp16 = dict(loss_scale=32.0)
 data = dict(

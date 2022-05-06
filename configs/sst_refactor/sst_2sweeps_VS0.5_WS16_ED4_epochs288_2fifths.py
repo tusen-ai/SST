@@ -1,6 +1,6 @@
 _base_ = [
     '../_base_/models/sst_base.py',
-    '../_base_/datasets/nusD1_25-3d-2sweep-remove_close.py',
+    '../_base_/datasets/nusD2_5-3d-2sweep-remove_close.py',
     '../_base_/schedules/cosine_2x.py',
     '../_base_/default_runtime.py',
 ]
@@ -8,7 +8,7 @@ _base_ = [
 voxel_size = (0.5, 0.5, 8)
 window_shape = (16, 16, 1)  # 12 * 0.32m
 point_cloud_range = [-50, -50, -5, 50, 50, 3]
-encoder_blocks = 8
+encoder_blocks = 4
 drop_info_training = {
     0: {'max_tokens': 30, 'drop_range': (0, 30)},
     1: {'max_tokens': 60, 'drop_range': (30, 60)},

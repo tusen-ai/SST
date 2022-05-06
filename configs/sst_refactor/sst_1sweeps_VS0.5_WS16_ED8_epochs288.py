@@ -1,6 +1,6 @@
 _base_ = [
     '../_base_/models/sst_base.py',
-    '../_base_/datasets/nusD1_25-3d-2sweep-remove_close.py',
+    '../_base_/datasets/nus-3d-1sweep-remove_close.py',
     '../_base_/schedules/cosine_2x.py',
     '../_base_/default_runtime.py',
 ]
