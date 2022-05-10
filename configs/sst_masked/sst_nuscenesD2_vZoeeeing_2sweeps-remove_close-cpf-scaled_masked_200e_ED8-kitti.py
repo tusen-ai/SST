@@ -227,8 +227,9 @@ train_nusc = dict(
         test_mode=False,
         # we use box_type_3d='LiDAR' in kitti and nuscenes dataset
         # and box_type_3d='Depth' in sunrgbd and scannet dataset.
-        box_type_3d='LiDAR'
-    )
+        box_type_3d='LiDAR',
+        load_interval=2,  # 1/2
+    ),
 )
 val = dict(
     type=dataset_type,
@@ -307,7 +308,7 @@ train_pipeline_kitti = [
 
 train_kitti = dict(
     type='RepeatDataset',
-    times=7,  # Contains 3712 training samples compared to nuscenes 28144 which is 7.58 times larger
+    times=4,  # Contains 3712 training samples compared to nuscenes 28144 which is 7.58 times larger
     dataset=dict(
         type=dataset_type,
         data_root=data_root,
@@ -320,7 +321,8 @@ train_kitti = dict(
         test_mode=False,
         # we use box_type_3d='LiDAR' in kitti and nuscenes dataset
         # and box_type_3d='Depth' in sunrgbd and scannet dataset.
-        box_type_3d='LiDAR')
+        box_type_3d='LiDAR'
+    )
 )
 
 data = dict(
