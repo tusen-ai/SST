@@ -215,16 +215,20 @@ eval_pipeline = [
     dict(type='Collect3D', keys=['points'])
 ]
 train_nusc = dict(
-    type=dataset_type,
-    data_root=data_root,
-    ann_file=data_root + 'nuscenes_infos_train.pkl',
-    pipeline=train_pipeline_nuscences,
-    classes=class_names,
-    modality=input_modality,
-    test_mode=False,
-    # we use box_type_3d='LiDAR' in kitti and nuscenes dataset
-    # and box_type_3d='Depth' in sunrgbd and scannet dataset.
-    box_type_3d='LiDAR'
+    type='RepeatDataset',
+    times=1,
+    dataset=dict(
+        type=dataset_type,
+        data_root=data_root,
+        ann_file=data_root + 'nuscenes_infos_train.pkl',
+        pipeline=train_pipeline_nuscences,
+        classes=class_names,
+        modality=input_modality,
+        test_mode=False,
+        # we use box_type_3d='LiDAR' in kitti and nuscenes dataset
+        # and box_type_3d='Depth' in sunrgbd and scannet dataset.
+        box_type_3d='LiDAR'
+    )
 )
 val = dict(
     type=dataset_type,
@@ -323,7 +327,11 @@ train_kitti = dict(
 data = dict(
     samples_per_gpu=4,
     workers_per_gpu=4,
-    train=[train_nusc, train_kitti],
+    train=dict(
+        type='ConcatDataset',
+        datasets=[train_nusc, train_kitti],
+        separate_eval=False
+    ),
     val=val,
     test=test
 )
