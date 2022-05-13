@@ -71,7 +71,8 @@ test_pipeline = [
         pad_empty_sweeps=True,
         remove_close=True,
         close_radius=2.0,
-        test_mode=True,),
+        test_mode=True,
+        use_dim=[0,1,2,3,4]),
     dict(
         type='MultiScaleFlipAug3D',
         img_scale=(1333, 800),
@@ -109,7 +110,8 @@ eval_pipeline = [
         pad_empty_sweeps=True,
         remove_close=True,
         close_radius=2.0,
-        test_mode=True,),
+        test_mode=True,
+        use_dim=[0,1,2,3,4]),
     dict(
         type='DefaultFormatBundle3D',
         class_names=class_names,
