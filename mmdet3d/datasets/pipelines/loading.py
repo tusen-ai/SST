@@ -377,7 +377,7 @@ class LoadPointsFromFile(object):
                  shift_height=False,
                  use_color=False,
                  file_client_args=dict(backend='disk'),
-                 kitti=True
+                 kitti=False
                  ):
         self.shift_height = shift_height
         self.use_color = use_color
@@ -433,9 +433,9 @@ class LoadPointsFromFile(object):
         pts_filename = results['pts_filename']
         points = self._load_points(pts_filename)
         points = points.reshape(-1, self.load_dim)
+        points = points[:, self.use_dim]
         if self.kitti:
             points = np.concatenate([points[:, :3], np.zeros((len(points), 1))], 1)
-        points = points[:, self.use_dim]
         attribute_dims = None
 
         if self.shift_height:
