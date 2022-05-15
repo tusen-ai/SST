@@ -203,7 +203,7 @@ class LoadPointsFromMultiSweeps(object):
             points = np.zeros((len(results['points']), 5))
             print(points[:, :4])
             print(points[:, :4].shape)
-            points[:, :4] = results['points']
+            points[:, :4] = results['points'].detach().cpu().numpy()
             sweep_points_list = [points]
             ts = 0
             n_sweeps = 0
