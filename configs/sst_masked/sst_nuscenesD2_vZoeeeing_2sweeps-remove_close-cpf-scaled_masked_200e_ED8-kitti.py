@@ -281,13 +281,7 @@ train_pipeline_kitti = [
         coord_type='LIDAR',
         load_dim=4,
         use_dim=4,
-        file_client_args=file_client_args),
-    dict(
-        type='LoadPointsFromMultiSweeps',
-        sweeps_num=0,
         file_client_args=file_client_args,
-        pad_empty_sweeps=False,
-        remove_close=False,
         kitti=True
     ),
     dict(

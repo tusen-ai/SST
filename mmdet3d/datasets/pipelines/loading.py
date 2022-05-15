@@ -377,6 +377,7 @@ class LoadPointsFromFile(object):
                  shift_height=False,
                  use_color=False,
                  file_client_args=dict(backend='disk'),
+                 kitti=True
                  ):
         self.shift_height = shift_height
         self.use_color = use_color
@@ -391,6 +392,7 @@ class LoadPointsFromFile(object):
         self.use_dim = use_dim
         self.file_client_args = file_client_args.copy()
         self.file_client = None
+        self.kitti = kitti
 
     def _load_points(self, pts_filename):
         """Private function to load point clouds data.
@@ -431,6 +433,8 @@ class LoadPointsFromFile(object):
         pts_filename = results['pts_filename']
         points = self._load_points(pts_filename)
         points = points.reshape(-1, self.load_dim)
+        if self.kitti:
+            points[:, 3] = 0
         points = points[:, self.use_dim]
         attribute_dims = None
 
