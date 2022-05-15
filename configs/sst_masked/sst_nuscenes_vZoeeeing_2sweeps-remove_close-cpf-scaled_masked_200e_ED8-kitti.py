@@ -286,7 +286,9 @@ train_pipeline_kitti = [
         sweeps_num=0,
         file_client_args=file_client_args,
         pad_empty_sweeps=False,
-        remove_close=False),
+        remove_close=False,
+        kitti=True
+    ),
     dict(
         type='LoadAnnotations3D',
         with_bbox_3d=True,
