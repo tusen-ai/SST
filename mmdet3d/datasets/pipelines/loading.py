@@ -434,7 +434,7 @@ class LoadPointsFromFile(object):
         points = self._load_points(pts_filename)
         points = points.reshape(-1, self.load_dim)
         if self.kitti:
-            points[:, 3] = 0
+            points = np.concatenate([points[:, :3], np.zeros((len(points), 1))], 1)
         points = points[:, self.use_dim]
         attribute_dims = None
 
