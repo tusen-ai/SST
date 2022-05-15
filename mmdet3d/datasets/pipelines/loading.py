@@ -198,7 +198,11 @@ class LoadPointsFromMultiSweeps(object):
                     cloud arrays.
         """
         if self.kitti:
+            print(results['points'])
+            print(results['points'].shape)
             points = np.zeros((len(results['points']), 5))
+            print(points[:, :4])
+            print(points[:, :4].shape)
             points[:, :4] = results['points']
             sweep_points_list = [points]
             ts = 0
