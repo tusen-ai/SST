@@ -1,5 +1,6 @@
 import mmcv
 import numpy as np
+import torch
 
 from mmdet3d.core.points import BasePoints, get_points_type
 from mmdet.datasets.builder import PIPELINES
@@ -198,8 +199,8 @@ class LoadPointsFromMultiSweeps(object):
                     cloud arrays.
         """
         if self.kitti:
-            points = np.zeros((len(results['points']), 5))
-            points[:, :4] = results['points'].tensor.numpy()
+            points = results['points']
+            points[:,3] = 0
             sweep_points_list = [points]
             ts = 0
             n_sweeps = 0
@@ -237,7 +238,10 @@ class LoadPointsFromMultiSweeps(object):
                 sweep_points_list.append(points_sweep)
 
         points = points.cat(sweep_points_list)
-        points = points[:, self.use_dim]
+        if self.kitti:
+            points = points
+        else:
+            points = points[:, self.use_dim]
         results['points'] = points
         return results
 
