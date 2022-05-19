@@ -271,8 +271,8 @@ def single_gpu_test(model,
                 "TN", "TP", "FN", "FP", "FPR", "FNR", "Recall", "Precision", "Accuracy"
             ]])
             sns.boxplot(x="variable", y="value", data=df_merge)
-            plt.savefig(f"occupied_metrics_{i}.png")
             plt.grid()
+            plt.savefig(f"occupied_metrics_{i}.png")
             plt.close()
     if show_pretrain:
         import matplotlib.pyplot as plt
@@ -294,7 +294,7 @@ def single_gpu_test(model,
             "TN", "TP", "FN", "FP", "FPR", "FNR", "Recall", "Precision", "Accuracy"
         ]])
         sns.boxplot(x="variable", y="value", data=df_merge)
-        plt.savefig(f"occupied_metrics.png")
         plt.grid()
+        plt.savefig(f"occupied_metrics.png")
         plt.close()
     return results
