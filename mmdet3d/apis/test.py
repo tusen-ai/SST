@@ -160,10 +160,10 @@ def single_gpu_test(model,
                                      norm=colors.LogNorm(vmin=vmin, vmax=gt_num_points_bev.max()),
                                      cmap='PuBu_r', shading='auto')
                     ax2.set_title("Predicted")
-                    pcm3 = ax3.pcolor(X[100:140, 80:120], Y[100:140, 80:120], gt_num_points_bev[100:140, 80:120],
+                    pcm3 = ax3.pcolor(X[80:120, 100:140], Y[80:120, 100:140], gt_num_points_bev[80:120, 100:140],
                                      norm=colors.LogNorm(vmin=vmin, vmax=gt_num_points_bev.max()),
                                      cmap='PuBu_r', shading='auto')
-                    pcm4 = ax4.pcolor(X[100:140, 80:120], Y[100:140, 80:120], pred_num_points[100:140, 80:120],
+                    pcm4 = ax4.pcolor(X[80:120, 100:140], Y[80:120, 100:140], pred_num_points[80:120, 100:140],
                                       norm=colors.LogNorm(vmin=vmin, vmax=gt_num_points_bev.max()),
                                       cmap='PuBu_r', shading='auto')
                     fig.colorbar(pcm, extend='max')
@@ -220,22 +220,22 @@ def single_gpu_test(model,
                     p_mask = (points[:, 0] > 0) & (points[:, 0] < 15) & (points[:, 1] > -7.5) & (points[:, 1] < 7.5)
 
                     f, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(200, 200))
-                    ax1.scatter(gt_points[:, 0], gt_points[:, 1], s=4, c=gt_color, label="GT")
+                    ax1.scatter(gt_points[:, 0], gt_points[:, 1], s=60, c=gt_color, label="GT")
                     ax1.set_title("Ground truth")
                     ax1.set_xticks(xticks_large)
                     ax1.set_yticks(yticks_large)
                     ax1.grid()
-                    ax2.scatter(points[:, 0], points[:, 1], s=4, c=color, label="Predicted")
+                    ax2.scatter(points[:, 0], points[:, 1], s=60, c=color, label="Predicted")
                     ax2.set_title("Predicted")
                     ax2.set_xticks(xticks_large)
                     ax2.set_yticks(yticks_large)
                     ax2.grid()
-                    ax3.scatter(gt_points[gt_mask][:, 0], gt_points[gt_mask][:, 1], s=4*45, c=gt_color[gt_mask], label="GT")
+                    ax3.scatter(gt_points[gt_mask][:, 0], gt_points[gt_mask][:, 1], s=45*45, c=gt_color[gt_mask], label="GT")
                     ax3.set_title("Ground truth")
                     ax3.set_xticks(xticks_small, xlabels)
                     ax3.set_yticks(yticks_small, ylabels)
                     ax3.grid()
-                    ax4.scatter(points[p_mask][:, 0], points[p_mask][:, 1], s=4*45, c=color[p_mask], label="Predicted")
+                    ax4.scatter(points[p_mask][:, 0], points[p_mask][:, 1], s=45*45, c=color[p_mask], label="Predicted")
                     ax4.set_title("Predicted")
                     ax4.set_xticks(xticks_small, xlabels)
                     ax4.set_yticks(yticks_small, ylabels)
