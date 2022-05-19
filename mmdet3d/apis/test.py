@@ -120,7 +120,7 @@ def single_gpu_test(model,
                 cticks = [-1, 0, 1, 2, 3, 4, 5]
                 for b in range(batch_size):
                     fig = plt.figure(figsize=(100, 100))
-                    occ_bev =result["occupied_bev"][b].detach().cpu().numpy()
+                    occ_bev =result["occupied_bev"][b].detach().cpu().numpy().T
 
                     # Even bounds give a contour-like effect:
                     bounds = np.linspace(-1.5, 5.5, 8)
@@ -156,13 +156,30 @@ def single_gpu_test(model,
             if result["gt_num_points_bev"] is not None:
                 batch_size = result["gt_num_points_bev"].shape[0]
                 for b in range(batch_size):
-                    fig = plt.figure(figsize=(100, 100))
-                    gt_num_points_bev = result["gt_num_points_bev"][b].detach().cpu().numpy()
+                    fig, ((ax1, ax2),(ax3, ax4)) = plt.subplots(2, 2, figsize=(200, 200))
+                    gt_num_points_bev = result["gt_num_points_bev"][b].detach().cpu().numpy().T
+
+
+                    diff_num_points_bev = result["diff_num_points_bev"][b].detach().cpu().numpy().T
+                    pred_num_points = gt_num_points_bev - diff_num_points_bev
+
                     vmin = gt_num_points_bev[gt_num_points_bev != 0].min()
                     assert X.shape == gt_num_points_bev.shape
-                    pcm = plt.pcolor(X, Y, gt_num_points_bev,
+                    pcm = ax1.pcolor(X, Y, gt_num_points_bev,
                                        norm=colors.LogNorm(vmin=vmin, vmax=gt_num_points_bev.max()),
                                        cmap='PuBu_r', shading='auto')
+                    ax1.set_title("Ground truth")
+
+                    pcm2 = ax2.pcolor(X, Y, pred_num_points,
+                                     norm=colors.LogNorm(vmin=vmin, vmax=gt_num_points_bev.max()),
+                                     cmap='PuBu_r', shading='auto')
+                    ax2.set_title("Predicted")
+                    pcm3 = ax3.pcolor(X[80:120], Y[80:120], gt_num_points_bev[80:120],
+                                     norm=colors.LogNorm(vmin=vmin, vmax=gt_num_points_bev.max()),
+                                     cmap='PuBu_r', shading='auto')
+                    pcm4 = ax4.pcolor(X[80:120], Y[80:120], pred_num_points[80:120],
+                                      norm=colors.LogNorm(vmin=vmin, vmax=gt_num_points_bev.max()),
+                                      cmap='PuBu_r', shading='auto')
                     fig.colorbar(pcm, extend='max')
                     plt.title(f"Number of points per voxel BEV, Datapoint {i}, batch {b}")
                     plt.savefig(f"gt_num_points_bev{i}_{b}.png")
@@ -171,7 +188,7 @@ def single_gpu_test(model,
                 batch_size = result["diff_num_points_bev"].shape[0]
                 for b in range(batch_size):
                     fig = plt.figure(figsize=(100, 100))
-                    diff_num_points_bev = result["diff_num_points_bev"][b].detach().cpu().numpy()
+                    diff_num_points_bev = result["diff_num_points_bev"][b].detach().cpu().numpy().T
                     diff_num_points_bev = np.abs(diff_num_points_bev)
                     vmin = diff_num_points_bev[diff_num_points_bev != 0].min()
                     vmax = diff_num_points_bev.max()
@@ -186,7 +203,7 @@ def single_gpu_test(model,
             if result["points"] is not None:
                 batch = result["points_batch"]
                 gt_batch = result["gt_points_batch"]
-                batch_size = result["gt_points_batch"].max().item()
+                batch_size = int(result["gt_points_batch"].max().item()) + 1
                 for b in range(batch_size):
                     points = result["points"][torch.where(batch == b)].detach().cpu().numpy()
                     gt_points = result["gt_points"][torch.where(gt_batch == b)].detach().cpu().numpy()
