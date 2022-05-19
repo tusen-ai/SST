@@ -275,7 +275,7 @@ def single_gpu_test(model,
             ]])
             sns.set_theme(style="whitegrid")
             sns.boxplot(x="variable", y="value", data=df_merge)
-            plt.grid()
+            plt.grid(axis='x')
             plt.savefig(f"occupied_metrics_{i}.png")
             plt.close()
     if show_pretrain:
@@ -299,7 +299,7 @@ def single_gpu_test(model,
         ]])
         sns.set_theme(style="whitegrid")
         sns.boxplot(x="variable", y="value", data=df_merge)
-        plt.grid()
+        plt.grid(axis='x')
         plt.savefig(f"occupied_metrics.png")
         plt.close()
     return results
