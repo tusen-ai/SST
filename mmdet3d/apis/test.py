@@ -118,7 +118,7 @@ def single_gpu_test(model,
                     bounds = np.linspace(-1.5, 5.5, 8)
                     norm = colors.BoundaryNorm(boundaries=bounds, ncolors=7)
                     cMap = colors.ListedColormap(
-                        ["w", 'limegreen', 'darkgreen', "deepskyblue", "darkblue", "gold",  "darkgoldenrod"])
+                        ["w", 'limegreen', 'darkgreen', "orangered", "darkred", "gold",  "darkgoldenrod"])
                     pcm = plt.pcolormesh(X, Y, occ_bev, norm=norm, cmap=cMap)
                     cb = fig.colorbar(pcm, orientation='vertical')
 
@@ -272,6 +272,7 @@ def single_gpu_test(model,
             ]])
             sns.boxplot(x="variable", y="value", data=df_merge)
             plt.savefig(f"occupied_metrics_{i}.png")
+            plt.grid()
             plt.close()
     if show_pretrain:
         import matplotlib.pyplot as plt
@@ -294,5 +295,6 @@ def single_gpu_test(model,
         ]])
         sns.boxplot(x="variable", y="value", data=df_merge)
         plt.savefig(f"occupied_metrics.png")
+        plt.grid()
         plt.close()
     return results
