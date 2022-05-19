@@ -117,7 +117,9 @@ def single_gpu_test(model,
                     # Even bounds give a contour-like effect:
                     bounds = np.linspace(-1.5, 5.5, 8)
                     norm = colors.BoundaryNorm(boundaries=bounds, ncolors=256)
-                    pcm = plt.pcolormesh(X, Y, occ_bev, norm=norm, cmap='magma_r')
+                    cMap = colors.ListedColormap(
+                        ["w", 'darkgreen', 'limegreen', "darkblue", "deepskyblue", "darkgoldenrod", "gold"])
+                    pcm = plt.pcolormesh(X, Y, occ_bev, norm=norm, cmap=cMap)
                     cb = fig.colorbar(pcm, orientation='vertical')
 
                     #im = plt.imshow(occ_bev, extent=extent, vmin=vmin, vmax=vmax)
