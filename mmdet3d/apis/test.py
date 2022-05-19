@@ -175,7 +175,7 @@ def single_gpu_test(model,
                     pcm3 = ax3.pcolor(X[80:120, 80:120], Y[80:120, 80:120], gt_num_points_bev[80:120, 80:120],
                                      norm=colors.LogNorm(vmin=vmin, vmax=gt_num_points_bev.max()),
                                      cmap='PuBu_r', shading='auto')
-                    pcm4 = ax4.pcolor(X[80:120], Y[80:120, 80:120], pred_num_points[80:120, 80:120],
+                    pcm4 = ax4.pcolor(X[80:120, 80:120], Y[80:120, 80:120], pred_num_points[80:120, 80:120],
                                       norm=colors.LogNorm(vmin=vmin, vmax=gt_num_points_bev.max()),
                                       cmap='PuBu_r', shading='auto')
                     fig.colorbar(pcm, extend='max')
