@@ -112,6 +112,8 @@ def single_gpu_test(model,
                 cticks = [-1, 0, 1, 2, 3, 4, 5]
                 for b in range(batch_size):
                     fig = plt.figure(figsize=(100, 100))
+
+                    fig, (ax1, ax2) = plt.subplots(1,2, figsize=(100, 200))
                     occ_bev =result["occupied_bev"][b].detach().cpu().numpy().T
 
                     # Even bounds give a contour-like effect:
@@ -119,11 +121,12 @@ def single_gpu_test(model,
                     norm = colors.BoundaryNorm(boundaries=bounds, ncolors=7)
                     cMap = colors.ListedColormap(
                         ["w", 'limegreen', 'darkgreen', "orangered", "darkred", "gold",  "darkgoldenrod"])
-                    pcm = plt.pcolormesh(X, Y, occ_bev, norm=norm, cmap=cMap)
+                    pcm = ax1.pcolormesh(X, Y, occ_bev, norm=norm, cmap=cMap)
+                    pcm2 = ax2.pcolormesh(X[50:150,100:], Y[50:150,100:], occ_bev[50:150,100:], norm=norm, cmap=cMap)
                     cb = fig.colorbar(pcm, orientation='vertical')
 
                     #im = plt.imshow(occ_bev, extent=extent, vmin=vmin, vmax=vmax)
-                    plt.title(f"Occupied prediction, Datapoint {i}, batch {b}")
+                    plt.suptitle(f"Occupied prediction, Datapoint {i}, batch {b}")
                     plt.savefig(f"occ_pred_{i}_{b}.png")
                     plt.close()
                     data_dict = {
