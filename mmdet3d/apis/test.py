@@ -111,9 +111,9 @@ def single_gpu_test(model,
                 vmin, vmax = -1, 5
                 cticks = [-1, 0, 1, 2, 3, 4, 5]
                 for b in range(batch_size):
-                    fig = plt.figure(figsize=(100, 100))
+                    #fig = plt.figure(figsize=(100, 100))
 
-                    fig, (ax1, ax2) = plt.subplots(1,2, figsize=(100, 200))
+                    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(200, 100))
                     occ_bev =result["occupied_bev"][b].detach().cpu().numpy().T
 
                     # Even bounds give a contour-like effect:
