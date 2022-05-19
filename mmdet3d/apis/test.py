@@ -273,6 +273,7 @@ def single_gpu_test(model,
             df_merge = pd.melt(df[[
                 "TN", "TP", "FN", "FP", "FPR", "FNR", "Recall", "Precision", "Accuracy"
             ]])
+            sns.set_theme(style="whitegrid")
             sns.boxplot(x="variable", y="value", data=df_merge)
             plt.grid()
             plt.savefig(f"occupied_metrics_{i}.png")
@@ -296,6 +297,7 @@ def single_gpu_test(model,
         df_merge = pd.melt(df[[
             "TN", "TP", "FN", "FP", "FPR", "FNR", "Recall", "Precision", "Accuracy"
         ]])
+        sns.set_theme(style="whitegrid")
         sns.boxplot(x="variable", y="value", data=df_merge)
         plt.grid()
         plt.savefig(f"occupied_metrics.png")
