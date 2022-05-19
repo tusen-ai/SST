@@ -98,12 +98,16 @@ def single_gpu_test(model,
             plt.rc('legend', fontsize=SMALL_SIZE)    # legend fontsize
             plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
             import numpy as np
-            xticks = np.arange(result["point_cloud_range"][0], result["point_cloud_range"][3] + 0.000001, step=result["voxel_shape"][0])
-            xmask = np.diff((xticks / 10).astype(int), append=0.0) > 0
+            #xticks = np.arange(result["point_cloud_range"][0], result["point_cloud_range"][3] + 0.000001, step=result["voxel_shape"][0])
+            xticks = np.arange(-50, 50 + 0.000001, 0.5)
+            xmask = xticks % 10 == 0
+            #xmask = np.diff((xticks / 10).astype(int), append=0.0) > 0
             xlabels = [round(xticks[i], 2) if xmask[i] else None for i in range(xticks.size)]
 
-            yticks = np.arange(result["point_cloud_range"][1], result["point_cloud_range"][3] + 0.000001, step=result["voxel_shape"][1])
-            ymask = np.diff((yticks / 10).astype(int), append=0.0) > 0
+            #yticks = np.arange(result["point_cloud_range"][1], result["point_cloud_range"][3] + 0.000001, step=result["voxel_shape"][1])
+            yticks = np.arange(-50, 50 + 0.000001, 0.5)
+            #ymask = np.diff((yticks / 10).astype(int), append=0.0) > 0
+            ymask = xticks % 10 == 0
             ylabels = [round(yticks[i], 2) if ymask[i] else None for i in range(yticks.size)]
 
             extent = result["point_cloud_range"][::3] + result["point_cloud_range"][1::3]
@@ -130,12 +134,6 @@ def single_gpu_test(model,
 
                     #im = plt.imshow(occ_bev, extent=extent, vmin=vmin, vmax=vmax)
                     plt.title(f"Occupied prediction, Datapoint {i}, batch {b}")
-                    # plt.xticks(xticks, xlabels)
-                    # plt.yticks(yticks, ylabels)
-                    # fig.subplots_adjust(right=0.85)
-                    # cbar_ax = fig.add_axes([0.88, 0.15, 0.04, 0.7])
-                    # cb = fig.colorbar(im, cax=cbar_ax, ticks=cticks)
-                    # cb.set_ticklabels(list(map(str, cticks)))
                     plt.savefig(f"occ_pred_{i}_{b}.png")
                     plt.close()
                     data_dict = {
@@ -174,10 +172,10 @@ def single_gpu_test(model,
                                      norm=colors.LogNorm(vmin=vmin, vmax=gt_num_points_bev.max()),
                                      cmap='PuBu_r', shading='auto')
                     ax2.set_title("Predicted")
-                    pcm3 = ax3.pcolor(X[80:120], Y[80:120], gt_num_points_bev[80:120],
+                    pcm3 = ax3.pcolor(X[80:120, 80:120], Y[80:120, 80:120], gt_num_points_bev[80:120, 80:120],
                                      norm=colors.LogNorm(vmin=vmin, vmax=gt_num_points_bev.max()),
                                      cmap='PuBu_r', shading='auto')
-                    pcm4 = ax4.pcolor(X[80:120], Y[80:120], pred_num_points[80:120],
+                    pcm4 = ax4.pcolor(X[80:120], Y[80:120, 80:120], pred_num_points[80:120, 80:120],
                                       norm=colors.LogNorm(vmin=vmin, vmax=gt_num_points_bev.max()),
                                       cmap='PuBu_r', shading='auto')
                     fig.colorbar(pcm, extend='max')
@@ -212,8 +210,10 @@ def single_gpu_test(model,
                     cmax = min(points[:, 2].max(), gt_points[:, 2].max())
                     color = (points[:, 2] - cmin)/(cmax - cmin)
                     gt_color = (gt_points[:, 2] - cmin)/(cmax - cmin)
+                    gt_mask = (gt_points > -10) & (gt_points < 10)
+                    p_mask = (points > -10) & (points < 10)
 
-                    f, (ax1, ax2) = plt.subplots(1, 2, figsize=(200, 100))
+                    f, ((ax1, ax2), (ax3, ax4)) = plt.subplots(1, 2, figsize=(200, 200))
                     ax1.scatter(gt_points[:, 0], gt_points[:, 1], s=0.75, c=gt_color, label="GT")
                     ax1.set_title("Ground truth")
                     ax1.set_xticks(xticks, xlabels)
@@ -224,6 +224,16 @@ def single_gpu_test(model,
                     ax2.set_xticks(xticks, xlabels)
                     ax2.set_yticks(yticks, ylabels)
                     ax2.grid()
+                    ax3.scatter(gt_points[gt_mask][:, 0], gt_points[gt_mask][:, 1], s=0.75, c=gt_color[gt_mask], label="GT")
+                    ax3.set_title("Ground truth")
+                    ax3.set_xticks(xticks[80:121], xlabels[80:121])
+                    ax3.set_yticks(yticks[80:121], ylabels[80:121])
+                    ax3.grid()
+                    ax4.scatter(points[p_mask][:, 0], points[p_mask][:, 1], s=0.75, c=color[p_mask], label="Predicted")
+                    ax4.set_title("Predicted")
+                    ax4.set_xticks(xticks[80:121], xlabels[80:121])
+                    ax4.set_yticks(yticks[80:121], ylabels[80:121])
+                    ax4.grid()
                     f.suptitle(f"Predicted point locations, Datapoint {i}, batch {b}")
                     plt.savefig(f"chamf_points_bev{i}_{b}.png")
                     plt.close()
