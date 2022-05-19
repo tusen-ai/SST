@@ -172,10 +172,10 @@ def single_gpu_test(model,
                                      norm=colors.LogNorm(vmin=vmin, vmax=gt_num_points_bev.max()),
                                      cmap='PuBu_r', shading='auto')
                     ax2.set_title("Predicted")
-                    pcm3 = ax3.pcolor(X[80:120, 80:120], Y[80:120, 80:120], gt_num_points_bev[80:120, 80:120],
+                    pcm3 = ax3.pcolor(X[100:140, 80:120], Y[100:140, 80:120], gt_num_points_bev[100:140, 80:120],
                                      norm=colors.LogNorm(vmin=vmin, vmax=gt_num_points_bev.max()),
                                      cmap='PuBu_r', shading='auto')
-                    pcm4 = ax4.pcolor(X[80:120, 80:120], Y[80:120, 80:120], pred_num_points[80:120, 80:120],
+                    pcm4 = ax4.pcolor(X[100:140, 80:120], Y[100:140, 80:120], pred_num_points[100:140, 80:120],
                                       norm=colors.LogNorm(vmin=vmin, vmax=gt_num_points_bev.max()),
                                       cmap='PuBu_r', shading='auto')
                     fig.colorbar(pcm, extend='max')
@@ -210,10 +210,10 @@ def single_gpu_test(model,
                     cmax = min(points[:, 2].max(), gt_points[:, 2].max())
                     color = (points[:, 2] - cmin)/(cmax - cmin)
                     gt_color = (gt_points[:, 2] - cmin)/(cmax - cmin)
-                    gt_mask = (gt_points > -10) & (gt_points < 10)
-                    p_mask = (points > -10) & (points < 10)
+                    gt_mask = (gt_points[:, 0] > 0) & (gt_points[:, 0] < 20) & (gt_points[:, 1] > -10) & (gt_points[:, 1] < 10)
+                    p_mask = (points[:, 0] > 0) & (points[:, 0] < 20) & (points[:, 1] > -10) & (points[:, 1] < 10)
 
-                    f, ((ax1, ax2), (ax3, ax4)) = plt.subplots(1, 2, figsize=(200, 200))
+                    f, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(200, 200))
                     ax1.scatter(gt_points[:, 0], gt_points[:, 1], s=0.75, c=gt_color, label="GT")
                     ax1.set_title("Ground truth")
                     ax1.set_xticks(xticks, xlabels)
@@ -224,14 +224,14 @@ def single_gpu_test(model,
                     ax2.set_xticks(xticks, xlabels)
                     ax2.set_yticks(yticks, ylabels)
                     ax2.grid()
-                    ax3.scatter(gt_points[gt_mask][:, 0], gt_points[gt_mask][:, 1], s=0.75, c=gt_color[gt_mask], label="GT")
+                    ax3.scatter(gt_points[gt_mask][:, 0], gt_points[gt_mask][:, 1], s=0.75*25, c=gt_color[gt_mask], label="GT")
                     ax3.set_title("Ground truth")
-                    ax3.set_xticks(xticks[80:121], xlabels[80:121])
+                    ax3.set_xticks(xticks[100:141], xlabels[100:141])
                     ax3.set_yticks(yticks[80:121], ylabels[80:121])
                     ax3.grid()
-                    ax4.scatter(points[p_mask][:, 0], points[p_mask][:, 1], s=0.75, c=color[p_mask], label="Predicted")
+                    ax4.scatter(points[p_mask][:, 0], points[p_mask][:, 1], s=0.75*25, c=color[p_mask], label="Predicted")
                     ax4.set_title("Predicted")
-                    ax4.set_xticks(xticks[80:121], xlabels[80:121])
+                    ax4.set_xticks(xticks[100:141], xlabels[100:141])
                     ax4.set_yticks(yticks[80:121], ylabels[80:121])
                     ax4.grid()
                     f.suptitle(f"Predicted point locations, Datapoint {i}, batch {b}")
