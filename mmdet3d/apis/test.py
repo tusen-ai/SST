@@ -122,8 +122,9 @@ def single_gpu_test(model,
                     cMap = colors.ListedColormap(
                         ["w", 'limegreen', 'darkgreen', "orangered", "darkred", "gold",  "darkgoldenrod"])
                     pcm = ax1.pcolormesh(X, Y, occ_bev, norm=norm, cmap=cMap)
-                    pcm2 = ax2.pcolormesh(X[50:150,100:], Y[50:150,100:], occ_bev[50:150,100:], norm=norm, cmap=cMap)
+                    pcm2 = ax2.pcolormesh(X[50:150, 100:], Y[50:150, 100:], occ_bev[50:150, 100:], norm=norm, cmap=cMap)
                     cb = fig.colorbar(pcm, orientation='vertical')
+                    cb.ax.set_xticks(cticks, ['Empty', 'True Unmasked ', 'False Unmasked', 'True Masked ', 'False Masked', 'False Fake', 'True Fake'])
 
                     #im = plt.imshow(occ_bev, extent=extent, vmin=vmin, vmax=vmax)
                     plt.suptitle(f"Occupied prediction, Datapoint {i}, batch {b}")
@@ -273,7 +274,6 @@ def single_gpu_test(model,
             df_merge = pd.melt(df[[
                 "TN", "TP", "FN", "FP", "FPR", "FNR", "Recall", "Precision", "Accuracy"
             ]])
-            sns.set_theme(style="whitegrid")
             sns.boxplot(x="variable", y="value", data=df_merge)
             plt.grid(axis='x')
             plt.savefig(f"occupied_metrics_{i}.png")
@@ -297,7 +297,6 @@ def single_gpu_test(model,
         df_merge = pd.melt(df[[
             "TN", "TP", "FN", "FP", "FPR", "FNR", "Recall", "Precision", "Accuracy"
         ]])
-        sns.set_theme(style="whitegrid")
         sns.boxplot(x="variable", y="value", data=df_merge)
         plt.grid(axis='x')
         plt.savefig(f"occupied_metrics.png")
