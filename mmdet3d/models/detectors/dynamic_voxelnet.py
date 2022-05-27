@@ -93,8 +93,6 @@ class DynamicVoxelNet(VoxelNet):
         """Test function without augmentaiton."""
         batch_size = len(points)
         vx, vy, vz = self.middle_encoder.sparse_shape
-        n_points = self.bbox_head.num_chamfer_points
-        occupied = torch.zeros((batch_size, vx, vy), dtype=torch.long)
 
         x = self.extract_feat(points, img_metas)
         outs = self.bbox_head(x, show=True)

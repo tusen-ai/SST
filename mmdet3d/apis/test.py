@@ -36,6 +36,17 @@ def single_gpu_test(model,
     prog_bar = mmcv.ProgressBar(len(dataset))
 
     occ_data=[]
+    import numpy as np
+    x_coors = np.arange(0, 200)
+    y_coors = np.arange(0, 200)
+    X_coors, Y_coors = np.meshgrid(x_coors, y_coors)
+    x = X_coors * 0.5 + 0.5 / 2 - 50
+    y = Y_coors * 0.5 + 0.5 / 2 - 50
+    r = np.sqrt(x ** 2 + y ** 2)
+    store = {
+        "occupied_bev": np.zeros((len(data_loader), 200, 200), dtype=np.int8),
+        "gt_num_points_bev": np.zeros((len(data_loader), 200, 200)),
+        "diff_num_points_bev": np.zeros((len(data_loader), 200, 200))}
     for i, data in enumerate(data_loader):
         with torch.no_grad():
             result = model(return_loss=False, rescale=True, pretrain=show_pretrain, **data)
@@ -84,7 +95,6 @@ def single_gpu_test(model,
             from matplotlib import ticker, cm
             import matplotlib.colors as colors
             import matplotlib.cbook as cbook
-            from numpy import ma
 
             SMALL_SIZE = 200
             MEDIUM_SIZE = 300
@@ -107,13 +117,12 @@ def single_gpu_test(model,
             X, Y = np.meshgrid(x_range, y_range)
 
             if result["occupied_bev"] is not None:
-                batch_size = result["occupied_bev"].shape[0]
-                vmin, vmax = -1, 5
-                cticks = [-1, 0, 1, 2, 3, 4, 5]
+                store["occupied_bev"][i] = result["occupied_bev"][0].detach().cpu().numpy().astype(np.int8).T
+                """batch_size = result["occupied_bev"].shape[0]
+                # vmin, vmax = -1, 5
+                # cticks = [-1, 0, 1, 2, 3, 4, 5]
                 for b in range(batch_size):
-                    #fig = plt.figure(figsize=(100, 100))
-
-                    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(200, 100))
+                    #fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(200, 100))
                     occ_bev =result["occupied_bev"][b].detach().cpu().numpy().T
 
                     # Even bounds give a contour-like effect:
@@ -143,10 +152,11 @@ def single_gpu_test(model,
                     data_dict["Recall"] = data_dict["TP"]/(data_dict["TP"]+data_dict["FN"])  # TPR
                     data_dict["Precision"] = data_dict["TP"]/(data_dict["TP"]+data_dict["FP"])
                     data_dict["Accuracy"] = (data_dict["TP"] + data_dict["TN"]) / data_dict["n_points"]
-                    occ_data.append(data_dict)
+                    occ_data.append(data_dict)"""
 
             if result["gt_num_points_bev"] is not None:
-                batch_size = result["gt_num_points_bev"].shape[0]
+                store["gt_num_points_bev"][i] = result["gt_num_points_bev"][0].detach().cpu().numpy().T
+                """batch_size = result["gt_num_points_bev"].shape[0]
                 for b in range(batch_size):
                     fig, ((ax1, ax2),(ax3, ax4)) = plt.subplots(2, 2, figsize=(200, 200))
                     gt_num_points_bev = result["gt_num_points_bev"][b].detach().cpu().numpy().T
@@ -175,9 +185,10 @@ def single_gpu_test(model,
                     fig.colorbar(pcm, extend='max')
                     plt.title(f"Number of points per voxel BEV, Datapoint {i}, batch {b}")
                     plt.savefig(f"gt_num_points_bev{i}_{b}.png")
-                    plt.close()
+                    plt.close()"""
             if result["diff_num_points_bev"] is not None:
-                batch_size = result["diff_num_points_bev"].shape[0]
+                store["diff_num_points_bev"][i] = result["diff_num_points_bev"][0].detach().cpu().numpy().T
+                """batch_size = result["diff_num_points_bev"].shape[0]
                 for b in range(batch_size):
                     fig = plt.figure(figsize=(100, 100))
                     diff_num_points_bev = result["diff_num_points_bev"][b].detach().cpu().numpy().T
@@ -191,8 +202,8 @@ def single_gpu_test(model,
                     fig.colorbar(pcm, extend='both')
                     plt.title(f"Diff in predicted number of points per voxel BEV, Datapoint {i}, batch {b}")
                     plt.savefig(f"diff_num_points_bev{i}_{b}.png")
-                    plt.close()
-            if result["points"] is not None:
+                    plt.close()"""
+            """if result["points"] is not None:
                 # xticks = np.arange(result["point_cloud_range"][0], result["point_cloud_range"][3] + 0.000001, step=result["voxel_shape"][0])
                 xticks_large = np.arange(-50, 50 + 0.000001, 0.5*16)
                 xticks_small = np.arange(0, 15 + 0.000001, 0.5)
@@ -248,14 +259,14 @@ def single_gpu_test(model,
                     ax4.grid()
                     f.suptitle(f"Predicted point locations, Datapoint {i}, batch {b}")
                     plt.savefig(f"chamf_points_bev{i}_{b}.png")
-                    plt.close()
+                    plt.close()"""
 
         results.extend(result)
 
-        batch_size = len(result)
+        batch_size = 1 #len(result)
         for _ in range(batch_size):
             prog_bar.update()
-        if show_pretrain and i % 10 == 0:
+        """if show_pretrain and i % 10 == 0:
             import matplotlib.pyplot as plt
             import seaborn as sns
             import pandas as pd
@@ -277,9 +288,14 @@ def single_gpu_test(model,
             sns.boxplot(x="variable", y="value", data=df_merge)
             plt.grid(axis='x')
             plt.savefig(f"occupied_metrics_{i}.png")
-            plt.close()
+            plt.close()"""
+        if show_pretrain and i % 100 == 0:
+            for key, val in store.items():
+                np.save(key+"_i", val)
     if show_pretrain:
-        import matplotlib.pyplot as plt
+        for key, val in store.items():
+            np.save(key + "_i", val)
+        """import matplotlib.pyplot as plt
         import seaborn as sns
         import pandas as pd
         SMALL_SIZE = 8
@@ -300,5 +316,5 @@ def single_gpu_test(model,
         sns.boxplot(x="variable", y="value", data=df_merge)
         plt.grid(axis='x')
         plt.savefig(f"occupied_metrics.png")
-        plt.close()
+        plt.close()"""
     return results
