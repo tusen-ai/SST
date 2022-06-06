@@ -21,6 +21,7 @@ Authors:
 [Paper Link](https://arxiv.org/pdf/2112.06375.pdf)， [中文解读](https://zhuanlan.zhihu.com/p/476056546)
 
 **NEWS**
+- [22-6-6] Support SST with CenterHead, cosine similarity in attention, faster SSTInputLayer. See Usage for details.
 - 🔥 SST is accepted at CVPR 2022.
 - Support Weighted NMS (CPU version) in [RangeDet](https://github.com/TuSimple/RangeDet), improving performance of vehicle class by ~1 AP.
 See `Usage` section.
@@ -34,14 +35,8 @@ See `Usage` section.
 
 
 
-## Introduction and Highlights
+## Introduction
 - SST is a **single-stride** network, which maintains original feature resolution from the beginning to the end of the network. Due to the characterisric of single stride, SST achieves exciting performances on small object detection (Pedestrian, Cyclist).
-- For simplicity, except for backbone, SST is almost the same with the basic PointPillars in MMDetection3D. With such a basic setting, SST achieves state-of-the-art performance in Pedestrian and Cyclist and outperforms PointPillars more than **10 AP** only at a cost of 1.5x latency.
-- SST consists of 6 **Regional Sparse Attention (SRA)** blocks, which deal with the sparse voxel set. It's similar to Submanifold Sparse Convolution (SSC), but much more powerful than SSC. It's locality and sparsity guarantee the efficiency in the single stride setting.
-- The SRA can also be used in many other task to process sparse point clouds. Our implementation of SRA only relies on the pure Python APIs in PyTorch without engineering efforts
-as taken in the CUDA implementation of sparse convolution. 
-- **Better utilizing rich point observations.** Benefiting more from multi-sweep point clouds due to single stride. 
-- Large room for further improvements. For example, **second stage, anchor-free head, IoU scores and advanced techniques from many kinds of vision transformers, etc.**
 
 ## Usage
 **PyTorch >= 1.9 is recommended for a better support of the checkpoint technique.**
@@ -52,6 +47,8 @@ Our implementation is based on [MMDetection3D](https://github.com/open-mmlab/mmd
 We only provide the single-stage model here, as for our two-stage models, please follow [LiDAR-RCNN](https://github.com/TuSimple/LiDAR_RCNN). It's also a good choice to apply other powerful second stage detectors to our single-stage SST.
 
 We borrow **Weighted NMS** from RangeDet and observe ~1 AP improvement on our best Vehicle model. To use it, you are supposed to clone [RangeDet](https://github.com/TuSimple/RangeDet), and simply run `pip install -v -e .` in its root directory. Then refer to `config/sst/sst_waymoD5_1x_car_8heads_wnms.py` to modify your config and enable Weight NMS. Note we only implement the CPU version for now, so it is relatively slow. Do NOT use it on 3-class models, which will lead to performance drop.
+
+To enable faster SSTInputLayer, clone https://github.com/Abyssaledge/TorchEx, and run `pip install -v .`.
 
 
 ## Play with your first single-stride model

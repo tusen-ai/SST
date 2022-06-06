@@ -13,13 +13,27 @@ import pickle as pkl
 
 class WindowAttention(nn.Module):
 
-    def __init__(self, d_model, nhead, dropout, batch_first=False, layer_id=None):
+    def __init__(self, d_model, nhead, dropout, batch_first=False, layer_id=None, layer_cfg=dict()):
         super().__init__()
         self.nhead = nhead
 
-        # from mmdet3d.models.transformer.my_multi_head_attention import MyMultiheadAttention
-        # self.self_attn = MyMultiheadAttention(d_model, nhead, dropout=dropout, batch_first=False)
-        self.self_attn = nn.MultiheadAttention(d_model, nhead, dropout=dropout)
+        if layer_cfg.get('cosine', False):
+            from mmdet3d.models.sst.cosine_msa import CosineMultiheadAttention
+            tau_min = layer_cfg.get('tau_min', 0.01)
+            self.self_attn = CosineMultiheadAttention(
+                d_model, nhead, dropout=dropout, batch_first=False, tau_min=tau_min,
+                cosine=True,
+                non_shared_tau=layer_cfg.get('non_shared_tau', False)
+            )
+        elif layer_cfg.get('linear', False):
+            raise NotImplementedError
+            from mmdet3d.models.sst.linear_msa import LinearMultiheadAttention
+            self.self_attn = LinearMultiheadAttention(
+                d_model, nhead, dropout=dropout, batch_first=False
+            )
+        else:
+            self.self_attn = nn.MultiheadAttention(d_model, nhead, dropout=dropout)
+
         self.exe_counter = 0
 
         self.layer_id = layer_id
@@ -67,7 +81,7 @@ class EncoderLayer(nn.Module):
         super().__init__()
         assert not batch_first, 'Current version of PyTorch does not support batch_first in MultiheadAttention. After upgrading pytorch, do not forget to check the layout of MLP and layer norm to enable batch_first option.'
         self.batch_first = batch_first
-        self.win_attn = WindowAttention(d_model, nhead, dropout, layer_id=layer_id)
+        self.win_attn = WindowAttention(d_model, nhead, dropout, layer_id=layer_id, layer_cfg=layer_cfg)
         # Implementation of Feedforward model
         self.linear1 = nn.Linear(d_model, dim_feedforward)
         self.dropout = nn.Dropout(mlp_dropout)
@@ -75,8 +89,8 @@ class EncoderLayer(nn.Module):
 
         use_bn = layer_cfg.get('use_bn', False)
         if use_bn:
-            self.norm1 = build_norm_layer(dict(type='naiveSyncBN1d'), d_model)[1]
-            self.norm2 = build_norm_layer(dict(type='naiveSyncBN1d'), d_model)[1]
+            self.norm1 = build_norm_layer(dict(type='naiveSyncBN1d', momentum=layer_cfg.get('mom', 0.1)), d_model)[1]
+            self.norm2 = build_norm_layer(dict(type='naiveSyncBN1d', momentum=layer_cfg.get('mom', 0.1)), d_model)[1]
         else:
             self.norm1 = nn.LayerNorm(d_model)
             self.norm2 = nn.LayerNorm(d_model)

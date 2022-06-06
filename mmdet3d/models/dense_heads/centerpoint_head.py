@@ -404,18 +404,17 @@ class CenterHead(BaseModule):
         """
         heatmaps, anno_boxes, inds, masks = multi_apply(
             self.get_targets_single, gt_bboxes_3d, gt_labels_3d)
-        # transpose heatmaps, because the dimension of tensors in each task is
-        # different, we have to use numpy instead of torch to do the transpose.
-        heatmaps = np.array(heatmaps).transpose(1, 0).tolist()
+        # Transpose heatmaps
+        heatmaps = list(map(list, zip(*heatmaps)))
         heatmaps = [torch.stack(hms_) for hms_ in heatmaps]
-        # transpose anno_boxes
-        anno_boxes = np.array(anno_boxes).transpose(1, 0).tolist()
+        # Transpose anno_boxes
+        anno_boxes = list(map(list, zip(*anno_boxes)))
         anno_boxes = [torch.stack(anno_boxes_) for anno_boxes_ in anno_boxes]
-        # transpose inds
-        inds = np.array(inds).transpose(1, 0).tolist()
+        # Transpose inds
+        inds = list(map(list, zip(*inds)))
         inds = [torch.stack(inds_) for inds_ in inds]
-        # transpose inds
-        masks = np.array(masks).transpose(1, 0).tolist()
+        # Transpose inds
+        masks = list(map(list, zip(*masks)))
         masks = [torch.stack(masks_) for masks_ in masks]
         return heatmaps, anno_boxes, inds, masks
 
@@ -537,8 +536,11 @@ class CenterHead(BaseModule):
                     ind[new_idx] = y * feature_map_size[0] + x
                     mask[new_idx] = 1
                     # TODO: support other outdoor dataset
-                    vx, vy = task_boxes[idx][k][7:]
                     rot = task_boxes[idx][k][6]
+                    if len(task_boxes[idx][k][7:]) == 0:
+                        vx = vy = torch.tensor(0, dtype=rot.dtype, device=rot.device)
+                    else:
+                        vx, vy = task_boxes[idx][k][7:]
                     box_dim = task_boxes[idx][k][3:6]
                     if self.norm_bbox:
                         box_dim = box_dim.log()
@@ -817,3 +819,4 @@ class CenterHead(BaseModule):
 
             predictions_dicts.append(predictions_dict)
         return predictions_dicts
+

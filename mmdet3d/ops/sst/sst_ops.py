@@ -145,7 +145,7 @@ def flat2window_v2(feat, inds_dict):
 
 
 @torch.no_grad()
-def get_inner_win_inds(win_inds):
+def get_inner_win_inds_deprecated(win_inds):
     '''
     Args:
         win_inds indicates which windows a voxel belongs to. Voxels share a window have same inds.
@@ -193,6 +193,28 @@ def get_inner_win_inds(win_inds):
     assert random_inner_inds.min() == 0
 
     return inner_inds_reorder
+
+import ingroup_indices
+from torch.autograd import Function
+class IngroupIndicesFunction(Function):
+
+    @staticmethod
+    def forward(ctx, group_inds):
+
+        out_inds = torch.zeros_like(group_inds) - 1
+
+        ingroup_indices.forward(group_inds, out_inds)
+
+        ctx.mark_non_differentiable(out_inds)
+
+        return out_inds
+
+    @staticmethod
+    def backward(ctx, g):
+
+        return None
+
+get_inner_win_inds = IngroupIndicesFunction.apply
 
 @torch.no_grad()
 def get_window_coors(coors, sparse_shape, window_shape, do_shift):

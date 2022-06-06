@@ -141,7 +141,7 @@ class SSTv2(nn.Module):
         
     def _reset_parameters(self):
         for name, p in self.named_parameters():
-            if p.dim() > 1 and 'scaler' not in name:
+            if p.dim() > 1 and 'scaler' not in name and 'tau' not in name:
                 nn.init.xavier_uniform_(p)
 
     def recover_bev(self, voxel_feat, coors, batch_size):

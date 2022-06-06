@@ -359,6 +359,7 @@ class LoadPointsFromFile(object):
                  coord_type,
                  load_dim=6,
                  use_dim=[0, 1, 2],
+                 tanh_dim=None, # to normalize intensity and elongation in WaymoOpenDataset
                  shift_height=False,
                  use_color=False,
                  file_client_args=dict(backend='disk'),
@@ -374,6 +375,7 @@ class LoadPointsFromFile(object):
         self.coord_type = coord_type
         self.load_dim = load_dim
         self.use_dim = use_dim
+        self.tanh_dim = tanh_dim
         self.file_client_args = file_client_args.copy()
         self.file_client = None
 
@@ -418,6 +420,12 @@ class LoadPointsFromFile(object):
         points = points.reshape(-1, self.load_dim)
         points = points[:, self.use_dim]
         attribute_dims = None
+
+        if self.tanh_dim is not None:
+            assert isinstance(self.tanh_dim, list)
+            assert max(self.tanh_dim) < points.shape[1]
+            assert min(self.tanh_dim) > 2
+            points[:, self.tanh_dim] = np.tanh(points[:, self.tanh_dim])
 
         if self.shift_height:
             floor_height = np.percentile(points[:, 2], 0.99)
