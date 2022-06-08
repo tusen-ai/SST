@@ -21,7 +21,6 @@ drop_info_test ={
     3:{'max_tokens':144, 'drop_range':(100, 100000)},
 }
 drop_info = (drop_info_training, drop_info_test)
-shifts_list=[(0, 0), (window_shape[0]//2, window_shape[1]//2) ]
 
 model = dict(
     type='DynamicCenterPoint',
@@ -73,23 +72,23 @@ model = dict(
         conv_in_channel=128,
         conv_out_channel=128,
         debug=True,
-        # seg=False,
         layer_cfg=dict(use_bn=False, cosine=True, tau_min=0.01),
-        checkpoint_blocks=[0,]
+        checkpoint_blocks=[0, 1], # Consider removing it if the GPU memory is suffcient
+        conv_shortcut=True,
     ),
     neck=dict(
         type='SECONDFPN',
         norm_cfg=dict(type='naiveSyncBN2d', eps=1e-3, momentum=0.01),
         in_channels=[128,],
         upsample_strides=[1,],
-        out_channels=[64, ]
+        out_channels=[128, ]
     ),
 
 
     bbox_head=dict(
         type='CenterHead',
         _delete_=True,
-        in_channels=sum([64,]),
+        in_channels=128,
         tasks=[
             dict(num_class=3, class_names=['car', 'pedestrian', 'cyclist']),
         ],
@@ -129,25 +128,25 @@ model = dict(
         grid_size=[468, 468, 1],
         voxel_size=voxel_size,
         out_size_factor=1,
-        dense_reg=1, # what is this
+        dense_reg=1, # not used
         gaussian_overlap=0.1,
         max_objs=500,
         min_radius=2,
         point_cloud_range=point_cloud_range,
         code_weights=[1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.0, 0.0]
-    ), # seems corresponding to common_heads
+    ),
     test_cfg=dict(
         post_center_limit_range=[-80, -80, -10, 80, 80, 10],
         max_per_img=500, # what is this
         max_pool_nms=False,
-        min_radius=[4, 12, 10, 1, 0.85, 0.175], # not used in normal nms, seems task-wise
+        min_radius=[4, 12, 10, 1, 0.85, 0.175], # not used in normal nms, task-wise
         score_threshold=0.1,
         pc_range=point_cloud_range[:2], # seems not used
         out_size_factor=1,
         voxel_size=voxel_size[:2],
         nms_type='rotate',
-        pre_max_size=4096, # change 
-        post_max_size=500, # change
+        pre_max_size=4096,
+        post_max_size=500,
         nms_thr=0.7
     )
 )
@@ -156,7 +155,6 @@ model = dict(
 runner = dict(type='EpochBasedRunner', max_epochs=12)
 evaluation = dict(interval=12)
 
-# fp16 = dict(loss_scale=32.0)
 data = dict(
     samples_per_gpu=1,
     workers_per_gpu=4,

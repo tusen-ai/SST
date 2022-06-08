@@ -46,12 +46,14 @@ class SSTv2(nn.Module):
         conv_kwargs=dict(kernel_size=3, dilation=2, padding=2, stride=1),
         checkpoint_blocks=[],
         layer_cfg=dict(),
+        conv_shortcut=False,
         ):
         super().__init__()
         
         self.d_model = d_model
         self.nhead = nhead
         self.checkpoint_blocks = checkpoint_blocks
+        self.conv_shortcut = conv_shortcut
 
         if in_channel is not None:
             self.linear0 = nn.Linear(in_channel, d_model[0])
@@ -132,7 +134,11 @@ class SSTv2(nn.Module):
 
         if self.num_attached_conv > 0:
             for conv in self.conv_layer:
-                output = conv(output)
+                temp = conv(output)
+                if temp.shape == output.shape and self.conv_shortcut:
+                    output = temp + output
+                else:
+                    output = temp
 
         output_list = []
         output_list.append(output)
