@@ -80,6 +80,7 @@ Please visit the website for detailed results: [SST_v1](https://waymo.com/open/c
 |         |  #Sweeps | Veh_L1 | Ped_L1 | Cyc_L1  | Veh_L2 | Ped_L2 | Cyc_L2  | 
 |---------|---------|--------|--------|---------|--------|--------|---------|
 |  SST_1f | 1       |  73.57  |  80.01  |  70.72   |  64.80  |  71.66  |  68.01
+|  SST_1f_center (4 SST blocks) | 1       |  75.50  |  80.10  |  70.50   |  66.84  |  72.60  |  68.00
 |  SST_3f | 3       |  75.16  |  83.24  |  75.96   |  66.52  |  76.17  |  73.59   |
 
 Note that we train the 3 classes together, so the performance above is a little bit lower than that reported in our paper.
