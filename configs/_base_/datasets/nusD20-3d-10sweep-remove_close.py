@@ -1,7 +1,7 @@
 # If point cloud range is changed, the models should also change their point
 # cloud range accordingly
 point_cloud_range = [-49.95, -49.95, -4.95, 49.95, 49.95, 2.95]
-number_of_sweeps = 1  # Extra sweeps to be merged. Max is 10.
+number_of_sweeps = 9  # Extra sweeps to be merged. Max is 9 extra.
 # For nuScenes we usually do 10-class detection
 class_names = [
     'car', 'truck', 'trailer', 'bus', 'construction_vehicle', 'bicycle',
@@ -130,7 +130,7 @@ data = dict(
         # we use box_type_3d='LiDAR' in kitti and nuscenes dataset
         # and box_type_3d='Depth' in sunrgbd and scannet dataset.
         box_type_3d='LiDAR',
-        load_interval=20,  # 1/5
+        load_interval=20,  # 5%
     ),
     val=dict(
         type=dataset_type,
