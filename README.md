@@ -1,4 +1,4 @@
-# SST: Single-stride Sparse Transformer
+## FSD: Fully Sparse 3D Object Detection  &  SST: Single-stride Sparse Transformer 
 	
 [![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/embracing-single-stride-3d-object-detector/3d-object-detection-on-waymo-pedestrian)](https://paperswithcode.com/sota/3d-object-detection-on-waymo-pedestrian?p=embracing-single-stride-3d-object-detector)
 [![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/embracing-single-stride-3d-object-detector/3d-object-detection-on-waymo-cyclist)](https://paperswithcode.com/sota/3d-object-detection-on-waymo-cyclist?p=embracing-single-stride-3d-object-detector)
@@ -6,17 +6,12 @@
 
 This is the official implementation of paper:
 
-### Embracing Single Stride 3D Object Detector with Sparse Transformer
+#### Fully Sparse 3D Object Detection
+[Paper Link (coming soon)]()
 
-Authors: 
-[Lue Fan](https://lue.fan/),
-[Ziqi Pang](https://ziqipang.me/),
-[Tianyuan Zhang](http://tianyuanzhang.com/),
-[Yu-Xiong Wang](https://yxw.web.illinois.edu/),
-[Hang Zhao](https://hangzhaomit.github.io/),
-[Feng Wang](http://happynear.wang/),
-[Naiyan Wang](https://winsty.net/),
-[Zhaoxiang Zhang](https://zhaoxiangzhang.net/)
+and paper:
+
+#### Embracing Single Stride 3D Object Detector with Sparse Transformer
 
 [Paper Link](https://arxiv.org/pdf/2112.06375.pdf)， [中文解读](https://zhuanlan.zhihu.com/p/476056546)
 
@@ -29,7 +24,7 @@ See `Usage` section.
 - Supported voxel-based region partition in `./configs/sst_refactor`. Users can easily use voxel-based SST by modifying the `recover_bev` function in the backbone.
 - Waymo Leaderboard results updated in [SST_v1](https://waymo.com/open/challenges/entry/?challenge=DETECTION_3D&emailId=5854f8ae-6285&timestamp=1640329826551565)
 
-**Visualization of a sequence by AB3DMOT tracking:**
+**Visualization of a SST detection sequence by AB3DMOT tracking:**
 
 ![demo-min](https://user-images.githubusercontent.com/21312704/145702575-24647aed-256d-486c-835f-730584cf99ee.gif)
 
@@ -44,6 +39,7 @@ See `Usage` section.
 
 Our implementation is based on [MMDetection3D](https://github.com/open-mmlab/mmdetection3d), so just follow their [getting_started](https://github.com/open-mmlab/mmdetection3d/blob/master/docs/getting_started.md) and simply run the script: `run.sh`. Then you will get a basic result of SST after 5~7 hours (depends on your devices).
 
+#### For SST:
 We only provide the single-stage model here, as for our two-stage models, please follow [LiDAR-RCNN](https://github.com/TuSimple/LiDAR_RCNN). It's also a good choice to apply other powerful second stage detectors to our single-stage SST.
 
 We borrow **Weighted NMS** from RangeDet and observe ~1 AP improvement on our best Vehicle model. To use it, you are supposed to clone [RangeDet](https://github.com/TuSimple/RangeDet), and simply run `pip install -v -e .` in its root directory. Then refer to `config/sst/sst_waymoD5_1x_car_8heads_wnms.py` to modify your config and enable Weight NMS. Note we only implement the CPU version for now, so it is relatively slow. Do NOT use it on 3-class models, which will lead to performance drop.
@@ -76,9 +72,6 @@ Please visit the website for detailed results: [SST_v1](https://waymo.com/open/c
 Note that we train the 3 classes together, so the performance above is a little bit lower than that reported in our paper.
 
 
-
-## TODO
-- [ ] Build SRA block with similar API as Sparse Convolution for more convenient usage.
 
 ## Citation
 Please consider citing our work as follows if it is helpful.
