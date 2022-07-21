@@ -7,7 +7,7 @@
 This is the official implementation of paper:
 
 #### Fully Sparse 3D Object Detection
-[Paper Link (coming soon)]()
+[Paper Link](http://arxiv.org/abs/2207.10035)
 
 and paper:
 
