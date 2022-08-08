@@ -61,12 +61,12 @@ So please let us know if you have trouble reproducing the results. Discussions a
 
 Please visit the website for detailed results: [SST_v1](https://waymo.com/open/challenges/entry/?challenge=DETECTION_3D&emailId=5854f8ae-6285&timestamp=1640329826551565)
 
-#### One stage model (based on PointPillars) on Waymo validation split
+#### One stage model on Waymo validation split (refer to this [page](https://github.com/TuSimple/SST/issues/50) for detailed performanc of CenterHead SST)
 
 |         |  #Sweeps | Veh_L1 | Ped_L1 | Cyc_L1  | Veh_L2 | Ped_L2 | Cyc_L2  | 
 |---------|---------|--------|--------|---------|--------|--------|---------|
 |  SST_1f | 1       |  73.57  |  80.01  |  70.72   |  64.80  |  71.66  |  68.01
-|  SST_1f_center (4 SST blocks) | 1       |  75.50  |  80.10  |  70.50   |  66.84  |  72.60  |  68.00
+|  SST_1f_center (4 SST blocks) | 1       |  75.40  |  80.28  |  71.58   |  66.76  |  72.63  |  68.89
 |  SST_3f | 3       |  75.16  |  83.24  |  75.96   |  66.52  |  76.17  |  73.59   |
 
 Note that we train the 3 classes together, so the performance above is a little bit lower than that reported in our paper.
