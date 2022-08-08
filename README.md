@@ -61,7 +61,7 @@ So please let us know if you have trouble reproducing the results. Discussions a
 
 Please visit the website for detailed results: [SST_v1](https://waymo.com/open/challenges/entry/?challenge=DETECTION_3D&emailId=5854f8ae-6285&timestamp=1640329826551565)
 
-#### One stage model on Waymo validation split (refer to this [page](https://github.com/TuSimple/SST/issues/50) for detailed performanc of CenterHead SST)
+#### One stage model on Waymo validation split (refer to this [page](https://github.com/TuSimple/SST/issues/50) for the detailed performance of CenterHead SST)
 
 |         |  #Sweeps | Veh_L1 | Ped_L1 | Cyc_L1  | Veh_L2 | Ped_L2 | Cyc_L2  | 
 |---------|---------|--------|--------|---------|--------|--------|---------|
