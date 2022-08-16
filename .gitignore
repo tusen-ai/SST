@@ -137,7 +137,6 @@ data/sunrgbd/OFFICIAL_SUNRGBD/
 *.obj
 *.ply
 
-# Something random by Elias
 lib64
 pyvenv.cfg
 run_local.sh

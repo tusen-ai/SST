@@ -1,6 +1,6 @@
 We do trials with constant effective window size (receptive field), and varies voxel sizes. Thus, the window shape will also vary.
 We perform the initial trials with 2 merged sweeps, and remove the close points up to 2 meters from the car.
-Using 2 merged sweeps to stay constant with Johans resent trials, though we could also investigate other merge sizes whenever we have merged all our branches to main.
+Using 2 merged sweeps to stay constant with resent trials, though we could also investigate other merge sizes whenever we have merged all our branches to main.
 
 We have a receptive field equivalent to 0.25*16=4m.
 

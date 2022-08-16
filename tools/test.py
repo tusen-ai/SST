@@ -102,14 +102,6 @@ def main():
     args = parse_args()
     args.show_dir="./figs"
     args.show_pretrain=True
-    args.config = "/cephyr/NOBACKUP/groups/snic2021-7-127/eliassv/SST_A40/configs/sst_masked/sst_nuscenes_vZoeeeing_2sweeps-remove_close-cpf-scaled_masked_200e_ED8.py"
-    args.checkpoint = "/mimer/NOBACKUP/groups/snic2021-7-127/eliassv//jobs/287775/epoch_200.pth"
-    """args.show = False
-    args.eval = 'mAP'
-    args.eval_options='show=True'
-    args.out_dir="./figs"
-    args.config = "/mimer/NOBACKUP/groups/snic2021-7-127/eliassv//jobs/308222/sst_10sweeps_VS0.5_WS16_ED8_epochs288.py"
-    args.checkpoint = "/mimer/NOBACKUP/groups/snic2021-7-127/eliassv//jobs/308222/epoch_288.pth"""
     assert args.out or args.eval or args.format_only or args.show \
         or args.show_dir, \
         ('Please specify at least one operation (save/eval/format/show the '
