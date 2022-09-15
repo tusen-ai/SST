@@ -16,7 +16,8 @@ and paper:
 [Paper Link](https://arxiv.org/pdf/2112.06375.pdf)， [中文解读](https://zhuanlan.zhihu.com/p/476056546)
 
 **NEWS**
-- [22-6-6] Support SST with CenterHead, cosine similarity in attention, faster SSTInputLayer. See Usage for details.
+- [22-09-15] 🔥 FSD is accepted at NeurIPS 2022. We will make the code public before the opening of conference.
+- [22-06-06] Support SST with CenterHead, cosine similarity in attention, faster SSTInputLayer. See Usage for details.
 - 🔥 SST is accepted at CVPR 2022.
 - Support Weighted NMS (CPU version) in [RangeDet](https://github.com/TuSimple/RangeDet), improving performance of vehicle class by ~1 AP.
 See `Usage` section.
