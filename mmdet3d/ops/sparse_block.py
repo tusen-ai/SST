@@ -1,11 +1,25 @@
 from mmcv.cnn import build_conv_layer, build_norm_layer
 from torch import nn
 
-from mmdet3d.ops import spconv
+from .spconv import IS_SPCONV2_AVAILABLE
+
+if IS_SPCONV2_AVAILABLE:
+    from spconv.pytorch import SparseModule, SparseSequential
+else:
+    from mmcv.ops import SparseModule, SparseSequential
+
 from mmdet.models.backbones.resnet import BasicBlock, Bottleneck
 
+def replace_feature(out, new_features):
+    if 'replace_feature' in out.__dir__():
+        # spconv 2.x behaviour
+        return out.replace_feature(new_features)
+    else:
+        out.features = new_features
+        return out
 
-class SparseBottleneck(Bottleneck, spconv.SparseModule):
+
+class SparseBottleneck(Bottleneck, SparseModule):
     """Sparse bottleneck block for PartA^2.
 
     Bottleneck block implemented with submanifold sparse convolution.
@@ -31,7 +45,7 @@ class SparseBottleneck(Bottleneck, spconv.SparseModule):
                  conv_cfg=None,
                  norm_cfg=None):
 
-        spconv.SparseModule.__init__(self)
+        SparseModule.__init__(self)
         Bottleneck.__init__(
             self,
             inplanes,
@@ -45,26 +59,26 @@ class SparseBottleneck(Bottleneck, spconv.SparseModule):
         identity = x.features
 
         out = self.conv1(x)
-        out.features = self.bn1(out.features)
-        out.features = self.relu(out.features)
+        out = replace_feature(out, self.bn1(out.features))
+        out = replace_feature(out, self.relu(out.features))
 
         out = self.conv2(out)
-        out.features = self.bn2(out.features)
-        out.features = self.relu(out.features)
+        out = replace_feature(out, self.bn2(out.features))
+        out = replace_feature(out, self.relu(out.features))
 
         out = self.conv3(out)
-        out.features = self.bn3(out.features)
+        out = replace_feature(out, self.bn3(out.features))
 
         if self.downsample is not None:
             identity = self.downsample(x)
 
-        out.features += identity
-        out.features = self.relu(out.features)
+        out = replace_feature(out, out.features + identity)
+        out = replace_feature(out, self.relu(out.features))
 
         return out
 
 
-class SparseBasicBlock(BasicBlock, spconv.SparseModule):
+class SparseBasicBlock(BasicBlock, SparseModule):
     """Sparse basic block for PartA^2.
 
     Sparse basic block implemented with submanifold sparse convolution.
@@ -88,8 +102,9 @@ class SparseBasicBlock(BasicBlock, spconv.SparseModule):
                  stride=1,
                  downsample=None,
                  conv_cfg=None,
-                 norm_cfg=None):
-        spconv.SparseModule.__init__(self)
+                 norm_cfg=None,
+                 act_type='relu'):
+        SparseModule.__init__(self)
         BasicBlock.__init__(
             self,
             inplanes,
@@ -99,23 +114,101 @@ class SparseBasicBlock(BasicBlock, spconv.SparseModule):
             conv_cfg=conv_cfg,
             norm_cfg=norm_cfg)
 
+        act_type = act_type.lower()
+        # a confused way
+        if act_type != 'relu':
+            if act_type == 'gelu':
+                self.relu = nn.GELU()
+            elif act_type == 'silu':
+                self.relu = nn.SiLU(inplace=True)
+
+
     def forward(self, x):
         identity = x.features
 
         assert x.features.dim() == 2, f'x.features.dim()={x.features.dim()}'
 
         out = self.conv1(x)
-        out.features = self.norm1(out.features)
-        out.features = self.relu(out.features)
+        out = replace_feature(out, self.norm1(out.features))
+        out = replace_feature(out, self.relu(out.features))
 
         out = self.conv2(out)
-        out.features = self.norm2(out.features)
+        out = replace_feature(out, self.norm2(out.features))
 
         if self.downsample is not None:
             identity = self.downsample(x)
 
-        out.features += identity
-        out.features = self.relu(out.features)
+        out = replace_feature(out, out.features + identity)
+        out = replace_feature(out, self.relu(out.features))
+
+        return out
+
+class AdaptiveSparseBasicBlock(BasicBlock, SparseModule):
+    """
+    Adaptive stride and channels
+    """
+
+    expansion = 1
+
+    def __init__(self,
+                 inplanes,
+                 planes,
+                 stride=1,
+                 merge=True,
+                 downsample=None,
+                 conv_cfg=None,
+                 norm_cfg=None):
+        SparseModule.__init__(self)
+        BasicBlock.__init__(
+            self,
+            planes,
+            planes,
+            stride=1,
+            downsample=downsample,
+            conv_cfg=conv_cfg,
+            norm_cfg=norm_cfg)
+
+        if isinstance(stride, (tuple, list)):
+            is_stride = max(stride) > 1
+        else:
+            is_stride = stride > 1
+
+        if inplanes != planes or is_stride:
+            ndim = int(conv_cfg['type'][-2])
+            assert ndim in (1, 2, 3, 4)
+            ada_conv_cfg = {}
+            ada_conv_cfg['type'] = f'SparseConv{ndim}d'
+            ada_conv_cfg['indice_key'] = conv_cfg['indice_key'] + '.adaptive'
+            if merge:
+                self.ada_conv = build_conv_layer(ada_conv_cfg, inplanes, planes, stride, stride=stride, padding=0)
+            else:
+                self.ada_conv = build_conv_layer(ada_conv_cfg, inplanes, planes, 3, stride=stride, padding=1)
+            self.ada_norm = build_norm_layer(norm_cfg, planes)[1]
+            self.ada_relu = nn.ReLU(inplace=True)
+
+    def forward(self, x):
+
+        if hasattr(self, 'ada_conv'):
+            x = self.ada_conv(x)
+            x = replace_feature(x, self.ada_norm(x.features))
+            x = replace_feature(x, self.ada_relu(x.features))
+
+        identity = x.features
+
+        assert x.features.dim() == 2, f'x.features.dim()={x.features.dim()}'
+
+        out = self.conv1(x)
+        out = replace_feature(out, self.norm1(out.features))
+        out = replace_feature(out, self.relu(out.features))
+
+        out = self.conv2(out)
+        out = replace_feature(out, self.norm2(out.features))
+
+        if self.downsample is not None:
+            identity = self.downsample(x)
+
+        out = replace_feature(out, out.features + identity)
+        out = replace_feature(out, self.relu(out.features))
 
         return out
 
@@ -127,6 +220,7 @@ def make_sparse_convmodule(in_channels,
                            stride=1,
                            padding=0,
                            conv_type='SubMConv3d',
+                           act_type='relu',
                            norm_cfg=None,
                            order=('conv', 'norm', 'act')):
     """Make sparse convolution module.
@@ -156,7 +250,9 @@ def make_sparse_convmodule(in_channels,
     for layer in order:
         if layer == 'conv':
             if conv_type not in [
-                    'SparseInverseConv3d', 'SparseInverseConv2d',
+                    'SparseInverseConv4d',
+                    'SparseInverseConv3d',
+                    'SparseInverseConv2d',
                     'SparseInverseConv1d'
             ]:
                 layers.append(
@@ -179,7 +275,16 @@ def make_sparse_convmodule(in_channels,
         elif layer == 'norm':
             layers.append(build_norm_layer(norm_cfg, out_channels)[1])
         elif layer == 'act':
-            layers.append(nn.ReLU(inplace=True))
+            act_type = act_type.lower()
+            if act_type == 'relu':
+                layers.append(nn.ReLU(inplace=True))
+            elif act_type == 'gelu':
+                layers.append(nn.GELU())
+            elif act_type == 'silu':
+                layers.append(nn.SiLU(inplace=True))
+            else:
+                raise NotImplementedError
 
-    layers = spconv.SparseSequential(*layers)
+
+    layers = SparseSequential(*layers)
     return layers

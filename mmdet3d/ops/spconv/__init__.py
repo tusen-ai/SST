@@ -12,26 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .conv import (SparseConv2d, SparseConv3d, SparseConvTranspose2d,
-                   SparseConvTranspose3d, SparseInverseConv2d,
-                   SparseInverseConv3d, SubMConv2d, SubMConv3d)
-from .modules import SparseModule, SparseSequential
-from .pool import SparseMaxPool2d, SparseMaxPool3d
-from .structure import SparseConvTensor, scatter_nd
+from .overwrite_spconv.write_spconv2 import register_spconv2
 
-__all__ = [
-    'SparseConv2d',
-    'SparseConv3d',
-    'SubMConv2d',
-    'SubMConv3d',
-    'SparseConvTranspose2d',
-    'SparseConvTranspose3d',
-    'SparseInverseConv2d',
-    'SparseInverseConv3d',
-    'SparseModule',
-    'SparseSequential',
-    'SparseMaxPool2d',
-    'SparseMaxPool3d',
-    'SparseConvTensor',
-    'scatter_nd',
-]
+try:
+    import spconv
+except ImportError:
+    IS_SPCONV2_AVAILABLE = False
+else:
+    if hasattr(spconv, '__version__') and spconv.__version__ >= '2.0.0':
+        IS_SPCONV2_AVAILABLE = register_spconv2()
+    else:
+        IS_SPCONV2_AVAILABLE = False
+
+__all__ = ['IS_SPCONV2_AVAILABLE']
+
