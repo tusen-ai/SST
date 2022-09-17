@@ -102,15 +102,23 @@ class DataBaseSampler(object):
                      type='LoadPointsFromFile',
                      coord_type='LIDAR',
                      load_dim=4,
-                     use_dim=[0, 1, 2, 3])):
+                     use_dim=[0, 1, 2, 3]),
+                 cat2label=None,
+                 label2cat=None):
         super().__init__()
         self.data_root = data_root
         self.info_path = info_path
         self.rate = rate
         self.prepare = prepare
         self.classes = classes
-        self.cat2label = {name: i for i, name in enumerate(classes)}
-        self.label2cat = {i: name for i, name in enumerate(classes)}
+        self.cat2label = cat2label
+        self.label2cat = label2cat
+
+        if cat2label is None:
+            self.cat2label = {name: i for i, name in enumerate(classes)}
+        if label2cat is None:
+            self.label2cat = {i: name for i, name in enumerate(classes)}
+
         self.points_loader = mmcv.build_from_cfg(points_loader, PIPELINES)
 
         db_infos = mmcv.load(info_path)
@@ -261,7 +269,7 @@ class DataBaseSampler(object):
                 s_points_list.append(s_points)
 
             gt_labels = np.array([self.cat2label[s['name']] for s in sampled],
-                                 dtype=np.long)
+                                 dtype=np.compat.long)
             ret = {
                 'gt_labels_3d':
                 gt_labels,

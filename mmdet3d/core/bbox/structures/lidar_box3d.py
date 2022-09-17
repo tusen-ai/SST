@@ -87,6 +87,28 @@ class LiDARInstance3DBoxes(BaseInstance3DBoxes):
         return corners
 
     @property
+    def canonical_corners(self):
+        assert len(self.tensor) != 0
+        dims = self.dims
+        corners_norm = torch.from_numpy(
+            np.stack(np.unravel_index(np.arange(8), [2] * 3), axis=1)).to(
+                device=dims.device, dtype=dims.dtype)
+
+        corners_norm = corners_norm[[0, 1, 3, 2, 4, 5, 7, 6]]
+        # use relative origin [0.5, 0.5, 0]
+        corners_norm = corners_norm - dims.new_tensor([0.5, 0.5, 0])
+        corners = dims.view([-1, 1, 3]) * corners_norm.reshape([1, 8, 3])
+        return corners
+
+    @property
+    def heading_unit_vector(self):
+        yaw = self.tensor[:, 6]
+        sin = torch.sin(yaw)
+        cos = torch.cos(yaw)
+        vector = torch.stack([sin, cos, torch.zeros_like(sin)], -1)
+        return vector
+
+    @property
     def bev(self):
         """torch.Tensor: 2D BEV box of each box with rotation
         in XYWHR format."""
@@ -252,6 +274,70 @@ class LiDARInstance3DBoxes(BaseInstance3DBoxes):
         enlarged_boxes[:, 3:6] += extra_width * 2
         # bottom center z minus extra_width
         enlarged_boxes[:, 2] -= extra_width
+        if extra_width < 0:
+            invalid_mask = (enlarged_boxes[:, 3:6] <= 0).any(1)
+            enlarged_boxes[invalid_mask] = self.tensor[invalid_mask]
+        return self.new_box(enlarged_boxes)
+
+    def classwise_enlarged_box(self, extra_width_dict, labels):
+        """Enlarge the length, width and height boxes.
+
+        Args:
+            extra_width (float | torch.Tensor): Extra width to enlarge the box.
+
+        Returns:
+            :obj:`LiDARInstance3DBoxes`: Enlarged boxes.
+        """
+        unq_labels = torch.unique(labels).tolist()
+        extra_width = self.tensor.new_ones(len(self.tensor))
+        for l in unq_labels:
+            this_mask = labels == l
+            extra_width[this_mask] = extra_width_dict[l]
+        extra_width = extra_width[:, None]
+
+        enlarged_boxes = self.tensor.clone()
+        enlarged_boxes[:, 3:6] += extra_width * 2
+        # bottom center z minus extra_width
+        enlarged_boxes[:, 2] -= extra_width.squeeze()
+        return self.new_box(enlarged_boxes)
+    
+    def noisy_box(self, center_noise, dim_noise, yaw_noise):
+        num = len(self.tensor)
+        device = self.tensor.device
+        dtype = self.tensor.dtype
+
+        if isinstance(center_noise, (list, tuple)):
+            center_noise = torch.tensor(center_noise, dtype=rois.dtype, device=rois.device)[None, :]
+
+        if isinstance(dim_noise, (list, tuple)):
+            dim_noise = torch.tensor(dim_noise, dtype=rois.dtype, device=rois.device)[None, :]
+        
+        dims = self.tensor[:, 3:6]
+
+        cen_noise = (torch.rand((num, 3), dtype=dtype, device=device) - 0.5) * 2 * center_noise * dims
+        dim_noise = (torch.rand((num, 3), dtype=dtype, device=device) - 0.5) * 2 * dim_noise + 1
+        yaw_noise = (torch.rand((num,  ), dtype=dtype, device=device) - 0.5) * 2 * yaw_noise
+        noisy_boxes = self.tensor.clone()
+        noisy_boxes[:, :3] += cen_noise
+        noisy_boxes[:, 3:6] *= dim_noise
+        noisy_boxes[:, 6] += yaw_noise
+        return self.new_box(noisy_boxes)
+
+    def enlarged_box_hw(self, extra_width):
+        """Enlarge the length, width and height boxes.
+
+        Args:
+            extra_width (float | torch.Tensor): Extra width to enlarge the box.
+
+        Returns:
+            :obj:`LiDARInstance3DBoxes`: Enlarged boxes.
+        """
+        enlarged_boxes = self.tensor.clone()
+        enlarged_boxes[:, 3:5] += extra_width * 2
+        # bottom center z minus extra_width
+        if extra_width < 0:
+            invalid_mask = (enlarged_boxes[:, 3:5] <= 0).any(1)
+            enlarged_boxes[invalid_mask] = self.tensor[invalid_mask]
         return self.new_box(enlarged_boxes)
 
     def points_in_boxes(self, points):
@@ -265,5 +351,19 @@ class LiDARInstance3DBoxes(BaseInstance3DBoxes):
         """
         box_idx = points_in_boxes_gpu(
             points.unsqueeze(0),
-            self.tensor.unsqueeze(0).to(points.device)).squeeze(0)
+            self.tensor[:, :7].unsqueeze(0).to(points.device)).squeeze(0)
         return box_idx
+
+    def move(self, t=0.1):
+        """ move boxes along the velocity
+
+        Returns:
+            :obj:`LiDARInstance3DBoxes`: Enlarged boxes.
+        """
+        assert not self.moved
+        velo = self.tensor[:, [7, 8]]
+        moved_boxes = self.tensor.clone()
+        moved_boxes[:, :2] += velo * t
+        # bottom center z minus extra_width
+        self.moved = True
+        return self.new_box(moved_boxes)

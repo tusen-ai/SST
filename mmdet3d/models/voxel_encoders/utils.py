@@ -143,6 +143,51 @@ class DynamicVFELayer(nn.Module):
         pointwise = F.relu(x)
         return pointwise
 
+from mmdet3d.ops import get_activation_layer
+class DynamicVFELayerV2(nn.Module):
+    """Replace the Voxel Feature Encoder layer in VFE layers.
+    This layer has the same utility as VFELayer above
+    Args:
+        in_channels (int): Number of input channels.
+        out_channels (int): Number of output channels.
+        norm_cfg (dict): Config dict of normalization layers
+    """
+
+    def __init__(self,
+                 in_channels,
+                 out_channels,
+                 norm_cfg=dict(type='BN1d', eps=1e-3, momentum=0.01),
+                 act='relu',
+                 dropout=0.0,
+                 ):
+        super(DynamicVFELayerV2, self).__init__()
+        self.fp16_enabled = False
+        # self.units = int(out_channels / 2)
+        self.norm = build_norm_layer(norm_cfg, out_channels)[1]
+        self.linear = nn.Linear(in_channels, out_channels, bias=False)
+        self.act = get_activation_layer(act, out_channels)
+        if dropout > 0:
+            self.dropout = nn.Dropout(p=dropout)
+        else:
+            self.dropout = None
+
+    @auto_fp16(apply_to=('inputs'), out_fp32=True)
+    def forward(self, inputs):
+        """Forward function.
+        Args:
+            inputs (torch.Tensor): Voxels features of shape (M, C).
+                M is the number of points, C is the number of channels of point features.
+        Returns:
+            torch.Tensor: point features in shape (M, C).
+        """
+        # [K, T, 7] tensordot [7, units] = [K, T, units]
+        if self.dropout is not None:
+            inputs = self.dropout(inputs)
+        x = self.linear(inputs)
+        x = self.norm(x)
+        pointwise = self.act(x)
+        return pointwise
+
 
 class PFNLayer(nn.Module):
     """Pillar Feature Net Layer.

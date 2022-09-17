@@ -219,7 +219,9 @@ class BaseInstance3DBoxes(object):
             scale_factors (float): Scale factors to scale the boxes.
         """
         self.tensor[:, :6] *= scale_factor
-        self.tensor[:, 7:] *= scale_factor
+        if self.tensor.size(1) > 7:
+            # scale velocity
+            self.tensor[:, [7, 8]] *= scale_factor
 
     def limit_yaw(self, offset=0.5, period=np.pi):
         """Limit the yaw to a given period and offset.

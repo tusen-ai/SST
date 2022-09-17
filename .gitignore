@@ -12,6 +12,7 @@ __pycache__/
 
 #core dump
 cores-*
+core.*
 
 # Distribution / packaging
 .Python
@@ -138,4 +139,4 @@ data/sunrgbd/OFFICIAL_SUNRGBD/
 *.ply
 
 # Waymo evaluation
-mmdet3d/core/evaluation/waymo_utils/compute_detection_metrics_main
+mmdet3d/core/evaluation/waymo_utils/compute_detection_metrics_main*

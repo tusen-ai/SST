@@ -52,7 +52,18 @@ def box3d_multiclass_nms(mlvl_bboxes,
     bboxes2d = []
     for i in range(0, num_classes):
         # get bboxes and scores of this class
-        cls_inds = mlvl_scores[:, i] > score_thr
+        if isinstance(score_thr, (list,tuple)):
+            assert len(score_thr) == num_classes
+            cls_score_thr = score_thr[i]
+        else:
+            cls_score_thr = score_thr
+
+        nms_thr = cfg.nms_thr
+        if isinstance(nms_thr, (list,tuple)):
+            assert len(nms_thr) == num_classes
+            nms_thr = nms_thr[i]
+
+        cls_inds = mlvl_scores[:, i] > cls_score_thr
         if not cls_inds.any():
             continue
 
@@ -64,7 +75,11 @@ def box3d_multiclass_nms(mlvl_bboxes,
         else:
             nms_func = nms_normal_gpu
 
-        selected = nms_func(_bboxes_for_nms, _scores, cfg.nms_thr)
+        # disable nms in a hacking manner
+        if nms_thr is None:
+            selected = torch.arange(len(_scores), dtype=torch.long, device=_scores.device)
+        else:
+            selected = nms_func(_bboxes_for_nms, _scores, nms_thr)
         _mlvl_bboxes = mlvl_bboxes[cls_inds, :]
         bboxes.append(_mlvl_bboxes[selected])
         scores.append(_scores[selected])

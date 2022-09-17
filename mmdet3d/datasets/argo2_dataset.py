@@ -9,24 +9,25 @@ from os import path as osp
 from mmdet.datasets import DATASETS
 from ..core.bbox import Box3DMode, points_cam2img
 from .kitti_dataset import KittiDataset
-import pickle as pkl
-from mmdet3d.core import LiDARInstance3DBoxes
-from mmcv.parallel import DataContainer as DC
+
+from ..core.bbox import (Box3DMode, CameraInstance3DBoxes, Coord3DMode,
+                         LiDARInstance3DBoxes, points_cam2img)
+
 from ipdb import set_trace
 import copy
+from pathlib import Path
 
 try:
-    from waymo_open_dataset import label_pb2
-    from waymo_open_dataset.protos import metrics_pb2
-except:
-    print('Can not import WOD')
-    label_pb2 = None
-    metrics_pb2 = None
+    from ..core.evaluation.argo2_utils.so3 import yaw_to_quat
+    from ..core.evaluation.argo2_utils.constants import LABEL_ATTR
+except ImportError:
+    yaw_to_quat = None
+    LABEL_ATTR = None
 
 
 @DATASETS.register_module()
-class WaymoDataset(KittiDataset):
-    """Waymo Dataset.
+class Argo2Dataset(KittiDataset):
+    """Argoverse2 Dataset.
 
     This class serves as the API for experiments on the Waymo Dataset.
 
@@ -62,7 +63,51 @@ class WaymoDataset(KittiDataset):
             invalid predicted boxes. Default: [-85, -85, -5, 85, 85, 5].
     """
 
-    CLASSES = ('Car', 'Cyclist', 'Pedestrian')
+    # CLASSES = ('Car', 'Cyclist', 'Pedestrian')
+    group1 = ["REGULAR_VEHICLE"]
+
+    group2 = [
+        "PEDESTRIAN",
+        "BICYCLIST",
+        "MOTORCYCLIST",
+        "WHEELED_RIDER",
+    ]
+
+    group3 = [
+        "BOLLARD",
+        "CONSTRUCTION_CONE",
+        "SIGN",
+        "CONSTRUCTION_BARREL",
+        "STOP_SIGN",
+        "MOBILE_PEDESTRIAN_CROSSING_SIGN",
+    ]
+
+    group4 = [
+        "LARGE_VEHICLE",
+        "BUS",
+        "BOX_TRUCK",
+        "TRUCK",
+        "VEHICULAR_TRAILER",
+        "TRUCK_CAB",
+        "SCHOOL_BUS",
+        "ARTICULATED_BUS",
+        "MESSAGE_BOARD_TRAILER",
+    ]
+
+    group5 = [
+        "BICYCLE",
+        "MOTORCYCLE",
+        "WHEELED_DEVICE",
+        "WHEELCHAIR",
+        "STROLLER",
+    ]
+
+    group6 = [
+        "DOG",
+    ]
+
+    all_classes = group1 + group2 + group3 + group4 + group5 + group6
+    CLASSES = tuple([c.lower().capitalize() for c in all_classes])
 
     def __init__(self,
                  data_root,
@@ -91,24 +136,15 @@ class WaymoDataset(KittiDataset):
             test_mode=test_mode,
             pcd_limit_range=pcd_limit_range)
         self.save_training = save_training
-        self.pipeline_types = [p['type'] for p in pipeline]
-        self._skip_type_keys = None
 
         # to load a subset, just set the load_interval in the dataset config
         self.data_infos = self.data_infos[::load_interval]
         if hasattr(self, 'flag'):
             self.flag = self.flag[::load_interval]
 
-        self.k2w_cls_map = {
-            'Car': label_pb2.Label.TYPE_VEHICLE,
-            'Pedestrian': label_pb2.Label.TYPE_PEDESTRIAN,
-            'Sign': label_pb2.Label.TYPE_SIGN,
-            'Cyclist': label_pb2.Label.TYPE_CYCLIST,
-        }
-
     def _get_pts_filename(self, idx):
         pts_filename = osp.join(self.root_split, self.pts_prefix,
-                                f'{idx:07d}.bin')
+                                f'{idx}.bin')
         return pts_filename
 
     def get_cat_ids(self, idx):
@@ -150,28 +186,17 @@ class WaymoDataset(KittiDataset):
                 - ann_info (dict): annotation info
         """
         info = self.data_infos[index]
-        sample_idx = info['image']['image_idx']
-        img_filename = os.path.join(self.data_root,
-                                    info['image']['image_path'])
+        sample_idx = info['sample_idx']
 
         # TODO: consider use torch.Tensor only
-        rect = info['calib']['R0_rect'].astype(np.float32)
-        Trv2c = info['calib']['Tr_velo_to_cam'].astype(np.float32)
-        P0 = info['calib']['P0'].astype(np.float32)
-        lidar2img = P0 @ rect @ Trv2c
 
         pts_filename = self._get_pts_filename(sample_idx)
         input_dict = dict(
             sample_idx=sample_idx,
             pts_filename=pts_filename,
             img_prefix=None,
-            img_info=dict(filename=img_filename),
-            lidar2img=lidar2img,
-            pose=info['pose']
-            # instance_id=info['annos']['instance_id'],
-            # speed=info['annos']['spped'],
-            # accel=info['annos']['accel']
-            )
+            img_info=dict(filename=None), # do not use image for now
+            lidar2img=None)
 
         if not self.test_mode:
             annos = self.get_ann_info(index)
@@ -179,7 +204,58 @@ class WaymoDataset(KittiDataset):
 
         return input_dict
 
-    def format_results(self,
+    def get_ann_info(self, index):
+        """Get annotation info according to the given index.
+
+        Args:
+            index (int): Index of the annotation data to get.
+
+        Returns:
+            dict: annotation information consists of the following keys:
+
+                - gt_bboxes_3d (:obj:`LiDARInstance3DBoxes`): \
+                    3D ground truth bboxes.
+                - gt_labels_3d (np.ndarray): Labels of ground truths.
+                - gt_bboxes (np.ndarray): 2D ground truth bboxes.
+                - gt_labels (np.ndarray): Labels of ground truths.
+                - gt_names (list[str]): Class names of ground truths.
+        """
+        # Use index to get the annos, thus the evalhook could also use this api
+        info = self.data_infos[index]
+
+        annos = info['annos']
+        # we need other objects to avoid collision when sample
+        loc = annos['location']
+        dims = annos['dimensions']
+        rots = annos['rotation_y']
+        gt_names = annos['name']
+        gt_bboxes_3d = np.concatenate([loc, dims, rots[..., np.newaxis]],
+                                      axis=1).astype(np.float32)
+
+        # convert gt_bboxes_3d to velodyne coordinates
+        gt_bboxes_3d = LiDARInstance3DBoxes(gt_bboxes_3d, origin=(0.5, 0.5, 0.5))
+
+        # selected = self.drop_arrays_by_name(gt_names, ['DontCare'])
+        # gt_names = gt_names[selected]
+
+        gt_labels = []
+        for cat in gt_names:
+            if cat in self.CLASSES:
+                gt_labels.append(self.CLASSES.index(cat))
+            else:
+                gt_labels.append(-1)
+        gt_labels = np.array(gt_labels).astype(np.int64)
+        gt_labels_3d = copy.deepcopy(gt_labels)
+
+        anns_results = dict(
+            gt_bboxes_3d=gt_bboxes_3d,
+            gt_labels_3d=gt_labels_3d,
+            bboxes=None,
+            labels=gt_labels,
+            gt_names=gt_names)
+        return anns_results
+
+    def format_results_old(self,
                        outputs,
                        pklfile_prefix=None,
                        submission_prefix=None,
@@ -265,6 +341,87 @@ class WaymoDataset(KittiDataset):
 
         return result_files, tmp_dir
 
+    def format_results(self,
+                       outputs,
+                       pklfile_prefix=None,
+                       submission_prefix=None,
+                       ):
+        """Format the results to .feather file with argo2 format.
+
+        Args:
+            outputs (list[dict]): Testing results of the dataset.
+            pklfile_prefix (str | None): The prefix of pkl files. It includes
+                the file path and the prefix of filename, e.g., "a/b/prefix".
+                If not specified, a temp file will be created. Default: None.
+            submission_prefix (str | None): The prefix of submitted files. It
+                includes the file path and the prefix of filename, e.g.,
+                "a/b/prefix". If not specified, a temp file will be created.
+                Default: None.
+
+        Returns:
+            tuple: (result_files, tmp_dir), result_files is a dict containing
+                the json filepaths, tmp_dir is the temporal directory created
+                for saving json files when jsonfile_prefix is not specified.
+        """
+        import pandas as pd
+
+        assert len(self.data_infos) == len(outputs)
+        num_samples = len(outputs)
+        print('\nGot {} samples'.format(num_samples))
+        
+        serialized_dts_list = []
+        
+        print('\nConvert predictions to Argoverse 2 format')
+        for i in mmcv.track_iter_progress(range(num_samples)):
+            out_i = outputs[i]
+            if 'pts_bbox' in out_i:
+                out_i = out_i['pts_bbox'] # for MVX-style detector
+            log_id, ts = self.data_infos[i]['uuid'].split('/')
+            track_uuid = None
+            cat_id = out_i['labels_3d'].numpy().tolist()
+            category = [self.CLASSES[i].upper() for i in cat_id]
+            serialized_dts = pd.DataFrame(
+                self.lidar_box_to_argo2(out_i['boxes_3d']).numpy(), columns=list(LABEL_ATTR)
+            )
+            serialized_dts["score"] = out_i['scores_3d'].numpy()
+            serialized_dts["log_id"] = log_id
+            serialized_dts["timestamp_ns"] = int(ts)
+            serialized_dts["category"] = category
+            serialized_dts_list.append(serialized_dts)
+        
+        dts = (
+            pd.concat(serialized_dts_list)
+            .set_index(["log_id", "timestamp_ns"])
+            .sort_index()
+        )
+
+        dts = dts.sort_values("score", ascending=False).reset_index()
+
+        if pklfile_prefix is not None:
+            if not pklfile_prefix.endswith(('.feather')):
+                pklfile_prefix = f'{pklfile_prefix}.feather'
+            dts.to_feather(pklfile_prefix)
+            print(f'Result is saved to {pklfile_prefix}.')
+
+        dts = dts.set_index(["log_id", "timestamp_ns"]).sort_index()
+
+        return dts 
+    
+    def lidar_box_to_argo2(self, boxes):
+        cnt_xyz = boxes.gravity_center
+        lwh = boxes.tensor[:, [4, 3, 5]]
+        yaw = boxes.tensor[:, 6]
+
+        yaw = -yaw - 0.5 * np.pi
+        while (yaw < -np.pi).any():
+            yaw[yaw < -np.pi] += 2 * np.pi
+        while (yaw > np.pi).any():
+            yaw[yaw > np.pi] -= 2 * np.pi
+
+        quat = yaw_to_quat(yaw)
+        argo_cuboid = torch.cat([cnt_xyz, lwh, quat], dim=1)
+        return argo_cuboid
+
     def evaluate(self,
                  results,
                  metric='waymo',
@@ -297,112 +454,52 @@ class WaymoDataset(KittiDataset):
         Returns:
             dict[str: float]: results of each evaluation metric
         """
-        assert ('waymo' in metric or 'kitti' in metric), \
-            f'invalid metric {metric}'
-        if 'kitti' in metric:
-            result_files, tmp_dir = self.format_results(
-                results,
-                pklfile_prefix,
-                submission_prefix,
-                data_format='kitti')
-            from mmdet3d.core.evaluation import kitti_eval
-            gt_annos = [info['annos'] for info in self.data_infos]
+        from av2.evaluation.detection.constants import CompetitionCategories
+        from av2.evaluation.detection.utils import DetectionCfg
+        from av2.evaluation.detection.eval import evaluate
+        from av2.utils.io import read_feather
 
-            if isinstance(result_files, dict):
-                ap_dict = dict()
-                for name, result_files_ in result_files.items():
-                    eval_types = ['bev', '3d']
-                    ap_result_str, ap_dict_ = kitti_eval(
-                        gt_annos,
-                        result_files_,
-                        self.CLASSES,
-                        eval_types=eval_types)
-                    for ap_type, ap in ap_dict_.items():
-                        ap_dict[f'{name}/{ap_type}'] = float(
-                            '{:.4f}'.format(ap))
+        dts = self.format_results(results, pklfile_prefix, submission_prefix)
+        argo2_root = osp.join(self.data_root.split('kitti_format')[0], 'argo2_format')
+        val_anno_path = osp.join(argo2_root, 'sensor/val_anno.feather')
+        gts = read_feather(val_anno_path)
+        gts = gts.set_index(["log_id", "timestamp_ns"]).sort_values("category")
 
-                    print_log(
-                        f'Results of {name}:\n' + ap_result_str, logger=logger)
+        valid_uuids_gts = gts.index.tolist()
+        valid_uuids_dts = dts.index.tolist()
+        valid_uuids = set(valid_uuids_gts) & set(valid_uuids_dts)
+        gts = gts.loc[list(valid_uuids)].sort_index()
 
-            else:
-                ap_result_str, ap_dict = kitti_eval(
-                    gt_annos,
-                    result_files,
-                    self.CLASSES,
-                    eval_types=['bev', '3d'])
-                print_log('\n' + ap_result_str, logger=logger)
-        if 'waymo' in metric:
-            waymo_root = osp.join(
-                self.data_root.split('kitti_format')[0], 'waymo_format')
-            if pklfile_prefix is None:
-                eval_tmp_dir = tempfile.TemporaryDirectory()
-                pklfile_prefix = osp.join(eval_tmp_dir.name, 'results')
-            else:
-                eval_tmp_dir = None
-            result_files, tmp_dir = self.format_results(
-                results,
-                pklfile_prefix,
-                submission_prefix,
-                data_format='waymo')
-            import subprocess
-            ret_bytes = subprocess.check_output(
-                'mmdet3d/core/evaluation/waymo_utils/' +
-                f'compute_detection_metrics_main {pklfile_prefix}.bin ' +
-                f'{waymo_root}/gt.bin',
-                shell=True)
-            ret_texts = ret_bytes.decode('utf-8')
-            print_log(ret_texts)
-            # parse the text to get ap_dict
-            ap_dict = {
-                'Vehicle/L1 mAP': 0,
-                'Vehicle/L1 mAPH': 0,
-                'Vehicle/L2 mAP': 0,
-                'Vehicle/L2 mAPH': 0,
-                'Pedestrian/L1 mAP': 0,
-                'Pedestrian/L1 mAPH': 0,
-                'Pedestrian/L2 mAP': 0,
-                'Pedestrian/L2 mAPH': 0,
-                'Sign/L1 mAP': 0,
-                'Sign/L1 mAPH': 0,
-                'Sign/L2 mAP': 0,
-                'Sign/L2 mAPH': 0,
-                'Cyclist/L1 mAP': 0,
-                'Cyclist/L1 mAPH': 0,
-                'Cyclist/L2 mAP': 0,
-                'Cyclist/L2 mAPH': 0,
-                'Overall/L1 mAP': 0,
-                'Overall/L1 mAPH': 0,
-                'Overall/L2 mAP': 0,
-                'Overall/L2 mAPH': 0
-            }
-            mAP_splits = ret_texts.split('mAP ')
-            mAPH_splits = ret_texts.split('mAPH ')
-            for idx, key in enumerate(ap_dict.keys()):
-                split_idx = int(idx / 2) + 1
-                if idx % 2 == 0:  # mAP
-                    ap_dict[key] = float(mAP_splits[split_idx].split(']')[0])
-                else:  # mAPH
-                    ap_dict[key] = float(mAPH_splits[split_idx].split(']')[0])
-            ap_dict['Overall/L1 mAP'] = \
-                (ap_dict['Vehicle/L1 mAP'] + ap_dict['Pedestrian/L1 mAP'] +
-                 ap_dict['Cyclist/L1 mAP']) / 3
-            ap_dict['Overall/L1 mAPH'] = \
-                (ap_dict['Vehicle/L1 mAPH'] + ap_dict['Pedestrian/L1 mAPH'] +
-                 ap_dict['Cyclist/L1 mAPH']) / 3
-            ap_dict['Overall/L2 mAP'] = \
-                (ap_dict['Vehicle/L2 mAP'] + ap_dict['Pedestrian/L2 mAP'] +
-                 ap_dict['Cyclist/L2 mAP']) / 3
-            ap_dict['Overall/L2 mAPH'] = \
-                (ap_dict['Vehicle/L2 mAPH'] + ap_dict['Pedestrian/L2 mAPH'] +
-                 ap_dict['Cyclist/L2 mAPH']) / 3
-            if eval_tmp_dir is not None:
-                eval_tmp_dir.cleanup()
+        categories = set(x.value for x in CompetitionCategories)
+        categories &= set(gts["category"].unique().tolist())
 
-        if tmp_dir is not None:
-            tmp_dir.cleanup()
+        split = 'val' if self.split == 'training' else 'test' # a little confusing
+        dataset_dir = Path(argo2_root) / 'sensor' / split
+        cfg = DetectionCfg(
+            dataset_dir=dataset_dir,
+            categories=tuple(sorted(categories)),
+            split=split,
+            max_range_m=200.0,
+            eval_only_roi_instances=True,
+        )
 
-        if show:
-            self.show(results, out_dir, pipeline=pipeline)
+        # Evaluate using Argoverse detection API.
+        eval_dts, eval_gts, metrics = evaluate(
+            dts.reset_index(), gts.reset_index(), cfg
+        )
+
+        valid_categories = sorted(categories) + ["AVERAGE_METRICS"]
+        print(metrics.loc[valid_categories])
+        ap_dict = {}
+        for index, row in metrics.iterrows():
+            # for k, v in row.to_dict().items():
+            #     name = (
+            #         "hp/CDS"
+            #         if k == "CDS" and (index == "AVERAGE_METRICS")
+            #         else f"hp/{k}/{index}"
+            #     )
+            #     ap_dict[name] = v
+            ap_dict[index] = row.to_json()
         return ap_dict
 
     def bbox2result_kitti(self,
@@ -422,6 +519,7 @@ class WaymoDataset(KittiDataset):
         Returns:
             List[dict]: A list of dict have the kitti 3d format
         """
+        raise NotImplementedError
         assert len(net_outputs) == len(self.data_infos), \
             'invalid list length of network outputs'
         if submission_prefix is not None:
@@ -541,6 +639,7 @@ class WaymoDataset(KittiDataset):
                 - label_preds (np.ndarray): Class labels of predicted boxes.
                 - sample_idx (np.ndarray): Sample index.
         """
+        raise NotImplementedError
         # TODO: refactor this function
         box_preds = box_dict['boxes_3d']
         scores = box_dict['scores_3d']
@@ -596,150 +695,3 @@ class WaymoDataset(KittiDataset):
                 label_preds=np.zeros([0, 4]),
                 sample_idx=sample_idx,
             )
-
-    def prepare_train_data(self, index):
-        """Training data preparation.
-
-        Args:
-            index (int): Index for accessing the target data.
-
-        Returns:
-            dict: Training data dict of the corresponding index.
-        """
-        input_dict = self.get_data_info(index)
-        if input_dict is None:
-            return None
-        self.pre_pipeline(input_dict)
-
-        example = input_dict
-        for transform, transform_type in zip(self.pipeline.transforms, self.pipeline_types):
-            if self._skip_type_keys is not None and transform_type in self._skip_type_keys:
-                continue
-            example = transform(example)
-
-        # example = self.pipeline(input_dict)
-        if self.filter_empty_gt and \
-                (example is None or
-                    ~(example['gt_labels_3d']._data != -1).any()):
-            return None
-        return example
-
-    def update_skip_type_keys(self, skip_type_keys):
-        self._skip_type_keys = skip_type_keys
-
-
-@DATASETS.register_module()
-class MultiSweepsWaymoDataset(WaymoDataset):
-    """Waymo Dataset.
-
-    This class serves as the API for experiments on the Waymo Dataset.
-
-    Please refer to `<https://waymo.com/open/download/>`_for data downloading.
-    It is recommended to symlink the dataset root to $MMDETECTION3D/data and
-    organize them as the doc shows.
-
-    Args:
-        data_root (str): Path of dataset root.
-        ann_file (str): Path of annotation file.
-        split (str): Split of input data.
-        pts_prefix (str, optional): Prefix of points files.
-            Defaults to 'velodyne'.
-        pipeline (list[dict], optional): Pipeline used for data processing.
-            Defaults to None.
-        classes (tuple[str], optional): Classes used in the dataset.
-            Defaults to None.
-        modality (dict, optional): Modality to specify the sensor data used
-            as input. Defaults to None.
-        box_type_3d (str, optional): Type of 3D box of this dataset.
-            Based on the `box_type_3d`, the dataset will encapsulate the box
-            to its original format then converted them to `box_type_3d`.
-            Defaults to 'LiDAR' in this dataset. Available options includes
-
-            - 'LiDAR': box in LiDAR coordinates
-            - 'Depth': box in depth coordinates, usually for indoor dataset
-            - 'Camera': box in camera coordinates
-        filter_empty_gt (bool, optional): Whether to filter empty GT.
-            Defaults to True.
-        test_mode (bool, optional): Whether the dataset is in test mode.
-            Defaults to False.
-        pcd_limit_range (list): The range of point cloud used to filter
-            invalid predicted boxes. Default: [-85, -85, -5, 85, 85, 5].
-    """
-
-    CLASSES = ('Car', 'Cyclist', 'Pedestrian')
-
-    def __init__(self,
-                 data_root,
-                 ann_file,
-                 split,
-                 pts_prefix='velodyne',
-                 pipeline=None,
-                 classes=None,
-                 modality=None,
-                 box_type_3d='LiDAR',
-                 filter_empty_gt=True,
-                 test_mode=False,
-                 load_interval=1,
-                 pcd_limit_range=[-85, -85, -5, 85, 85, 5],
-                 save_training=False):
-        super().__init__(
-            data_root=data_root,
-            ann_file=ann_file,
-            split=split,
-            pts_prefix=pts_prefix,
-            pipeline=pipeline,
-            classes=classes,
-            modality=modality,
-            box_type_3d=box_type_3d,
-            filter_empty_gt=filter_empty_gt,
-            test_mode=test_mode,
-            load_interval=load_interval,
-            pcd_limit_range=pcd_limit_range,
-            save_training=save_training)
-
-    def get_data_info(self, index):
-        """Get data info according to the given index.
-
-        Args:
-            index (int): Index of the sample data to get.
-
-        Returns:
-            dict: Standard input_dict consists of the
-                data information.
-
-                - sample_idx (str): sample index
-                - pts_filename (str): filename of point clouds
-                - img_prefix (str | None): prefix of image files
-                - img_info (dict): image info
-                - lidar2img (list[np.ndarray], optional): transformations from
-                    lidar to different cameras
-                - ann_info (dict): annotation info
-        """
-        info = self.data_infos[index]
-        sample_idx = info['image']['image_idx']
-        img_filename = os.path.join(self.data_root,
-                                    info['image']['image_path'])
-
-        # TODO: consider use torch.Tensor only
-        rect = info['calib']['R0_rect'].astype(np.float32)
-        Trv2c = info['calib']['Tr_velo_to_cam'].astype(np.float32)
-        P0 = info['calib']['P0'].astype(np.float32)
-        lidar2img = P0 @ rect @ Trv2c
-
-        pts_filename = self._get_pts_filename(sample_idx)
-        input_dict = dict(
-            sample_idx=sample_idx,
-            pts_filename=pts_filename,
-            img_prefix=None,
-            img_info=dict(filename=img_filename),
-            lidar2img=lidar2img,
-            sweeps=info['sweeps'],
-            timestamp=info['timestamp'],
-            pose=info['pose'],
-            )
-
-        if not self.test_mode:
-            annos = self.get_ann_info(index)
-            input_dict['ann_info'] = annos
-
-        return input_dict
