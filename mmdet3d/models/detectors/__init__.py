@@ -13,6 +13,8 @@ from .single_stage_mono3d import SingleStageMono3DDetector
 from .ssd3dnet import SSD3DNet
 from .votenet import VoteNet
 from .voxelnet import VoxelNet
+from .vote_detector import VoteDetector, VoteSegmentor
+from .two_stage_fsd import TwoStageVoteDetector
 
 __all__ = [
     'Base3DDetector', 'VoxelNet', 'DynamicVoxelNet', 'MVXTwoStageDetector',

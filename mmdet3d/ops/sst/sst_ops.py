@@ -1,8 +1,12 @@
 import torch
+import torch.nn as nn
 from ipdb import set_trace
 import random
 import numpy as np
 from mmdet3d.ops import spconv
+import torch_scatter
+from mmcv.cnn import build_norm_layer
+import traceback
 
 def scatter_nd(indices, updates, shape):
     """pytorch edition of tensorflow scatter_nd.
@@ -41,7 +45,6 @@ def get_flat2win_inds(batch_win_inds, voxel_drop_lvl, drop_info, debug=True):
 
         conti_win_inds = make_continuous_inds(batch_win_inds[dl_mask])
 
-        num_windows = len(torch.unique(conti_win_inds))
         max_tokens = drop_info[dl]['max_tokens']
 
         inner_win_inds = get_inner_win_inds(conti_win_inds)
@@ -51,6 +54,7 @@ def get_flat2win_inds(batch_win_inds, voxel_drop_lvl, drop_info, debug=True):
         flat2window_inds_dict[dl] = (flat2window_inds, torch.where(dl_mask))
 
         if debug:
+            num_windows = len(torch.unique(conti_win_inds))
             assert inner_win_inds.max() < max_tokens, f'Max inner inds({inner_win_inds.max()}) larger(equal) than {max_tokens}'
             assert (flat2window_inds >= 0).all()
             max_ind = flat2window_inds.max().item()
@@ -60,7 +64,7 @@ def get_flat2win_inds(batch_win_inds, voxel_drop_lvl, drop_info, debug=True):
     return flat2window_inds_dict
 
 
-def flat2window(feat, voxel_drop_lvl, flat2win_inds_dict, drop_info):
+def flat2window(feat, voxel_drop_lvl, flat2win_inds_dict, drop_info, padding=0):
     '''
     Args:
         feat: shape=[N, C], N is the voxel num in the batch.
@@ -89,9 +93,10 @@ def flat2window(feat, voxel_drop_lvl, flat2win_inds_dict, drop_info):
 
         max_tokens = drop_info[dl]['max_tokens']
         num_windows = (this_inds // max_tokens).max().item() + 1
-        feat_3d = torch.zeros((num_windows * max_tokens, feat_dim), dtype=dtype, device=device)
-        if this_inds.max() >= num_windows * max_tokens:
-            set_trace()
+        padding = torch.tensor(padding, dtype=dtype, device=device)
+        feat_3d = torch.ones((num_windows * max_tokens, feat_dim), dtype=dtype, device=device) * padding
+        # if this_inds.max() >= num_windows * max_tokens:
+        #     set_trace()
         feat_3d[this_inds] = feat_this_dl
         feat_3d = feat_3d.reshape((num_windows, max_tokens, feat_dim))
         feat_3d_dict[dl] = feat_3d
@@ -111,7 +116,7 @@ def window2flat(feat_3d_dict, inds_dict):
     feat_dim = feat_3d_dict[list(feat_3d_dict.keys())[0]].shape[-1]
 
     all_flat_feat = torch.zeros((num_all_voxel, feat_dim), device=device, dtype=dtype)
-    check_feat = -torch.ones((num_all_voxel,), device=device, dtype=torch.long)
+    # check_feat = -torch.ones((num_all_voxel,), device=device, dtype=torch.long)
 
     for dl in feat_3d_dict:
         feat = feat_3d_dict[dl]
@@ -120,9 +125,9 @@ def window2flat(feat_3d_dict, inds_dict):
         feat = feat.reshape(-1, feat_dim)
         flat_feat = feat[inds]
         all_flat_feat[flat_pos] = flat_feat
-        check_feat[flat_pos] = 0
+        # check_feat[flat_pos] = 0
         # flat_feat_list.append(flat_feat)
-    assert (check_feat == 0).all()
+    # assert (check_feat == 0).all()
     
     return all_flat_feat
 
@@ -137,11 +142,53 @@ def window2flat_v2(feat_3d_dict, inds_dict):
     inds_v1 = {k:inds_dict[k] for k in inds_dict if not isinstance(k, str)}
     return window2flat(feat_3d_dict, inds_v1)
 
-def flat2window_v2(feat, inds_dict):
+def flat2window_v2(feat, inds_dict, padding=0):
     assert 'voxel_drop_level' in inds_dict, 'voxel_drop_level should be in inds_dict in v2 function'
     inds_v1 = {k:inds_dict[k] for k in inds_dict if not isinstance(k, str)}
     batching_info = inds_dict['batching_info']
-    return flat2window(feat, inds_dict['voxel_drop_level'], inds_v1, batching_info)
+    return flat2window(feat, inds_dict['voxel_drop_level'], inds_v1, batching_info, padding=padding)
+
+def scatter_v2(feat, coors, mode, return_inv=True, min_points=0, unq_inv=None, new_coors=None):
+    assert feat.size(0) == coors.size(0)
+    if mode == 'avg':
+        mode = 'mean'
+
+
+    if unq_inv is None and min_points > 0:
+        new_coors, unq_inv, unq_cnt = torch.unique(coors, return_inverse=True, return_counts=True, dim=0)
+    elif unq_inv is None:
+        new_coors, unq_inv = torch.unique(coors, return_inverse=True, return_counts=False, dim=0)
+    else:
+        assert new_coors is not None, 'please pass new_coors for interface consistency, caller: {}'.format(traceback.extract_stack()[-2][2])
+
+
+    if min_points > 0:
+        cnt_per_point = unq_cnt[unq_inv]
+        valid_mask = cnt_per_point >= min_points
+        feat = feat[valid_mask]
+        coors = coors[valid_mask]
+        new_coors, unq_inv, unq_cnt = torch.unique(coors, return_inverse=True, return_counts=True, dim=0)
+
+    if mode == 'max':
+        new_feat, argmax = torch_scatter.scatter_max(feat, unq_inv, dim=0)
+    elif mode in ('mean', 'sum'):
+        new_feat = torch_scatter.scatter(feat, unq_inv, dim=0, reduce=mode)
+    else:
+        raise NotImplementedError
+
+    if not return_inv:
+        return new_feat, new_coors
+    else:
+        return new_feat, new_coors, unq_inv
+
+def filter_almost_empty(pts_coors, min_points=5):
+    if min_points > 0:
+        new_coors, unq_inv, unq_cnt = torch.unique(coors, return_inverse=True, return_counts=True, dim=0)
+        cnt_per_point = unq_cnt[unq_inv]
+        valid_mask = cnt_per_point >= min_points
+    else:
+        valid_mask = torch.ones(len(pts_coors), device=pts_coors.device, dtype=torch.bool)
+    return valid_mask
 
 
 @torch.no_grad()
@@ -281,9 +328,34 @@ def make_continuous_inds(inds):
 
     conti_inds = canvas[inds]
 
-    assert conti_inds.max() == len(torch.unique(conti_inds)) - 1, 'Continuity check failed.'
-    assert conti_inds.min() == 0, '-1 in canvas should not be indexed.'
+    # assert conti_inds.max() == len(torch.unique(conti_inds)) - 1, 'Continuity check failed.'
+    # assert conti_inds.min() == 0, '-1 in canvas should not be indexed.'
     return conti_inds
+
+def cat_dict(input):
+    keys = list(input.keys())
+    assert isinstance(keys[0], int)
+    sorted_keys = sorted(keys)
+    output = torch.cat([input[k] for k in sorted_keys], dim=0)
+    return output
+
+def split2dict(input, ref):
+    keys = list(ref.keys())
+    assert isinstance(keys[0], int)
+    sorted_keys = sorted(keys)
+    len_list = [ref[k].size(0) for k in sorted_keys]
+    assert sum(len_list) == input.size(0)
+    check_vector = torch.zeros(input.size(0), device=input.device, dtype=torch.int) 
+    beg = 0
+    output_dict = {}
+    for i, k in enumerate(sorted_keys):
+        s = len_list[i]
+        output_dict[k] = input[beg:beg+s]
+        check_vector[beg:beg+s] += 1
+        beg = beg + s
+    assert (check_vector == 1).all()
+    return output_dict
+
 
 class SRATensor(object):
 
@@ -737,3 +809,61 @@ class DebugSRATensor(object):
         """
         self.features = features
         self.indices = indices
+
+def build_mlp(in_channel, hidden_dims, norm_cfg, is_head=False, act='relu', bias=False, dropout=0):
+    layer_list = []
+    last_channel = in_channel
+    for i, c in enumerate(hidden_dims):
+        act_layer = get_activation_layer(act, c)
+
+        norm_layer = build_norm_layer(norm_cfg, c)[1]
+        if i == len(hidden_dims) - 1 and is_head:
+            layer_list.append(nn.Linear(last_channel, c, bias=True),)
+        else:
+            sq = [
+                nn.Linear(last_channel, c, bias=bias),
+                norm_layer,
+                act_layer,
+            ]
+            if dropout > 0:
+                sq.append(nn.Dropout(dropout))
+            layer_list.append(
+                nn.Sequential(
+                    *sq
+                )
+            )
+
+        last_channel = c
+    mlp = nn.Sequential(*layer_list)
+    return mlp
+
+def get_activation(activation):
+    """Return an activation function given a string"""
+    if activation == "relu":
+        return torch.nn.functional.relu
+    if activation == "gelu":
+        return torch.nn.functional.gelu
+    if activation == "glu":
+        return torch.nn.functional.glu
+    raise RuntimeError(F"activation should be relu/gelu, not {activation}.")
+
+def get_activation_layer(act, dim=None):
+    """Return an activation function given a string"""
+    act = act.lower()
+    if act == 'relu':
+        act_layer = nn.ReLU(inplace=True)
+    elif act == 'gelu':
+        act_layer = nn.GELU()
+    elif act == 'leakyrelu':
+        act_layer = nn.LeakyReLU(inplace=True)
+    elif act == 'prelu':
+        act_layer = nn.PReLU(num_parameters=dim)
+    elif act == 'swish' or act == 'silu':
+        act_layer = nn.SiLU(inplace=True)
+    elif act == 'glu':
+        act_layer = nn.GLU()
+    elif act == 'elu':
+        act_layer = nn.ELU(inplace=True)
+    else:
+        raise NotImplementedError
+    return act_layer

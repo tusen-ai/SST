@@ -48,6 +48,8 @@ class KITTI2Waymo(object):
         self.waymo_tfrecords_dir = waymo_tfrecords_dir
         self.waymo_results_save_dir = waymo_results_save_dir
         self.waymo_results_final_path = waymo_results_final_path
+        print(f'Converting results will be save to {self.waymo_results_save_dir }')
+        print(f'Final results will be save to {self.waymo_results_final_path}')
         self.prefix = prefix
         self.workers = int(workers)
         self.name2idx = {}

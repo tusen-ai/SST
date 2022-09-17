@@ -13,6 +13,31 @@ import pickle as pkl
 import os
 
 @MIDDLE_ENCODERS.register_module()
+class PseudoMiddleEncoderForSpconvFSD(nn.Module):
+
+    def __init__(self,):
+        super().__init__()
+
+    @auto_fp16(apply_to=('voxel_feat', ))
+    def forward(self, voxel_feats, voxel_coors, batch_size=None):
+        '''
+        Args:
+            voxel_feats: shape=[N, C], N is the voxel num in the batch.
+            coors: shape=[N, 4], [b, z, y, x]
+        Returns:
+            feat_3d_dict: contains region features (feat_3d) of each region batching level. Shape of feat_3d is [num_windows, num_max_tokens, C].
+            flat2win_inds_list: two dict containing transformation information for non-shifted grouping and shifted grouping, respectively. The two dicts are used in function flat2window and window2flat.
+            voxel_info: dict containing extra information of each voxel for usage in the backbone.
+        '''
+
+        voxel_info = {}
+        voxel_info['voxel_feats'] = voxel_feats
+        voxel_info['voxel_coors'] = voxel_coors
+
+        return voxel_info
+
+
+@MIDDLE_ENCODERS.register_module()
 class SSTInputLayerV2(nn.Module):
     """
     This is one of the core class of SST, converting the output of voxel_encoder to sst input.

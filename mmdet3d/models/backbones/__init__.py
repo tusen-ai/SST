@@ -8,6 +8,7 @@ from .sst_v1 import SSTv1
 from .sst_v2 import SSTv2
 from .sst import SST
 from .hrnet import HRNet3D
+from .sparse_scatter_backbone import StackedVFE
 
 __all__ = [
     'ResNet', 'ResNetV1d', 'ResNeXt', 'SSDVGG', 'HRNet', 'NoStemRegNet',

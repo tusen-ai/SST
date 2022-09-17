@@ -2,10 +2,15 @@ import mmcv
 import numpy as np
 
 from mmdet3d.core.points import BasePoints, get_points_type
+from mmdet3d.core import LiDARInstance3DBoxes
 from mmdet.datasets.builder import PIPELINES
 from mmdet.datasets.pipelines import LoadAnnotations, LoadImageFromFile
 import os
 from pdb import set_trace
+import yaml
+import torch
+from mmdet.datasets.pipelines import to_tensor
+from mmcv.parallel import DataContainer as DC
 
 
 @PIPELINES.register_module()
@@ -359,7 +364,6 @@ class LoadPointsFromFile(object):
                  coord_type,
                  load_dim=6,
                  use_dim=[0, 1, 2],
-                 tanh_dim=None, # to normalize intensity and elongation in WaymoOpenDataset
                  shift_height=False,
                  use_color=False,
                  file_client_args=dict(backend='disk'),
@@ -375,7 +379,6 @@ class LoadPointsFromFile(object):
         self.coord_type = coord_type
         self.load_dim = load_dim
         self.use_dim = use_dim
-        self.tanh_dim = tanh_dim
         self.file_client_args = file_client_args.copy()
         self.file_client = None
 
@@ -420,12 +423,6 @@ class LoadPointsFromFile(object):
         points = points.reshape(-1, self.load_dim)
         points = points[:, self.use_dim]
         attribute_dims = None
-
-        if self.tanh_dim is not None:
-            assert isinstance(self.tanh_dim, list)
-            assert max(self.tanh_dim) < points.shape[1]
-            assert min(self.tanh_dim) > 2
-            points[:, self.tanh_dim] = np.tanh(points[:, self.tanh_dim])
 
         if self.shift_height:
             floor_height = np.percentile(points[:, 2], 0.99)
@@ -512,6 +509,7 @@ class LoadAnnotations3D(LoadAnnotations):
                  with_mask=False,
                  with_seg=False,
                  with_bbox_depth=False,
+                 with_speed=False,
                  poly2mask=True,
                  seg_3d_dtype='int',
                  file_client_args=dict(backend='disk')):
@@ -529,6 +527,7 @@ class LoadAnnotations3D(LoadAnnotations):
         self.with_mask_3d = with_mask_3d
         self.with_seg_3d = with_seg_3d
         self.seg_3d_dtype = seg_3d_dtype
+        self.with_speed = with_speed
 
     def _load_bboxes_3d(self, results):
         """Private function to load 3D bounding box annotations.
@@ -540,6 +539,17 @@ class LoadAnnotations3D(LoadAnnotations):
             dict: The dict containing loaded 3D bounding box annotations.
         """
         results['gt_bboxes_3d'] = results['ann_info']['gt_bboxes_3d']
+        if self.with_speed:
+            assert 'speed_global' in results['ann_info']
+            speed_global = results['ann_info']['speed_global']
+            pose = results['pose']
+            speed_global = np.pad(speed_global, ((0, 0), (0, 1)), mode='constant', constant_values=0)  # (N, 3)
+            speed_local = np.dot(speed_global, np.linalg.inv(pose[:3, :3].T))[:, :2]
+            box_7dim = results['gt_bboxes_3d'].tensor
+            speed_tensor = torch.from_numpy(speed_local).to(box_7dim.dtype)
+            box_with_speed = torch.cat([box_7dim, speed_tensor], -1)
+            results['gt_bboxes_3d'] = type(results['gt_bboxes_3d'])(box_with_speed, box_dim=9)
+
         results['bbox3d_fields'].append('gt_bboxes_3d')
         return results
 
@@ -709,6 +719,8 @@ class LoadPointsFromMultiSweepsWaymo(LoadPointsFromMultiSweeps):
                  pad_empty_sweeps=False,
                  remove_close=False,
                  close_radius=1.0,
+                 t_dim=3,
+                 return_list=False,
                  test_mode=False):
         super().__init__(
                  sweeps_num=sweeps_num,
@@ -721,6 +733,8 @@ class LoadPointsFromMultiSweepsWaymo(LoadPointsFromMultiSweeps):
         self.close_radius = close_radius
         if isinstance(self.use_dim, int):
             self.use_dim = list(range(self.use_dim))
+        self.t_dim = t_dim
+        self.return_list = return_list
 
     def _remove_close(self, points, radius=1.0):
         """Removes point too close within a certain radius from origin.
@@ -761,7 +775,16 @@ class LoadPointsFromMultiSweepsWaymo(LoadPointsFromMultiSweeps):
                     cloud arrays.
         """
         points = results['points']
-        points.tensor[:, 3] = 0
+
+        if self.t_dim == points.tensor.size(-1):
+            padding = points.tensor.new_zeros(len(points.tensor))[:, None]
+            points.tensor = torch.cat([points.tensor, padding], dim=1)
+            points.points_dim += 1
+        elif self.t_dim < points.tensor.size(-1):
+            points.tensor[:, self.t_dim] = 0
+        else:
+            raise ValueError
+
         sweep_points_list = [points]
         # ts = results['timestamp']
         ts = None # timestamp in mmdet is wrong
@@ -812,12 +835,23 @@ class LoadPointsFromMultiSweepsWaymo(LoadPointsFromMultiSweeps):
                 past_pc_in_curr = np.einsum('ij,nj->ni', world2curr_rot, past_pc_in_world) + world2curr_trans[None, :]
 
                 points_sweep[:, :3] = past_pc_in_curr
-                points_sweep[:, 3] = -1 * float(idx+1)
+                # points_sweep[:, 3] = -1 * float(idx+1)
                 points_sweep = points_sweep[:, self.use_dim]
 
+                if self.t_dim == points_sweep.shape[-1]:
+                    padding = np.zeros(len(points_sweep), dtype=points_sweep.dtype)[:, None] - float(idx+1)
+                    points_sweep = np.concatenate([points_sweep, padding], axis=1)
+                elif self.t_dim < points_sweep.shape[-1]:
+                    points_sweep[:, self.t_dim] = -1 * float(idx+1)
+
+                assert points.points_dim == points_sweep.shape[-1]
                 points_sweep = points.new_point(points_sweep)
                 # vis_bev_pc('ms_01_before_cat.png', points_sweep.tensor[:, :3], [-80.88, -80.88, -2, 80.88, 80.88, 4])
                 sweep_points_list.append(points_sweep)
+
+        if self.return_list:
+            results['points_list'] = sweep_points_list
+            return results
 
         points = points.cat(sweep_points_list)
         # points = points[:, self.use_dim]
@@ -839,6 +873,7 @@ class LoadPointsFromFileResetLast(LoadPointsFromFile):
                  use_dim=[0, 1, 2, 3],
                  shift_height=False,
                  use_color=False,
+                 append_last=False,
                  file_client_args=dict(backend='disk'),
                  reset_value=0):
         super().__init__(
@@ -850,6 +885,7 @@ class LoadPointsFromFileResetLast(LoadPointsFromFile):
                  file_client_args,
         )
         self.reset_value = reset_value
+        self.append_last = append_last
 
     def __call__(self, results):
         """Call function to load points data from file.
@@ -891,7 +927,11 @@ class LoadPointsFromFileResetLast(LoadPointsFromFile):
         points_class = get_points_type(self.coord_type)
         points = points_class(
             points, points_dim=points.shape[-1], attribute_dims=attribute_dims)
-        points.tensor[:, -1] = float(self.reset_value)
+        if self.append_last:
+            points.tensor = torch.nn.functional.pad(points.tensor, (0, 1), 'constant', float(self.reset_value))
+            points.points_dim += 1
+        else:
+            points.tensor[:, -1] = float(self.reset_value)
         results['points'] = points
 
         return results
