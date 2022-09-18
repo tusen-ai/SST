@@ -9,9 +9,6 @@ from mmdet.models import HEADS
 from ..builder import build_head, build_roi_extractor
 from .base_3droi_head import Base3DRoIHead
 
-from ipdb import set_trace
-from mmdet3d.utils import TorchTimer
-timer = TorchTimer(-1)
 
 
 @HEADS.register_module()
@@ -165,30 +162,7 @@ class FullySparseROIHead(Base3DRoIHead):
     def _bbox_forward_train(self, pts_xyz, pts_feats, batch_idx, sampling_results):
 
         rois = bbox3d2roi([res.bboxes for res in sampling_results])
-        if self.train_cfg.get('roi_aug', False):
-            cfg = self.train_cfg
-            assert rois.size(1) == 8
-            num_rois = len(rois)
 
-            if isinstance(cfg['xyz_noise'], (list, tuple)):
-                xyz_noise = torch.tensor(cfg['xyz_noise'], dtype=rois.dtype, device=rois.device)[None, :]
-            else:
-                xyz_noise = cfg['xyz_noise']
-
-            if isinstance(cfg['dim_noise'], (list, tuple)):
-                dim_noise = torch.tensor(cfg['dim_noise'], dtype=rois.dtype, device=rois.device)[None, :]
-            else:
-                dim_noise = cfg['dim_noise']
-
-            xyz_noise = (torch.rand((num_rois, 3), dtype=rois.dtype, device=rois.device) - 0.5) * 2 * xyz_noise
-            dim_noise = (torch.rand((num_rois, 3), dtype=rois.dtype, device=rois.device) - 0.5) * 2 * dim_noise + 1
-            yaw_noise = (torch.rand((num_rois,), dtype=rois.dtype, device=rois.device) - 0.5)   * 2 * cfg['yaw_noise']
-            # assert (xyz_noise >= -cfg['xyz_noise']).all() and (xyz_noise <= cfg['xyz_noise']).all()
-            # assert (dim_noise >= 1 - cfg['dim_noise']).all() and (dim_noise <= 1 + cfg['dim_noise']).all()
-            # assert (yaw_noise >= -cfg['yaw_noise']).all() and (yaw_noise <= cfg['yaw_noise']).all()
-            rois[:, 1:4] += xyz_noise
-            rois[:, 4:-1] *= dim_noise
-            rois[:, -1] += yaw_noise
         bbox_results = self._bbox_forward(pts_xyz, pts_feats, batch_idx, rois)
 
         bbox_targets = self.bbox_head.get_targets(sampling_results, self.train_cfg)

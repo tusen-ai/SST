@@ -5,7 +5,6 @@ from mmdet3d import ops
 from mmdet.models.builder import ROI_EXTRACTORS
 from mmdet3d.ops import dynamic_point_pool
 
-from ipdb import set_trace
 
 @ROI_EXTRACTORS.register_module()
 class DynamicPointROIExtractor(BaseModule):
@@ -27,14 +26,6 @@ class DynamicPointROIExtractor(BaseModule):
         self.extra_wlh = extra_wlh
         self.max_inbox_point = max_inbox_point
 
-    # def build_roi_layers(self, layer_cfg):
-    #     """Build roi layers using `layer_cfg`"""
-    #     cfg = layer_cfg.copy()
-    #     layer_type = cfg.pop('type')
-    #     assert hasattr(ops, layer_type)
-    #     layer_cls = getattr(ops, layer_type)
-    #     roi_layers = layer_cls(**cfg)
-    #     return roi_layers
 
     def forward(self, pts_xyz, batch_inds, rois):
 

@@ -1,13 +1,10 @@
-from mmcv.cnn.bricks import ConvModule
 import torch
 from torch import nn as nn
 
-from mmdet3d.ops import PointFPModule
 from mmdet.models import HEADS
 from .decode_head import Base3DDecodeHead
-from ipdb import set_trace
-from mmcv.runner import auto_fp16, force_fp32, BaseModule
-from mmcv.cnn import build_norm_layer, normal_init
+from mmcv.runner import auto_fp16, force_fp32 
+from mmcv.cnn import normal_init
 from mmseg.models.builder import build_loss
 from mmdet.models.builder import build_loss as build_det_loss
 
@@ -146,8 +143,6 @@ class VoteSegHead(Base3DDecodeHead):
         else:
             loss['loss_vote'] = vote_preds.sum() * 0
 
-        # is_right = seg_logit.argmax(1) == seg_label
-        # loss['acc'] = is_right.sum().float() / len(is_right)
         train_cfg = self.train_cfg
         if train_cfg.get('score_thresh', None) is not None:
             score_thresh = train_cfg['score_thresh']
@@ -165,7 +160,6 @@ class VoteSegHead(Base3DDecodeHead):
                 score = seg_logit.softmax(1)
                 group_lens = train_cfg['group_lens']
                 group_score = self.gather_group(score[:, :-1], group_lens)
-                # pred_true = argmax < 26
                 num_fg = score.new_zeros(1)
                 for gi in range(len(group_lens)):
                     pred_true = group_score[:, gi] > score_thresh[gi]

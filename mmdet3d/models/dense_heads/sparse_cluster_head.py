@@ -7,14 +7,11 @@ from mmcv.runner import BaseModule, force_fp32
 from torch.nn import functional as F
 
 from mmdet3d.models.builder import build_loss
-from mmdet3d.ops import build_sa_module, furthest_point_sample, build_mlp, get_activation
+from mmdet3d.ops import build_mlp 
 from mmdet3d.core import AssignResult, PseudoSampler, xywhr2xyxyr, box3d_multiclass_nms, bbox_overlaps_3d, LiDARInstance3DBoxes
 from mmdet.core import build_bbox_coder, multi_apply, reduce_mean
 from mmdet.models import HEADS
-from mmcv.cnn import build_norm_layer
 
-
-from ipdb import set_trace
 
 
 @HEADS.register_module()
@@ -100,13 +97,6 @@ class SparseClusterHead(BaseModule):
         
         self.save_list = []
 
-        # if init_cfg is None:
-        #     self.init_cfg = dict(
-        #         type='Normal',
-        #         layer='Conv2d',
-        #         std=0.01,
-        #         override=dict(
-        #             type='Normal', name='conv_cls', std=0.01, bias_prob=0.01))
 
     def forward(self, feats, pts_xyz=None, pts_inds=None):
 
@@ -140,16 +130,13 @@ class SparseClusterHead(BaseModule):
         if iou_logits is not None and iou_logits.dtype == torch.float16:
             iou_logits = iou_logits.to(torch.float)
 
-        # loss_inputs = (outs, cluster_xyz, cluster_batch_idx) + (gt_bboxes_3d, gt_labels_3d, img_metas)
         cluster_batch_idx = cluster_inds[:, 1]
         num_total_samples = len(reg_preds)
-        # assert reg_preds.size(1) == self.num_classes * self.box_code_size
 
         targets = self.get_targets(cluster_xyz, cluster_batch_idx, gt_bboxes_3d, gt_labels_3d, reg_preds)
         labels, label_weights, bbox_targets, bbox_weights, iou_labels = targets
         assert (label_weights == 1).all(), 'for now'
 
-        # reg_preds = self.pick_reg_preds_by_class(reg_preds, labels) #[num_preds, 8]
         cls_avg_factor = num_total_samples * 1.0
         if self.sync_cls_avg_factor:
             cls_avg_factor = reduce_mean(
@@ -259,21 +246,6 @@ class SparseClusterHead(BaseModule):
 
         return corner_loss.mean(1)
 
-    
-    def pick_reg_preds_by_class(self, reg_preds, labels):
-        num_preds = len(reg_preds)
-        bg_mask = labels == self.num_classes
-        assert num_preds == len(labels)
-        assert (labels >= 0).all() and (labels <= self.num_classes).all()
-        reg_preds = reg_preds.reshape(num_preds * self.num_classes, self.box_code_size)
-
-        temp_labels = labels.clone()
-        temp_labels[bg_mask] = 0
-        indices = torch.arange(num_preds, device=reg_preds.device) * self.num_classes + temp_labels
-        reg_preds = reg_preds[indices, :] # num_preds, self.box_code_size
-
-        reg_preds[bg_mask] = 0 # ignore bg in regression, stop gradient by in-place assignment
-        return reg_preds
 
     def get_targets(self,
                     cluster_xyz,
@@ -418,18 +390,6 @@ class SparseClusterHead(BaseModule):
         inbox_inds = self.dist_constrain(inbox_inds, cluster_xyz, gt_bboxes_3d, gt_labels_3d)
         pos_cluster_mask = inbox_inds > -1
 
-        #log
-        # num_matched_gt = len(torch.unique(inbox_inds)) - 1
-        # num_matched_gt = torch.tensor(num_matched_gt, dtype=torch.float, device=cluster_xyz.device)
-        # num_gts_t = torch.tensor(num_gts, dtype=torch.float, device=cluster_xyz.device)
-
-        # reduce will fail if this function return early when num_gts == 0
-        # if torch.distributed.is_available() and torch.distributed.is_initialized():
-        #     torch.distributed.all_reduce(num_gts_t)
-        #     torch.distributed.all_reduce(num_matched_gt)
-        # self.print_info['assign_recall'] = num_matched_gt / (num_gts_t + 1 + 1e-5)
-        # end log
-
         if pos_cluster_mask.any():
             assigned_gt_inds[pos_cluster_mask] = inbox_inds[pos_cluster_mask] + 1
             assigned_labels[pos_cluster_mask] = gt_labels_3d[inbox_inds[pos_cluster_mask]]
@@ -483,57 +443,6 @@ class SparseClusterHead(BaseModule):
         self.print_info['assign_recall'] = num_matched_gt / (num_gts_t + 1 + 1e-5)
         # end log
 
-
-
-        if pos_cluster_mask.any():
-            assigned_gt_inds[pos_cluster_mask] = matched_gt_inds[pos_cluster_mask] + 1
-            assigned_labels[pos_cluster_mask] = gt_labels_3d[matched_gt_inds[pos_cluster_mask]]
-
-        return AssignResult(num_gts, assigned_gt_inds, None, labels=assigned_labels)
-
-    def multiple_assign_single(self,
-                      cluster_xyz,
-                      pts_xyz,
-                      pts_inds,
-                      gt_bboxes_3d,
-                      gt_labels_3d,
-                      ):
-        """Generate targets of vote head for single batch.
-
-        """
-
-        num_cluster = cluster_xyz.size(0)
-        num_gts = gt_bboxes_3d.tensor.size(0)
-
-        # initialize as all background
-        assigned_gt_inds = cluster_xyz.new_zeros((num_cluster, ), dtype=torch.long) # 0 indicates assign to backgroud
-        assigned_labels = cluster_xyz.new_full((num_cluster, ), -1, dtype=torch.long)
-
-        if num_gts == 0 or num_cluster == 0:
-            # No ground truth or cluster, return empty assignment
-            if num_gts == 0:
-                # No ground truth, assign all to background
-                assigned_gt_inds[:] = 0
-            return AssignResult(
-                num_gts, assigned_gt_inds, None, labels=assigned_labels)
-
-        # enlarged_box = self.enlarge_gt_bboxes(gt_bboxes_3d)
-        # inbox_inds = enlarged_box.points_in_boxes(cluster_xyz).long()
-        # inbox_inds = self.dist_constrain(inbox_inds, cluster_xyz, gt_bboxes_3d, gt_labels_3d)
-        # pos_cluster_mask = inbox_inds > -1
-        gt_centers = gt_bboxes_3d.gravity_center[None, :, :2]
-        pd_xy = cluster_xyz[None, :, :2]
-        dist_mat = torch.cdist(pd_xy, gt_centers)
-        max_dist = self.train_cfg['max_dist']
-        min_dist_v, matched_gt_inds = torch.min(dist_mat, dim=1)
-
-        # dist_mat[list(range(num_cluster)), matched_gt_inds] = 1e6
-
-        matched_gt_inds[min_dist_v >= max_dist] = -1
-        pos_cluster_mask = matched_gt_inds > -1
-
-        # min_dist_v_2, gt_matched_2 = torch.min(dist_mat, dim=1)
-        # gt_matched_2[min_dist_v_2 >= max_dist] = -1
 
         if pos_cluster_mask.any():
             assigned_gt_inds[pos_cluster_mask] = matched_gt_inds[pos_cluster_mask] + 1
@@ -633,17 +542,6 @@ class SparseClusterHead(BaseModule):
 
         scores = cls_logits.sigmoid()
 
-        if os.getenv('SAVE_CLUSTER'):
-            if not hasattr(self, 'score_list'):
-                self.score_list = []
-            if not hasattr(self, 'xyz_list'):
-                self.xyz_list = []
-            self.score_list.append(scores.cpu().numpy())
-            self.xyz_list.append(cluster_xyz.cpu().numpy())
-            if len(self.score_list) == 20:
-                np.savez('/mnt/truenas/scratch/lve.fan/transdet3d/data/pkls/cluster_centers.npz', scores=self.score_list, points=self.xyz_list)
-                set_trace()
-
         if iou_logits is not None:
             iou_scores = iou_logits.sigmoid()
             a = cfg.get('iou_score_weight', 0.5)
@@ -674,98 +572,3 @@ class SparseClusterHead(BaseModule):
         out_bboxes = input_meta['box_type_3d'](out_bboxes)
 
         return (out_bboxes, out_scores, out_labels)
-
-class KNNAttentionBlock(nn.Module):
-
-    def __init__(
-        self,
-        K,
-        d_model,
-        dim_feedforward,
-        nhead,
-        max_dist,
-        pos_mlp,
-        norm_cfg,
-        dropout=0,
-        activation='gelu'
-        ):
-        super().__init__()
-
-        self.K = K
-        self.nhead = nhead
-        self.max_dist = max_dist
-
-        self.self_attn = nn.MultiheadAttention(d_model, nhead, batch_first=True)
-        self.pos_mlp = build_mlp(3, pos_mlp, norm_cfg)
-
-        self.linear1 = nn.Linear(d_model, dim_feedforward)
-        self.dropout = nn.Dropout(dropout)
-        self.linear2 = nn.Linear(dim_feedforward, d_model)
-
-        self.norm1 = nn.LayerNorm(d_model)
-        self.norm2 = nn.LayerNorm(d_model)
-        self.dropout1 = nn.Dropout(dropout)
-        self.dropout2 = nn.Dropout(dropout)
-
-        self.activation = get_activation(activation)
-        self.fp16_enabled=False
-
-    
-    def forward(self, pts_feats, pts_xyz, pts_inds):
-
-        group_feats, group_xyz, group_inds = self.group(pts_feats, pts_xyz, pts_inds) #[num_points, K, C(3)]
-
-        assert ((group_xyz[:, 0, :] - pts_xyz) < 1e-5).all()
-
-        pos_embed = self.get_pos_embed(group_xyz, pts_xyz) #[npoints, K, C]
-
-        key_mask = self.get_key_mask(group_xyz, pts_xyz)
-
-        src = pts_feats.unsqueeze(1) #[npoints, 1, C]
-        q = src + pos_embed[:, 0:1, :]
-
-        k = v = group_feats #[npoints, K, C]
-        k = k + pos_embed
-
-        src2, attn_map = self.self_attn(q, k, value=v, key_padding_mask=key_mask)
-        src = src + self.dropout1(src2)
-        src = self.norm1(src)
-        src2 = self.linear2(self.dropout(self.activation(self.linear1(src))))
-        src = src + self.dropout2(src2)
-        src = self.norm2(src) #[num_points, 1, C]
-
-        return src.squeeze(1)
-    
-    def group(self, pts_feats, pts_xyz, pts_inds):
-        assert (pts_inds[:, 1] == 0).all(), 'assue batchsize = 1 for fast developing'
-        npoints = len(pts_feats)
-        assert npoints > 0
-
-        # dist_mat = torch.cdist(pts_xyz, pts_xyz) # [npoints, npoints] # cdist seems not reliable
-        rel_xyz = pts_xyz[:, None, :] - pts_xyz[None, :, :]                                                                                                                    
-        dist_mat = torch.linalg.norm(rel_xyz, ord=2, dim=2) 
-
-        K = min(npoints, self.K)
-        topk_inds = dist_mat.topk(K, dim=1, largest=False, sorted=True)[1] #[npoints, K], set sorted to make sure the first element is self.
-        # base_inds = 
-        flat_inds = topk_inds.reshape(-1)
-        group_feats = pts_feats[flat_inds, :].reshape(npoints, K, -1)
-        group_xyz = pts_xyz[flat_inds, :].reshape(npoints, K, -1)
-        # group_xyz = pts_xyz[flat_inds, :].reshape(npoints, K, -1)
-        return group_feats, group_xyz, topk_inds
-    
-    def get_key_mask(self, group_xyz, pts_xyz):
-        rel_dist = torch.linalg.norm(group_xyz - pts_xyz[:, None, :], ord=2, dim=2) #[npoints, K]
-        be_masked = rel_dist > self.max_dist
-        assert ((~be_masked).any(1)).all()
-        return be_masked
-
-    def get_pos_embed(self, group_xyz, pts_xyz):
-
-        npoints = group_xyz.size(0)
-        K = group_xyz.size(1)
-
-        rel_xyz = (group_xyz - pts_xyz[:, None, :]).reshape(npoints, K, 3)
-        pos_embed = self.pos_mlp(rel_xyz / 10)
-        pos_embed = pos_embed.reshape(npoints, K, -1)
-        return pos_embed

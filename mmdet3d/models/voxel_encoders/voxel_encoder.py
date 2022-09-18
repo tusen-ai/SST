@@ -279,16 +279,9 @@ class DynamicVFE(nn.Module):
         # Combine together feature decorations
         features = torch.cat(features_ls, dim=-1)
 
-        # features.requires_grad = True # for cam vis
-        # features.register_hook(append_grad(-1)) # for cam vis
-        # point_feat_dict[-1] = features.detach() # for cam vis
-
         low_level_point_feature = features
         for i, vfe in enumerate(self.vfe_layers):
             point_feats = vfe(features)
-
-            # point_feats.register_hook(append_grad(i)) # for cam vis
-            # point_feat_dict[i] = point_feats.detach() # for cam vis
 
             if (i == len(self.vfe_layers) - 1 and self.fusion_layer is not None
                     and img_feats is not None):

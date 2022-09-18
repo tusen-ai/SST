@@ -1,6 +1,5 @@
 import numpy as np
 import torch
-from mmcv.cnn import ConvModule, normal_init
 from mmcv.runner import BaseModule, force_fp32
 from torch import nn as nn
 import torch.nn.functional as F
@@ -8,17 +7,12 @@ import torch.nn.functional as F
 from mmdet3d.core.bbox.structures import (LiDARInstance3DBoxes,
                                           rotation_3d_in_axis, xywhr2xyxyr)
 from mmdet3d.models.builder import build_loss
-from mmdet3d.ops import make_sparse_convmodule, scatter_v2, build_mlp
-from mmdet3d.ops import spconv as spconv
+from mmdet3d.ops import scatter_v2, build_mlp
 from mmdet3d.ops.iou3d.iou3d_utils import nms_gpu, nms_normal_gpu
 from mmdet.core import build_bbox_coder, multi_apply, reduce_mean
 from mmdet.models import HEADS
 
 from mmdet3d.models import builder
-
-from ipdb import set_trace
-from mmdet3d.utils import TorchTimer
-timer = TorchTimer(-1)
 
 
 
@@ -126,7 +120,6 @@ class FullySparseBboxHead(BaseModule):
 
     def init_weights(self):
         super().init_weights()
-        # normal_init(self.conv_reg[-1].conv, mean=0, std=0.001)
 
     @force_fp32(apply_to=('pts_features', 'rois'))
     def forward(self, pts_xyz, pts_features, pts_info, roi_inds, rois):
@@ -146,16 +139,6 @@ class FullySparseBboxHead(BaseModule):
         rois = rois[:, 1:]
         roi_centers = rois[:, :3]
         rel_xyz = pts_xyz[:, :3] - roi_centers[roi_inds] 
-
-        # invalid_pts_mask = roi_inds == -1
-        # if invalid_pts_mask.any():
-        #     rel_xyz[invalid_pts_mask] = 0
-        #     pts_features = pts_features.clone()
-        #     pts_xyz = pts_xyz.clone()
-        #     pts_features[invalid_pts_mask] = 0
-        #     pts_xyz[invalid_pts_mask] = 0
-        #     if real_batch_size == 1:
-        #         assert pts_features.size(0) == 1
 
         if self.unique_once:
             new_coors, unq_inv = torch.unique(roi_inds, return_inverse=True, return_counts=False, dim=0)
@@ -188,7 +171,7 @@ class FullySparseBboxHead(BaseModule):
         final_cluster_feats = torch.cat(cluster_feat_list, dim=1)
 
         if self.training and (out_coors == -1).any():
-            assert out_coors[0].item() == -1, 'This should be hold due to sorted=True in torch.unique'
+            assert out_coors[0].item() == -1, 'This should hold due to sorted=True in torch.unique'
 
         nonempty_roi_mask = self.get_nonempty_roi_mask(out_coors, len(rois))
 
@@ -210,20 +193,6 @@ class FullySparseBboxHead(BaseModule):
         nonempty_roi_mask = torch.zeros(num_rois, dtype=torch.bool, device=out_coors.device)
         nonempty_roi_mask[out_coors] = True
         return nonempty_roi_mask
-    
-    def pad_pred_to_roi_size(self, cls_score, bbox_pred, nonempty_roi_mask, out_coors):
-        num_all_rois = nonempty_roi_mask.size(0)
-        new_cls_score = cls_score.new_zeros((num_all_rois, cls_score.size(1)))
-        out_coors = out_coors[out_coors >= 0]
-        # a tricky pytorch feature: a[all_false_mask] = b does not raise any error
-        try:
-            new_cls_score[nonempty_roi_mask] = cls_score
-        except RuntimeError:
-            set_trace()
-
-        new_bbox_pred = bbox_pred.new_ones((num_all_rois, bbox_pred.size(1))) * -1
-        new_bbox_pred[nonempty_roi_mask] = bbox_pred
-        return new_cls_score, new_bbox_pred
 
     def align_roi_feature_and_rois(self, features, out_coors, num_rois):
         """
@@ -244,14 +213,6 @@ class FullySparseBboxHead(BaseModule):
         new_feature[nonempty_coors] = nonempty_feats
 
         return new_feature
-
-    # def loss(self, cls_score, bbox_pred, valid_roi_mask, rois, labels, bbox_targets,
-    #          pos_gt_bboxes, reg_mask, label_weights, bbox_weights):
-    #     losses = {}
-    #     losses['loss_rcnn_bbox'] = bbox_pred.sum() * 0 + bbox_targets.sum() * 0
-    #     # losses['loss_rcnn_bbox'] = bbox_pred.sum() * 0
-    #     losses['loss_rcnn_cls'] = cls_score.sum() * 0 
-    #     return losses
 
 
     def loss(self, cls_score, bbox_pred, nonempty_roi_mask, rois, labels, bbox_targets, pos_batch_idx,
@@ -357,9 +318,6 @@ class FullySparseBboxHead(BaseModule):
 
                 # calculate corner loss
                 assert pos_gt_bboxes.size(0) == pos_gt_labels.size(0)
-                # temp_filter_mask = torch.nonzero(pos_inds).reshape(-1)
-                # pos_gt_bboxes = pos_gt_bboxes[temp_filter_mask]
-                # pos_gt_labels = pos_gt_labels[temp_filter_mask]
                 pos_gt_bboxes = self.filter_pos_assigned_but_empty_rois(pos_gt_bboxes, pos_batch_idx, pos_inds, rois[:, 0].int())
                 pos_gt_labels = self.filter_pos_assigned_but_empty_rois(pos_gt_labels, pos_batch_idx, pos_inds, rois[:, 0].int())
                 if self.train_cfg.get('corner_loss_only_car', True):
