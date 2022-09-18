@@ -4,7 +4,6 @@ from torch import nn as nn
 from torch.autograd import Function
 
 import dynamic_point_pool_ext
-from ipdb import set_trace
 
 
 class DynamicPointPoolFunction(Function):

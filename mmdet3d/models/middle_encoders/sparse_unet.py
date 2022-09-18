@@ -320,25 +320,9 @@ class SparseUNet(BaseModule):
                         ))
             in_channels = block_channels[2]
 
-from ipdb import set_trace
 @BACKBONES.register_module()
 class SimpleSparseUNet(SparseUNet):
-    r"""SparseUNet for PartA^2.
-
-    See the `paper <https://arxiv.org/abs/1907.03670>`_ for more details.
-
-    Args:
-        in_channels (int): The number of input channels.
-        sparse_shape (list[int]): The sparse shape of input tensor.
-        norm_cfg (dict): Config of normalization layer.
-        base_channels (int): Out channels for conv_input layer.
-        output_channels (int): Out channels for conv_out layer.
-        encoder_channels (tuple[tuple[int]]):
-            Convolutional channels of each encode block.
-        encoder_paddings (tuple[tuple[int]]): Paddings of each encode block.
-        decoder_channels (tuple[tuple[int]]):
-            Convolutional channels of each decode block.
-        decoder_paddings (tuple[tuple[int]]): Paddings of each decode block.
+    r""" A simpler SparseUNet, removing the densify part
     """
 
     def __init__(self,
@@ -420,6 +404,6 @@ class SimpleSparseUNet(SparseUNet):
 
         seg_features = x.features
         ret = {'voxel_feats':x.features}
-        ret = [ret,] # keep consistent with SSTv4
+        ret = [ret,] # keep consistent with SSTv2
 
         return ret

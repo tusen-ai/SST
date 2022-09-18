@@ -3,8 +3,7 @@ from mmcv.runner import force_fp32
 from torch.nn import functional as F
 
 from mmdet.models import DETECTORS
-from .voxelnet import VoxelNet
-from mmdet3d.core import bbox3d2result, merge_aug_bboxes_3d
+from mmdet3d.core import bbox3d2result
 from ipdb import set_trace
 
 from .dynamic_voxelnet import DynamicVoxelNet
@@ -156,21 +155,15 @@ class VoteSegmentor(Base3DSegmentor):
                  segmentation_head,
                  decode_neck=None,
                  auxiliary_head=None,
-                 voxel_downsampling_size=None,
                  train_cfg=None,
                  test_cfg=None,
                  init_cfg=None,
-                 temporal_cfg=None,
                  pretrained=None,
                  tanh_dims=None,
                  **extra_kwargs):
         super().__init__(init_cfg=init_cfg)
 
-        if temporal_cfg is not None and temporal_cfg['enable_4D_spconv']:
-            # use customized voxelization
-            self.voxel_layer = None
-        else:
-            self.voxel_layer = Voxelization(**voxel_layer)
+        self.voxel_layer = Voxelization(**voxel_layer)
 
         self.voxel_encoder = builder.build_voxel_encoder(voxel_encoder)
         self.middle_encoder = builder.build_middle_encoder(middle_encoder)
@@ -178,7 +171,6 @@ class VoteSegmentor(Base3DSegmentor):
         self.segmentation_head = build_head(segmentation_head)
         self.segmentation_head.train_cfg = train_cfg
         self.segmentation_head.test_cfg = test_cfg
-        self.temporal_cfg = temporal_cfg
         self.decode_neck = build_neck(decode_neck)
 
         assert voxel_encoder['type'] == 'DynamicScatterVFE'
@@ -192,7 +184,6 @@ class VoteSegmentor(Base3DSegmentor):
         self.save_list = []
         self.point_cloud_range = voxel_layer['point_cloud_range']
         self.voxel_size = voxel_layer['voxel_size']
-        self.voxel_downsampling_size = voxel_downsampling_size
         self.tanh_dims = tanh_dims
     
     def encode_decode(self, ):
@@ -210,8 +201,6 @@ class VoteSegmentor(Base3DSegmentor):
         Returns:
             tuple[torch.Tensor]: Concatenated points and coordinates.
         """
-        if self.temporal_cfg is not None and self.temporal_cfg['enable_4D_spconv']:
-            return self.voxelize4D(points)
         coors = []
         # dynamic voxelization only provide a coors mapping
         for res in points:
@@ -225,44 +214,11 @@ class VoteSegmentor(Base3DSegmentor):
         coors_batch = torch.cat(coors_batch, dim=0)
         return points, coors_batch
 
-    @torch.no_grad()
-    @force_fp32()
-    def voxelize4D(self, points):
-        """Apply dynamic voxelization to points.
-
-        """
-        device = points[0].device
-        t_dim = self.temporal_cfg['t_dim']
-        EPS = self.temporal_cfg['EPS']
-        voxel_size = torch.tensor(self.voxel_size, device=device)
-        assert len(voxel_size) == 4, 'temporal interval should be added at the 3rd position'
-        pc_range = torch.tensor(self.point_cloud_range, device=device)
-        assert len(pc_range) == 8, 'temporal dims should be added at 3rd and 7th positions'
-
-        coors = []
-        for res in points:
-            res = res.clone()
-            res[:, t_dim] += EPS
-            res_coors = torch.div(res[:, [0, 1, 2, t_dim]] - pc_range[None, :4], voxel_size[None, :], rounding_mode='floor').long()
-            res_coors = res_coors[:, [2, 1, 0, 3]] # to zyxt order
-            coors.append(res_coors)
-
-        points = torch.cat(points, dim=0)
-
-        coors_batch = []
-        for i, coor in enumerate(coors):
-            coor_pad = F.pad(coor, (1, 0), mode='constant', value=i)
-            coors_batch.append(coor_pad)
-        coors_batch = torch.cat(coors_batch, dim=0)
-
-        return points, coors_batch
-
     def extract_feat(self, points, img_metas):
         """Extract features from points."""
         batch_points, coors = self.voxelize(points)
         coors = coors.long()
         voxel_features, voxel_coors, voxel2point_inds = self.voxel_encoder(batch_points, coors, return_inv=True)
-        self.print_info['num_voxels'] = voxel_features.new_ones((1,)).float() * len(voxel_features)
         voxel_info = self.middle_encoder(voxel_features, voxel_coors)
         x = self.backbone(voxel_info)[0]
         padding = -1
@@ -270,6 +226,7 @@ class VoteSegmentor(Base3DSegmentor):
         if 'shuffle_inds' not in voxel_info:
             voxel_feats_reorder = x['voxel_feats']
         else:
+            # this branch only used in SST-based FSD 
             voxel_feats_reorder = self.reorder(x['voxel_feats'], voxel_info['shuffle_inds'], voxel_info['voxel_keep_inds'], padding) #'not consistent with voxel_coors any more'
 
         out = self.decode_neck(batch_points, coors, voxel_feats_reorder, voxel2point_inds, padding)
@@ -292,25 +249,6 @@ class VoteSegmentor(Base3DSegmentor):
 
         return out_data
     
-    def voxel_downsample(self, points_list):
-        device = points_list[0].device
-        out_points_list = []
-        voxel_size = torch.tensor(self.voxel_downsampling_size, device=device)
-        pc_range = torch.tensor(self.point_cloud_range, device=device)
-
-        if self.temporal_cfg is not None and self.temporal_cfg['enable_4D_voxel_downsample']:
-            t_dim = self.temporal_cfg['t_dim']
-        else:
-            t_dim = None
-
-        for points in points_list:
-            if t_dim is not None:
-                coors = torch.div(points[:, [0, 1, 2, t_dim]] - pc_range[None, :4], voxel_size[None, :], rounding_mode='floor').long()
-            else:
-                coors = torch.div(points[:, :3] - pc_range[None, :3], voxel_size[None, :], rounding_mode='floor').long()
-            out_points, new_coors = scatter_v2(points, coors, mode='avg', return_inv=False)
-            out_points_list.append(out_points)
-        return out_points_list
 
     def forward_train(self,
                       points,
@@ -323,10 +261,9 @@ class VoteSegmentor(Base3DSegmentor):
             for p in points:
                 p[:, self.tanh_dims] = torch.tanh(p[:, self.tanh_dims])
         elif points[0].size(1) in (4,5):
+            # a hack way to scale the intensity and elongation in WOD
             points = [torch.cat([p[:, :3], torch.tanh(p[:, 3:])], dim=1) for p in points]
         
-        if self.voxel_downsampling_size is not None:
-            points = self.voxel_downsample(points)
 
         labels, vote_targets, vote_mask = self.segmentation_head.get_targets(points, gt_bboxes_3d, gt_labels_3d)
 
@@ -378,8 +315,6 @@ class VoteSegmentor(Base3DSegmentor):
         elif points[0].size(1) in (4,5):
             points = [torch.cat([p[:, :3], torch.tanh(p[:, 3:])], dim=1) for p in points]
 
-        if self.voxel_downsampling_size is not None:
-            points = self.voxel_downsample(points)
 
         seg_pred = []
         x, pts_coors, points = self.extract_feat(points, img_metas)
@@ -508,7 +443,7 @@ class VoteDetector(SingleStage3DDetector):
                       gt_labels_3d,
                       gt_bboxes_ignore=None,
                       runtime_info=None):
-        self.runtime_info = runtime_info # very hacky way to pass parameters from children class
+        self.runtime_info = runtime_info # stupid way to get arguements from children class
         losses = {}
         gt_bboxes_3d = [b[l>=0] for b, l in zip(gt_bboxes_3d, gt_labels_3d)]
         gt_labels_3d = [l[l>=0] for l in gt_labels_3d]
@@ -531,7 +466,6 @@ class VoteDetector(SingleStage3DDetector):
         )
         if self.cfg.get('pre_voxelization_size', None) is not None:
             dict_to_sample = self.pre_voxelize(dict_to_sample)
-        # vote_offsets = seg_out_dict['offsets'].detach(),
         sampled_out = self.sample(dict_to_sample, dict_to_sample['vote_offsets'], gt_bboxes_3d, gt_labels_3d) # per cls list in sampled_out
 
         # we filter almost empty voxel in clustering, so here is a valid_mask
@@ -644,8 +578,7 @@ class VoteDetector(SingleStage3DDetector):
             assert isinstance(gt_labels_3d, list)
             assert len(gt_bboxes_3d) == len(gt_labels_3d) == 1, 'assuming single sample testing'
 
-        with timer.timing('segmentor'):
-            seg_out_dict = self.segmentor.simple_test(points, img_metas, rescale=False)
+        seg_out_dict = self.segmentor.simple_test(points, img_metas, rescale=False)
 
         seg_feats = seg_out_dict['seg_feats']
 
@@ -657,50 +590,36 @@ class VoteDetector(SingleStage3DDetector):
             batch_idx=seg_out_dict['batch_idx'],
             vote_offsets = seg_out_dict['offsets']
         )
-        with timer.timing('pre_voxelization'):
-            if self.cfg.get('pre_voxelization_size', None) is not None:
-                dict_to_sample = self.pre_voxelize(dict_to_sample)
-        # vote_offsets = seg_out_dict['offsets']
-        with timer.timing('sampling'):
-            sampled_out = self.sample(dict_to_sample, dict_to_sample['vote_offsets'], gt_bboxes_3d, gt_labels_3d) # per cls list in sampled_out
+        if self.cfg.get('pre_voxelization_size', None) is not None:
+            dict_to_sample = self.pre_voxelize(dict_to_sample)
+        sampled_out = self.sample(dict_to_sample, dict_to_sample['vote_offsets'], gt_bboxes_3d, gt_labels_3d) # per cls list in sampled_out
 
         # we filter almost empty voxel in clustering, so here is a valid_mask
-        with timer.timing('clustering'):
-            cluster_inds_list, valid_mask_list = self.cluster_assigner(sampled_out['center_preds'], sampled_out['batch_idx'], gt_bboxes_3d, gt_labels_3d, origin_points=sampled_out['seg_points']) # per cls list
+        cluster_inds_list, valid_mask_list = self.cluster_assigner(sampled_out['center_preds'], sampled_out['batch_idx'], gt_bboxes_3d, gt_labels_3d, origin_points=sampled_out['seg_points']) # per cls list
 
-        with timer.timing('between_cluster_and_sir'):
-            pts_cluster_inds = torch.cat(cluster_inds_list, dim=0) #[N, 3], (cls_id, batch_idx, cluster_id)
+        pts_cluster_inds = torch.cat(cluster_inds_list, dim=0) #[N, 3], (cls_id, batch_idx, cluster_id)
 
-            # num_clusters = len(torch.unique(pts_cluster_inds, dim=0)) * torch.ones((1,), device=pts_cluster_inds.device).float()
+        sampled_out = self.update_sample_results_by_mask(sampled_out, valid_mask_list)
 
-            sampled_out = self.update_sample_results_by_mask(sampled_out, valid_mask_list)
+        combined_out = self.combine_classes(sampled_out, ['seg_points', 'seg_logits', 'seg_vote_preds', 'seg_feats', 'center_preds'])
 
-            combined_out = self.combine_classes(sampled_out, ['seg_points', 'seg_logits', 'seg_vote_preds', 'seg_feats', 'center_preds'])
+        points = combined_out['seg_points']
+        pts_feats = torch.cat([combined_out['seg_logits'], combined_out['seg_vote_preds'], combined_out['seg_feats']], dim=1)
+        assert len(pts_cluster_inds) == len(points) == len(pts_feats)
 
-            points = combined_out['seg_points']
-            pts_feats = torch.cat([combined_out['seg_logits'], combined_out['seg_vote_preds'], combined_out['seg_feats']], dim=1)
-            assert len(pts_cluster_inds) == len(points) == len(pts_feats)
-
-        # cluster_feats, cluster_xyz, cluster_inds = \
-        #     self.extract_feat(points, pts_feats, pts_cluster_inds, img_metas,  combined_out['center_preds'])
-        with timer.timing('sir'):
-            extracted_outs = self.extract_feat(points, pts_feats, pts_cluster_inds, img_metas,  combined_out['center_preds'])
+        extracted_outs = self.extract_feat(points, pts_feats, pts_cluster_inds, img_metas,  combined_out['center_preds'])
         cluster_feats = extracted_outs['cluster_feats']
         cluster_xyz = extracted_outs['cluster_xyz']
         cluster_inds = extracted_outs['cluster_inds']
         assert (cluster_inds[:, 1] == 0).all()
-        # assert (cluster_inds[:, 0]).max().item() < 3
 
-        # outs = self.bbox_head(cluster_feats)
-        with timer.timing('rpn_head'):
-            outs = self.bbox_head(cluster_feats, cluster_xyz, cluster_inds)
+        outs = self.bbox_head(cluster_feats, cluster_xyz, cluster_inds)
 
-        with timer.timing('rpn_get_bboxes'):
-            bbox_list = self.bbox_head.get_bboxes(
-                outs['cls_logits'], outs['reg_preds'],
-                cluster_xyz, cluster_inds, img_metas,
-                rescale=rescale,
-                iou_logits=outs.get('iou_logits', None))
+        bbox_list = self.bbox_head.get_bboxes(
+            outs['cls_logits'], outs['reg_preds'],
+            cluster_xyz, cluster_inds, img_metas,
+            rescale=rescale,
+            iou_logits=outs.get('iou_logits', None))
 
         if self.as_rpn:
             output_dict = dict(
@@ -846,6 +765,11 @@ class VoteDetector(SingleStage3DDetector):
         return full_data
 
     def group_sample(self, dict_to_sample, offset):
+
+        """
+        For argoverse 2 dataset, where the number of classes is large
+        """
+
         bsz = dict_to_sample['batch_idx'].max().item() + 1
         assert bsz == 1, "Maybe some codes need to be modified if bsz > 1"
         # combine all classes as fg class.
@@ -1000,53 +924,10 @@ class ClusterAssigner(torch.nn.Module):
             cluster_inds = find_connected_componets_single_batch(sampled_centers, voxel_coors[:, 0], dist)
         assert len(cluster_inds) == len(sampled_centers)
 
-        # import pickle as pkl
-        # save_dict = dict(points=sampled_centers.cpu().numpy(), inds=cluster_inds.cpu().numpy())
-        # with open('/mnt/truenas/scratch/lve.fan/transdet3d/data/pkls/connected_centers.pkl', 'wb') as fw:
-        #     pkl.dump(save_dict, fw)
-        # set_trace()
-
         cluster_inds_per_point = cluster_inds[inv_inds]
         cluster_inds_per_point = torch.stack([batch_idx, cluster_inds_per_point], 1)
         return cluster_inds_per_point, valid_mask
     
-    # def filter_almost_empty(self, coors, min_points):
-    #     new_coors, unq_inv, unq_cnt = torch.unique(coors, return_inverse=True, return_counts=True, dim=0)
-    #     cnt_per_point = unq_cnt[unq_inv]
-    #     valid_mask = cnt_per_point >= min_points
-    #     return valid_mask
-    
-    # def find_connected_componets(self, points, batch_idx, dist):
-
-    #     device = points.device
-    #     bsz = batch_idx.max().item() + 1
-    #     base = 0
-    #     components_inds = torch.zeros_like(batch_idx) - 1
-
-    #     for i in range(bsz):
-    #         batch_mask = batch_idx == i
-    #         if batch_mask.any():
-    #             this_points = points[batch_mask]
-    #             dist_mat = this_points[:, None, :2] - this_points[None, :, :2] # only care about xy
-    #             dist_mat = (dist_mat ** 2).sum(2) ** 0.5
-    #             adj_mat = dist_mat < dist
-    #             adj_mat = adj_mat.cpu().numpy()
-    #             c_inds = connected_components(adj_mat, directed=False)[1]
-    #             c_inds = torch.from_numpy(c_inds).to(device).long() + base
-    #             base = c_inds.max().item() + 1
-    #             components_inds[batch_mask] = c_inds
-
-    #     assert len(torch.unique(components_inds)) == components_inds.max().item() + 1
-
-    #     return components_inds
-    
-    # def modify_cluster_by_class(self, cluster_inds_list):
-    #     new_list = []
-    #     for i, inds in enumerate(cluster_inds_list):
-    #         cls_pad = inds.new_ones((len(inds),)) * i
-    #         inds = torch.cat([cls_pad[:, None], inds], 1)
-    #         new_list.append(inds)
-    #     return new_list
 
 class SSGAssigner(torch.nn.Module):
     ''' Generating cluster centers for each class and assign each point to cluster centers
@@ -1149,16 +1030,6 @@ class SSGAssigner(torch.nn.Module):
 
         return cluster_inds_per_point, valid_pts_mask
     
-    
-    
-    
-    # def modify_cluster_by_class(self, cluster_inds_list):
-    #     new_list = []
-    #     for i, inds in enumerate(cluster_inds_list):
-    #         cls_pad = inds.new_ones((len(inds),)) * i
-    #         inds = torch.cat([cls_pad[:, None], inds], 1)
-    #         new_list.append(inds)
-    #     return new_list
 
 class HybridAssigner(torch.nn.Module):
     ''' Generating cluster centers for each class and assign each point to cluster centers
@@ -1208,46 +1079,6 @@ class HybridAssigner(torch.nn.Module):
         coors = torch.cat([batch_idx[:, None], coors], dim=1)
 
         voxels, voxel_coors, inv_inds = scatter_v2(points, coors, mode='avg', return_inv=True)
-
-
-        # if num_fps >= len(voxels):
-        #     key_points = voxels
-        # else:
-        #     key_points = fps(voxels, num_fps)
-
-        # k_dist_mat = key_points[:, None, :2] - key_points[None, :, :2] 
-        # k_dist_mat = (k_dist_mat ** 2).sum(2) ** 0.5 #[k, k]
-        # dist_mask = k_dist_mat < radius * 2 + 0.01
-
-        # triangle1 = torch.arange(len(key_points))[None, :].expand(len(key_points), -1) #[[0,1,2], [0, 1, 2]]
-        # triangle2 = triangle1.T #[[0, 0, 0], [1, 1, 1]]
-        # triangle_mask = triangle1 <= triangle2 
-        # dist_mask[triangle_mask] = False
-        # invalid_keypoints_mask = dist_mask.any(0)
-
-        # key_points = key_points[~invalid_keypoints_mask]
-
-        # dist_mat = key_points[:, None, :2] - voxels[None, :, :2] #[K, N]
-        # dist_mat = (dist_mat ** 2).sum(2) ** 0.5
-
-        # in_radius_mask = dist_mat < radius
-
-        # assert (in_radius_mask.sum(0) <= 1).all()
-
-        # valid_centers_mask = in_radius_mask.sum(0) == 1
-        # assert valid_centers_mask.any()
-
-        # pos = torch.nonzero(in_radius_mask)
-        # cluster_inds = pos[:, 0]
-
-        # col_inds = pos[:, 1]
-        # sorted_col_inds, order = torch.sort(col_inds)
-        # cluster_inds = cluster_inds[order]
-        # assert (sorted_col_inds == torch.nonzero(valid_centers_mask).reshape(-1)).all()
-
-        # cluster_inds_full = cluster_inds.new_zeros(len(voxels)) - 1
-
-        # cluster_inds_full[valid_centers_mask] = cluster_inds
 
         cluster_inds_full = ssg(voxels, voxel_coors[:, 0], num_fps, radius)
 

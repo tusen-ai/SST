@@ -1,6 +1,3 @@
-import os
-
-import numpy as np
 import torch
 import torch.nn as nn
 from mmcv.runner import BaseModule, force_fp32
@@ -8,18 +5,13 @@ from torch.nn import functional as F
 
 from mmdet3d.models import builder
 from mmdet3d.models.builder import build_loss
-from mmdet3d.ops import build_sa_module, furthest_point_sample, build_mlp, get_activation
+from mmdet3d.ops import build_mlp
 from mmdet3d.core import AssignResult, PseudoSampler, xywhr2xyxyr, box3d_multiclass_nms, bbox_overlaps_3d, LiDARInstance3DBoxes
 from mmdet.core import build_bbox_coder, multi_apply, reduce_mean
 from mmdet.models import HEADS
-from mmcv.cnn import build_norm_layer
 
-
-from ipdb import set_trace
 from .sparse_cluster_head import SparseClusterHead
 import copy
-from mmdet3d.utils import TorchTimer
-timer = TorchTimer(-1)
 
 
 @HEADS.register_module()
@@ -419,32 +411,6 @@ class SparseClusterHeadV2(SparseClusterHead):
             return gt_bboxes_3d.enlarged_box(self.enlarge_width)
         else:
             return gt_bboxes_3d
-    
-    def dist_constrain(self, inbox_inds, cluster_xyz, gt_bboxes_3d, gt_labels_3d):
-
-        inbox_inds = inbox_inds.clone()
-        max_dist = self.train_cfg.get('max_assign_dist', None)
-        if max_dist is None:
-            return inbox_inds
-
-        if not (inbox_inds > -1).any():
-            return inbox_inds
-
-        pos_mask = inbox_inds > -1
-        pos_inds = inbox_inds[pos_mask].clone()
-        pos_xyz = cluster_xyz[pos_mask]
-        pos_labels = gt_labels_3d[pos_inds]
-        pos_box_center = gt_bboxes_3d.gravity_center[pos_inds]
-        rel_dist = torch.linalg.norm(pos_xyz[:, :2] - pos_box_center[:, :2], ord=2, dim=1) # only xy-dist
-        thresh = torch.zeros_like(rel_dist)
-        assert len(max_dist) == self.num_classes, 'this assertion is wrong using separate head'
-        for i in range(self.num_classes):
-            thresh[pos_labels == i] = max_dist[i]
-        
-        pos_inds[rel_dist > thresh] = -1
-        inbox_inds[pos_mask] = pos_inds
-        return inbox_inds
-        
 
     @torch.no_grad()
     def get_bboxes(self,
@@ -580,33 +546,30 @@ class SparseClusterHeadV2(SparseClusterHead):
             scores = scores[topk_inds, :]
             cluster_xyz = cluster_xyz[topk_inds, :]
 
-        with timer.timing('decode bbox'):
-            bboxes = self.bbox_coder.decode(reg_preds, cluster_xyz)
-            bboxes_for_nms = xywhr2xyxyr(input_meta['box_type_3d'](bboxes, box_dim=bboxes.size(1)).bev)
+        bboxes = self.bbox_coder.decode(reg_preds, cluster_xyz)
+        bboxes_for_nms = xywhr2xyxyr(input_meta['box_type_3d'](bboxes, box_dim=bboxes.size(1)).bev)
 
         # Add a dummy background class to the front when using sigmoid
         padding = scores.new_zeros(scores.shape[0], 1)
         scores = torch.cat([scores, padding], dim=1)
 
         score_thr = cfg.get('score_thr', 0)
-        with timer.timing('nms'):
-            results = box3d_multiclass_nms(bboxes, bboxes_for_nms,
-                                        scores, score_thr, cfg.max_num,
-                                        cfg)
+        results = box3d_multiclass_nms(bboxes, bboxes_for_nms,
+                                    scores, score_thr, cfg.max_num,
+                                    cfg)
 
         out_bboxes, out_scores, out_labels = results
 
         out_bboxes = input_meta['box_type_3d'](out_bboxes, out_bboxes.size(1))
 
         # modify task labels to global label indices
-        with timer.timing('modify label'):
-            new_labels = torch.zeros_like(out_labels) - 1 # all -1 
-            if len(out_labels) > 0:
-                for i, name in enumerate(self.tasks[task_id]['class_names']):
-                    global_cls_ind = self.class_names.index(name)
-                    new_labels[out_labels == i] = global_cls_ind
+        new_labels = torch.zeros_like(out_labels) - 1 # all -1 
+        if len(out_labels) > 0:
+            for i, name in enumerate(self.tasks[task_id]['class_names']):
+                global_cls_ind = self.class_names.index(name)
+                new_labels[out_labels == i] = global_cls_ind
 
-                assert (new_labels >= 0).all()
+            assert (new_labels >= 0).all()
 
         out_labels = new_labels
 
