@@ -846,7 +846,6 @@ class LoadPointsFromMultiSweepsWaymo(LoadPointsFromMultiSweeps):
 
                 assert points.points_dim == points_sweep.shape[-1]
                 points_sweep = points.new_point(points_sweep)
-                # vis_bev_pc('ms_01_before_cat.png', points_sweep.tensor[:, :3], [-80.88, -80.88, -2, 80.88, 80.88, 4])
                 sweep_points_list.append(points_sweep)
 
         if self.return_list:
@@ -854,9 +853,6 @@ class LoadPointsFromMultiSweepsWaymo(LoadPointsFromMultiSweeps):
             return results
 
         points = points.cat(sweep_points_list)
-        # points = points[:, self.use_dim]
-        # vis_bev_pc('ms_01_after_cat.png', points.tensor[:, :3], [-80.88, -80.88, -2, 80.88, 80.88, 4])
-        # set_trace()
         results['points'] = points
         return results
 

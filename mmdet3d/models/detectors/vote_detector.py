@@ -18,7 +18,7 @@ from scipy.sparse.csgraph import connected_components
 from mmdet.core import multi_apply
 from .single_stage import SingleStage3DDetector
 from mmdet3d.models.segmentors.base import Base3DSegmentor
-from mmdet3d.utils import TorchTimer, vis_bev_pc, vis_bev_pc_list
+from mmdet3d.utils import TorchTimer
 from torch.utils.checkpoint import checkpoint
 timer = TorchTimer(-1)
 
