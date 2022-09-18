@@ -228,10 +228,10 @@ class TwoStageVoteDetector(VoteDetector):
             )
 
             # shuffle point
-            inds = torch.randperm(pts_xyz.shape[0], device=pts_xyz.device)
-            pts_xyz = pts_xyz[inds].contiguous()
-            pts_feats = pts_feats[inds].contiguous()
-            pts_batch_inds = pts_batch_inds[inds].contiguous()
+            # inds = torch.randperm(pts_xyz.shape[0], device=pts_xyz.device)
+            # pts_xyz = pts_xyz[inds].contiguous()
+            # pts_feats = pts_feats[inds].contiguous()
+            # pts_batch_inds = pts_batch_inds[inds].contiguous()
 
         with timer.timing('rcnn'):
             results = self.roi_head.simple_test(
