@@ -4,13 +4,13 @@
 [![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/embracing-single-stride-3d-object-detector/3d-object-detection-on-waymo-cyclist)](https://paperswithcode.com/sota/3d-object-detection-on-waymo-cyclist?p=embracing-single-stride-3d-object-detector)
 [![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/embracing-single-stride-3d-object-detector/3d-object-detection-on-waymo-vehicle)](https://paperswithcode.com/sota/3d-object-detection-on-waymo-vehicle?p=embracing-single-stride-3d-object-detector)
 
-This is the official implementation of paper:
+This is the official implementation of:
 
 [Fully Sparse 3D Object Detection](http://arxiv.org/abs/2207.10035) 
 and
 [Embracing Single Stride 3D Object Detector with Sparse Transformer](https://arxiv.org/pdf/2112.06375.pdf).
 
-**🔥FSD Pre-release**
+**🔥 FSD Preview Release**
 - Code of SpConv-based FSD on Waymo is released. See `./configs/fsd/fsd_waymoD1_1x.py`
 - We provide the tools for processing Argoverse 2 dataset in `./tools/argo`. We will release the instruction and configs of Argo2 model later.
 - A very fast Waymo evaluation, see Usage section for detailed instructions. The whole evaluation process of FSD on Waymo costs less than **10min** with 8 2080Ti GPUs.
@@ -27,14 +27,10 @@ See `Usage` section.
 - Supported voxel-based region partition in `./configs/sst_refactor`. Users can easily use voxel-based SST by modifying the `recover_bev` function in the backbone.
 - Waymo Leaderboard results updated in [SST_v1](https://waymo.com/open/challenges/entry/?challenge=DETECTION_3D&emailId=5854f8ae-6285&timestamp=1640329826551565)
 
-**Visualization of a SST detection sequence by AB3DMOT tracking:**
+<!-- **Visualization of a SST detection sequence by AB3DMOT tracking:**
 
-![demo-min](https://user-images.githubusercontent.com/21312704/145702575-24647aed-256d-486c-835f-730584cf99ee.gif)
+![demo-min](https://user-images.githubusercontent.com/21312704/145702575-24647aed-256d-486c-835f-730584cf99ee.gif) -->
 
-
-
-## Introduction
-- SST is a **single-stride** network, which maintains original feature resolution from the beginning to the end of the network. Due to the characterisric of single stride, SST achieves exciting performances on small object detection (Pedestrian, Cyclist).
 
 ## Usage
 **PyTorch >= 1.9 is recommended for a better support of the checkpoint technique.**
@@ -43,8 +39,8 @@ Our implementation is based on [MMDetection3D](https://github.com/open-mmlab/mmd
 
 ### Fast Waymo Evaluation:
 - Copy `tools/idx2timestamp.pkl` and `tools/idx2contextname.pkl` to `./data/waymo/kitti_format/`.
-- Passing the arguement `--eval fast` (See `run.sh`). This arguement will directly convert network outputs to Waymo `.bin` format, which is much faster than the old waymo.
-- Users could further build the multi-thread waymo evaluation tool (link)[https://github.com/Abyssaledge/waymo-open-dataset-master] for faster evaluation. 
+- Passing the argument `--eval fast` (See `run.sh`). This argument will directly convert network outputs to Waymo `.bin` format, which is much faster than the old way.
+- Users could further build the multi-thread Waymo evaluation tool ([link](https://github.com/Abyssaledge/waymo-open-dataset-master)) for faster evaluation. 
 
 ### For SST:
 We only provide the single-stage model here, as for our two-stage models, please follow [LiDAR-RCNN](https://github.com/TuSimple/LiDAR_RCNN). It's also a good choice to apply other powerful second stage detectors to our single-stage SST.
@@ -83,11 +79,19 @@ Note that we train the 3 classes together, so the performance above is a little 
 ## Citation
 Please consider citing our work as follows if it is helpful.
 ```
-@article{fan2021embracing,
-  title={Embracing Single Stride 3D Object Detector with Sparse Transformer},
+@inproceedings{fan2022embracing,
+  title={{Embracing Single Stride 3D Object Detector with Sparse Transformer}},
   author={Fan, Lue and Pang, Ziqi and Zhang, Tianyuan and Wang, Yu-Xiong and Zhao, Hang and Wang, Feng and Wang, Naiyan and Zhang, Zhaoxiang},
-  journal={arXiv preprint arXiv:2112.06375},
-  year={2021}
+  booktitle={CVPR},
+  year={2022}
+}
+```
+```
+@article{fan2022fully,
+  title={{Fully Sparse 3D Object Detection}},
+  author={Fan, Lue and Wang, Feng and Wang, Naiyan and Zhang, Zhaoxiang},
+  journal={arXiv preprint arXiv:2207.10035},
+  year={2022}
 }
 ```
 
