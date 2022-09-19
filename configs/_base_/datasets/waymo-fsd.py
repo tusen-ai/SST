@@ -1,7 +1,4 @@
-# 5car 5ped 3cyclist, all min points 5
 # dataset settings
-# D5 in the config name means the whole dataset is divided into 5 folds
-# We only use one fold for efficient experiments
 dataset_type = 'WaymoDataset'
 # data_root = 'data/waymo/kitti_format/'
 data_root = 'data/waymo/kitti_format/'
