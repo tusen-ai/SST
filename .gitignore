@@ -140,3 +140,6 @@ data/sunrgbd/OFFICIAL_SUNRGBD/
 
 # Waymo evaluation
 mmdet3d/core/evaluation/waymo_utils/compute_detection_metrics_main*
+
+!tools/idx2timestamp.pkl
+!tools/idx2contextname.pkl
