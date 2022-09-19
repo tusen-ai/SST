@@ -6,17 +6,19 @@
 
 This is the official implementation of paper:
 
-#### Fully Sparse 3D Object Detection
-[Paper Link](http://arxiv.org/abs/2207.10035)
+[Fully Sparse 3D Object Detection](http://arxiv.org/abs/2207.10035) 
+and
+[Embracing Single Stride 3D Object Detector with Sparse Transformer](https://arxiv.org/pdf/2112.06375.pdf).
 
-and paper:
-
-#### Embracing Single Stride 3D Object Detector with Sparse Transformer
-
-[Paper Link](https://arxiv.org/pdf/2112.06375.pdf)， [中文解读](https://zhuanlan.zhihu.com/p/476056546)
+**🔥FSD Pre-release**
+- Code of SpConv-based FSD on Waymo is released. See `./configs/fsd/fsd_waymoD1_1x.py`
+- We provide the tools for processing Argoverse 2 dataset in `./tools/argo`. We will release the instruction and configs of Argo2 model later.
+- A very fast Waymo evaluation, see Usage section for detailed instructions. The whole evaluation process of FSD on Waymo costs less than **10min** with 8 2080Ti GPUs.
+- We cannot distribute model weights of FSD on Waymo due to the license. Users could contact us for the private model weights.
+- Before using this repo, please install [TorchEx](https://github.com/Abyssaledge/TorchEx) and SpConv2 (SpConv 1.x is not supported).
 
 **NEWS**
-- [22-09-15] 🔥 FSD is accepted at NeurIPS 2022. We will make the code public before the opening of conference.
+- [22-09-15] 🔥 FSD is accepted at NeurIPS 2022.
 - [22-06-06] Support SST with CenterHead, cosine similarity in attention, faster SSTInputLayer. See Usage for details.
 - 🔥 SST is accepted at CVPR 2022.
 - Support Weighted NMS (CPU version) in [RangeDet](https://github.com/TuSimple/RangeDet), improving performance of vehicle class by ~1 AP.
@@ -36,11 +38,15 @@ See `Usage` section.
 
 ## Usage
 **PyTorch >= 1.9 is recommended for a better support of the checkpoint technique.**
-(or you can manually replace the interface of checkpoint in torch < 1.9 with the one in torch >= 1.9.)
 
-Our implementation is based on [MMDetection3D](https://github.com/open-mmlab/mmdetection3d), so just follow their [getting_started](https://github.com/open-mmlab/mmdetection3d/blob/master/docs/getting_started.md) and simply run the script: `run.sh`. Then you will get a basic result of SST after 5~7 hours (depends on your devices).
+Our implementation is based on [MMDetection3D](https://github.com/open-mmlab/mmdetection3d), so just follow their [getting_started](https://github.com/open-mmlab/mmdetection3d/blob/master/docs/getting_started.md) and simply run the script: `run.sh`.
 
-#### For SST:
+### Fast Waymo Evaluation:
+- Copy `tools/idx2timestamp.pkl` and `tools/idx2contextname.pkl` to `./data/waymo/kitti_format/`.
+- Passing the arguement `--eval fast` (See `run.sh`). This arguement will directly convert network outputs to Waymo `.bin` format, which is much faster than the old waymo.
+- Users could further build the multi-thread waymo evaluation tool (link)[https://github.com/Abyssaledge/waymo-open-dataset-master] for faster evaluation. 
+
+### For SST:
 We only provide the single-stage model here, as for our two-stage models, please follow [LiDAR-RCNN](https://github.com/TuSimple/LiDAR_RCNN). It's also a good choice to apply other powerful second stage detectors to our single-stage SST.
 
 We borrow **Weighted NMS** from RangeDet and observe ~1 AP improvement on our best Vehicle model. To use it, you are supposed to clone [RangeDet](https://github.com/TuSimple/RangeDet), and simply run `pip install -v -e .` in its root directory. Then refer to `config/sst/sst_waymoD5_1x_car_8heads_wnms.py` to modify your config and enable Weight NMS. Note we only implement the CPU version for now, so it is relatively slow. Do NOT use it on 3-class models, which will lead to performance drop.

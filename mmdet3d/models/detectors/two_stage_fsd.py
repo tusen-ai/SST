@@ -1,22 +1,11 @@
-from .vote_detector import VoteDetector
+from .single_stage_fsd import SingleStageFSD
 import torch
-from mmcv.runner import force_fp32
-from torch.nn import functional as F
-
 from mmdet.models import DETECTORS
-from mmdet3d.core import bbox3d2result, merge_aug_bboxes_3d
-from ipdb import set_trace
-
-from mmdet.models import build_detector
-
+from mmdet3d.core import bbox3d2result
 from .. import builder
-from mmdet3d.ops import scatter_v2
-from mmdet.core import multi_apply
-from mmdet3d.utils import TorchTimer
-timer = TorchTimer(-1)
 
 @DETECTORS.register_module()
-class TwoStageVoteDetector(VoteDetector):
+class FSD(SingleStageFSD):
 
     def __init__(self,
                  backbone,
@@ -65,8 +54,6 @@ class TwoStageVoteDetector(VoteDetector):
         gt_bboxes_3d = [b[l>=0] for b, l in zip(gt_bboxes_3d, gt_labels_3d)]
         gt_labels_3d = [l[l>=0] for l in gt_labels_3d]
 
-        if self.train_cfg.get('extract_noisy_fg_at_first', False):
-            points = self.extract_fg_by_gt(points, gt_bboxes_3d, gt_labels_3d, self.train_cfg['extract_fg_extra_width'])
 
         losses = {}
         rpn_outs = super().forward_train(
@@ -83,7 +70,7 @@ class TwoStageVoteDetector(VoteDetector):
             rpn_outs['cls_logits'], rpn_outs['reg_preds'], rpn_outs['cluster_xyz'], rpn_outs['cluster_inds'], img_metas
         )
 
-        assert len(proposal_list) == len(gt_bboxes_3d) # make sure the length is batch size
+        assert len(proposal_list) == len(gt_bboxes_3d)
 
         pts_xyz, pts_feats, pts_batch_inds = self.prepare_multi_class_roi_input(
             rpn_outs['all_input_points'],
@@ -93,12 +80,6 @@ class TwoStageVoteDetector(VoteDetector):
             rpn_outs['pts_batch_inds'],
             rpn_outs['valid_pts_xyz']
         )
-
-        # shuffle point. I forget why the shuffle is needed 
-        # inds = torch.randperm(pts_xyz.shape[0])
-        # pts_xyz = pts_xyz[inds].contiguous()
-        # pts_feats = pts_feats[inds].contiguous()
-        # pts_batch_inds = pts_batch_inds[inds].contiguous()
 
         roi_losses = self.roi_head.forward_train(
             pts_xyz,
@@ -189,60 +170,46 @@ class TwoStageVoteDetector(VoteDetector):
     
     def simple_test(self, points, img_metas, imgs=None, rescale=False, gt_bboxes_3d=None, gt_labels_3d=None):
 
-        if self.test_cfg.get('extract_noisy_fg_at_first', False):
-            points = self.extract_fg_by_gt(points, gt_bboxes_3d, gt_labels_3d, self.test_cfg['extract_fg_extra_width'])
 
-        with timer.timing('rpn'):
-            rpn_outs = super().simple_test(
-                points=points,
-                img_metas=img_metas,
-                gt_bboxes_3d=gt_bboxes_3d,
-                gt_labels_3d=gt_labels_3d,
-            )
+        rpn_outs = super().simple_test(
+            points=points,
+            img_metas=img_metas,
+            gt_bboxes_3d=gt_bboxes_3d,
+            gt_labels_3d=gt_labels_3d,
+        )
 
-        # proposal_list = self.bbox_head.get_bboxes(
-        #     rpn_outs['cls_logits'], rpn_outs['reg_preds'], rpn_outs['cluster_xyz'], rpn_outs['cluster_inds'], img_metas
-        # )
-        with timer.timing('between rpn and rcnn'):
-            proposal_list = rpn_outs['proposal_list']
+        proposal_list = rpn_outs['proposal_list']
 
-            if self.test_cfg.get('skip_rcnn', False):
-                bbox_results = [
-                    bbox3d2result(bboxes, scores, labels)
-                    for bboxes, scores, labels in proposal_list
-                ]
-                return bbox_results
+        if self.test_cfg.get('skip_rcnn', False):
+            bbox_results = [
+                bbox3d2result(bboxes, scores, labels)
+                for bboxes, scores, labels in proposal_list
+            ]
+            return bbox_results
 
-            if self.num_classes > 1 or self.test_cfg.get('enable_multi_class_test', False):
-                prepare_func = self.prepare_multi_class_roi_input
-            else:
-                prepare_func = self.prepare_roi_input
+        if self.num_classes > 1 or self.test_cfg.get('enable_multi_class_test', False):
+            prepare_func = self.prepare_multi_class_roi_input
+        else:
+            prepare_func = self.prepare_roi_input
 
-            pts_xyz, pts_feats, pts_batch_inds = prepare_func(
-                rpn_outs['all_input_points'],
-                rpn_outs['valid_pts_feats'],
-                rpn_outs['seg_feats'],
-                rpn_outs['pts_mask'],
-                rpn_outs['pts_batch_inds'],
-                rpn_outs['valid_pts_xyz']
-            )
+        pts_xyz, pts_feats, pts_batch_inds = prepare_func(
+            rpn_outs['all_input_points'],
+            rpn_outs['valid_pts_feats'],
+            rpn_outs['seg_feats'],
+            rpn_outs['pts_mask'],
+            rpn_outs['pts_batch_inds'],
+            rpn_outs['valid_pts_xyz']
+        )
 
-            # shuffle point
-            # inds = torch.randperm(pts_xyz.shape[0], device=pts_xyz.device)
-            # pts_xyz = pts_xyz[inds].contiguous()
-            # pts_feats = pts_feats[inds].contiguous()
-            # pts_batch_inds = pts_batch_inds[inds].contiguous()
-
-        with timer.timing('rcnn'):
-            results = self.roi_head.simple_test(
-                pts_xyz,
-                pts_feats,
-                pts_batch_inds,
-                img_metas,
-                proposal_list,
-                gt_bboxes_3d,
-                gt_labels_3d,
-            )
+        results = self.roi_head.simple_test(
+            pts_xyz,
+            pts_feats,
+            pts_batch_inds,
+            img_metas,
+            proposal_list,
+            gt_bboxes_3d,
+            gt_labels_3d,
+        )
 
         return results
     

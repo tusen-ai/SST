@@ -24,21 +24,17 @@ class FullySparseBboxHead(BaseModule):
                  num_blocks,
                  in_channels, 
                  feat_channels,
-                 with_distance,
-                 with_cluster_center,
-                 with_rel_mlp,
                  rel_mlp_hidden_dims,
                  rel_mlp_in_channels,
                  reg_mlp,
                  cls_mlp,
+                 with_rel_mlp=True,
+                 with_cluster_center=False,
+                 with_distance=False,
                  mode='max',
                  xyz_normalizer=[20, 20, 4],
-                 cat_voxel_feats=True,
-                 pos_fusion='mul',
-                 fusion='cat',
                  act='gelu',
                  geo_input=True,
-                 use_middle_cluster_feature=True,
                  with_corner_loss=False,
                  bbox_coder=dict(type='DeltaXYZWLHRBBoxCoder'),
                  norm_cfg=dict(type='LN', eps=1e-3, momentum=0.01),
@@ -67,7 +63,6 @@ class FullySparseBboxHead(BaseModule):
         self.corner_loss_weight = corner_loss_weight
 
         self.num_blocks = num_blocks
-        self.use_middle_cluster_feature = use_middle_cluster_feature
         self.print_info = {}
         self.unique_once = unique_once
         
@@ -75,7 +70,7 @@ class FullySparseBboxHead(BaseModule):
         for i in range(num_blocks):
             return_point_feats = i != num_blocks-1
             kwargs = dict(
-                type='DynamicClusterVFE',
+                type='SIRLayer',
                 in_channels=in_channels[i],
                 feat_channels=feat_channels[i],
                 with_distance=with_distance,
@@ -92,10 +87,7 @@ class FullySparseBboxHead(BaseModule):
                 return_point_feats=return_point_feats,
                 return_inv=False,
                 rel_dist_scaler=10.0,
-                fusion=fusion,
-                pos_fusion=pos_fusion,
                 xyz_normalizer=xyz_normalizer,
-                cat_voxel_feats=cat_voxel_feats,
                 act=act,
                 dropout=dropout,
             )
@@ -135,7 +127,6 @@ class FullySparseBboxHead(BaseModule):
         assert pts_features.size(0) > 0
 
         rois_batch_idx = rois[:, 0]
-        real_batch_size = rois_batch_idx.max().item() + 1
         rois = rois[:, 1:]
         roi_centers = rois[:, :3]
         rel_xyz = pts_xyz[:, :3] - roi_centers[roi_inds] 
@@ -146,7 +137,6 @@ class FullySparseBboxHead(BaseModule):
             new_coors = unq_inv = None
 
 
-        point_feat_list = []
         out_feats = pts_features
         f_cluster = torch.cat([pts_info['local_xyz'], pts_info['boundary_offset'], pts_info['is_in_margin'][:, None], rel_xyz], dim=-1)
 
@@ -161,8 +151,7 @@ class FullySparseBboxHead(BaseModule):
             if i < self.num_blocks - 1:
                 # return point features
                 out_feats, out_cluster_feats = block(in_feats, roi_inds, f_cluster, unq_inv_once=unq_inv, new_coors_once=new_coors)
-                if self.use_middle_cluster_feature:
-                    cluster_feat_list.append(out_cluster_feats)
+                cluster_feat_list.append(out_cluster_feats)
             if i == self.num_blocks - 1:
                 # return group features
                 out_cluster_feats, out_coors = block(in_feats, roi_inds, f_cluster, unq_inv_once=unq_inv, new_coors_once=new_coors)

@@ -12,7 +12,7 @@ from .base_3droi_head import Base3DRoIHead
 
 
 @HEADS.register_module()
-class FullySparseROIHead(Base3DRoIHead):
+class GroupCorrectionHead(Base3DRoIHead):
     """Part aggregation roi head for PartA2.
 
     Args:

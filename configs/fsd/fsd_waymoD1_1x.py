@@ -24,7 +24,6 @@ segmentor = dict(
         type='DynamicScatterVFE',
         in_channels=5,
         feat_channels=[64, 64],
-        with_distance=False,
         voxel_size=seg_voxel_size,
         with_cluster_center=True,
         with_voxel_center=True,
@@ -62,7 +61,7 @@ segmentor = dict(
         type='VoteSegHead',
         in_channel=67,
         hidden_dims=[128, 128],
-        num_classes=num_classes, # using focal loss, binary classification
+        num_classes=num_classes,
         dropout_ratio=0.0,
         conv_cfg=dict(type='Conv1d'),
         norm_cfg=dict(type='naiveSyncBN1d'),
@@ -83,33 +82,22 @@ segmentor = dict(
         class_names=('Car', 'Ped', 'Cyc'), # for training log
         centroid_offset=False,
     ),
-    test_cfg=dict(
-        point_loss=True,
-        score_thresh=seg_score_thresh, # for test
-        clustering_voxel_size=(0.5, 0.5, 6), # for test
-    )
 )
 
 model = dict(
-    type='TwoStageVoteDetector',
+    type='FSD',
 
     segmentor=segmentor,
 
     backbone=dict(
-        type='StackedVFE',
+        type='SIR',
         num_blocks=3,
         in_channels=[84,] + [133, ] * 2,
         feat_channels=[[128, 128], ] * 3,
         rel_mlp_hidden_dims=[[16, 32],] * 3,
-        with_rel_mlp=True,
-        with_distance=False,
-        with_cluster_center=False,
         norm_cfg=dict(type='LN', eps=1e-3),
         mode='max',
         xyz_normalizer=[20, 20, 4],
-        use_middle_cluster_feature=True,
-        cat_voxel_feats=True,
-        pos_fusion='mul',
         act='gelu',
         unique_once=True,
     ),
@@ -151,7 +139,7 @@ model = dict(
         as_rpn=True,
     ),
     roi_head=dict(
-        type='FullySparseROIHead',
+        type='GroupCorrectionHead',
         num_classes=num_classes,
         roi_extractor=dict(
              type='DynamicPointROIExtractor',
@@ -163,23 +151,16 @@ model = dict(
             type='FullySparseBboxHead',
             num_classes=num_classes,
             num_blocks=6,
-            in_channels=[275 - 64 + 2, 131+13+2, 131+13+2, 131+13+2, 131+13+2, 131+13+2], 
+            in_channels=[213, 146, 146, 146, 146, 146], 
             feat_channels=[[128, 128], ] * 6,
-            with_distance=False,
-            with_cluster_center=False,
-            with_rel_mlp=True,
             rel_mlp_hidden_dims=[[16, 32],] * 6,
             rel_mlp_in_channels=[13, ] * 6,
             reg_mlp=[512, 512],
             cls_mlp=[512, 512],
             mode='max',
             xyz_normalizer=[20, 20, 4],
-            cat_voxel_feats=True,
-            pos_fusion='mul',
-            fusion='cat',
             act='gelu',
             geo_input=True,
-            use_middle_cluster_feature=True,
             with_corner_loss=True,
             corner_loss_weight=1.0,
             bbox_coder=dict(type='DeltaXYZWLHRBBoxCoder'),
@@ -206,8 +187,6 @@ model = dict(
     ),
 
     train_cfg=dict(
-        use_voting_center=True,
-        use_gt_assigner=False,
         score_thresh=seg_score_thresh,
         sync_reg_avg_factor=True,
         pre_voxelization_size=(0.1, 0.1, 0.1),
@@ -232,7 +211,7 @@ model = dict(
                     min_pos_iou=0.45,
                     ignore_iof_thr=-1
                 ),
-                dict( # Cyc
+                dict( # Ped
                     type='MaxIoUAssigner',
                     iou_calculator=dict(
                         type='BboxOverlaps3D', coordinate='lidar'),
@@ -241,7 +220,7 @@ model = dict(
                     min_pos_iou=0.35,
                     ignore_iof_thr=-1
                 ),
-                dict( # Ped
+                dict( # Cyc
                     type='MaxIoUAssigner',
                     iou_calculator=dict(
                         type='BboxOverlaps3D', coordinate='lidar'),
@@ -266,12 +245,11 @@ model = dict(
             cls_neg_thr=(0.2, 0.15, 0.15),
             sync_reg_avg_factor=True,
             sync_cls_avg_factor=True,
-            corner_loss_only_car=True, # default True, explicitly set to False to disable
+            corner_loss_only_car=True,
             class_names=class_names,
         )
     ),
     test_cfg=dict(
-        use_voting_center=True,
         score_thresh=seg_score_thresh,
         pre_voxelization_size=(0.1, 0.1, 0.1),
         skip_rcnn=False,
@@ -286,7 +264,7 @@ model = dict(
         rcnn=dict(
             use_rotate_nms=True,
             nms_pre=-1,
-            nms_thr=0.25, # from 0.25 to 0.7 for retest
+            nms_thr=0.25,
             score_thr=0.1, 
             min_bbox_size=0,
             max_num=500,
@@ -313,7 +291,6 @@ model = dict(
 runner = dict(type='EpochBasedRunner', max_epochs=12)
 evaluation = dict(interval=12)
 
-# fp16 = dict(loss_scale=32.0)
 data = dict(
     samples_per_gpu=2,
     workers_per_gpu=4,
@@ -327,10 +304,9 @@ data = dict(
 log_config=dict(
     interval=50,
 )
-# load_from='/mnt/truenas/scratch/lve.fan/transdet3d/work_dirs/fsd_sp2_pretrain/segmentor_pretrain.pth'
 custom_hooks = [
     dict(type='DisableAugmentationHook', num_last_epochs=1, skip_type_keys=('ObjectSample', 'RandomFlip3D', 'GlobalRotScaleTrans')),
-    dict(type='EnableFSDDetectionHookIter', enable_after_iter=4000, threshold_buffer=0.3, buffer_iter=8000)
+    dict(type='EnableFSDDetectionHookIter', enable_after_iter=4000, threshold_buffer=0.3, buffer_iter=8000) 
 ]
 
 optimizer = dict(

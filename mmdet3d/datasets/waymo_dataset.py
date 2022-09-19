@@ -297,7 +297,7 @@ class WaymoDataset(KittiDataset):
         Returns:
             dict[str: float]: results of each evaluation metric
         """
-        assert ('waymo' in metric or 'kitti' in metric), \
+        assert ('waymo' in metric or 'kitti' in metric or 'fast' in metric), \
             f'invalid metric {metric}'
         if 'kitti' in metric:
             result_files, tmp_dir = self.format_results(
@@ -397,6 +397,62 @@ class WaymoDataset(KittiDataset):
                  ap_dict['Cyclist/L2 mAPH']) / 3
             if eval_tmp_dir is not None:
                 eval_tmp_dir.cleanup()
+
+        if 'fast' in metric:
+            waymo_root = osp.join(self.data_root.split('kitti_format')[0], 'waymo_format')
+            self.fast_convert_to_waymo(results, pklfile_prefix)
+            import subprocess
+            ret_bytes = subprocess.check_output(
+                'mmdet3d/core/evaluation/waymo_utils/' +
+                f'compute_detection_metrics_main {pklfile_prefix}.bin ' +
+                f'{waymo_root}/gt.bin',
+                shell=True)
+            ret_texts = ret_bytes.decode('utf-8')
+            print_log(ret_texts)
+            # parse the text to get ap_dict
+            ap_dict = {
+                'Vehicle/L1 mAP': 0,
+                'Vehicle/L1 mAPH': 0,
+                'Vehicle/L2 mAP': 0,
+                'Vehicle/L2 mAPH': 0,
+                'Pedestrian/L1 mAP': 0,
+                'Pedestrian/L1 mAPH': 0,
+                'Pedestrian/L2 mAP': 0,
+                'Pedestrian/L2 mAPH': 0,
+                'Sign/L1 mAP': 0,
+                'Sign/L1 mAPH': 0,
+                'Sign/L2 mAP': 0,
+                'Sign/L2 mAPH': 0,
+                'Cyclist/L1 mAP': 0,
+                'Cyclist/L1 mAPH': 0,
+                'Cyclist/L2 mAP': 0,
+                'Cyclist/L2 mAPH': 0,
+                'Overall/L1 mAP': 0,
+                'Overall/L1 mAPH': 0,
+                'Overall/L2 mAP': 0,
+                'Overall/L2 mAPH': 0
+            }
+            mAP_splits = ret_texts.split('mAP ')
+            mAPH_splits = ret_texts.split('mAPH ')
+            for idx, key in enumerate(ap_dict.keys()):
+                split_idx = int(idx / 2) + 1
+                if idx % 2 == 0:  # mAP
+                    ap_dict[key] = float(mAP_splits[split_idx].split(']')[0])
+                else:  # mAPH
+                    ap_dict[key] = float(mAPH_splits[split_idx].split(']')[0])
+            ap_dict['Overall/L1 mAP'] = \
+                (ap_dict['Vehicle/L1 mAP'] + ap_dict['Pedestrian/L1 mAP'] +
+                 ap_dict['Cyclist/L1 mAP']) / 3
+            ap_dict['Overall/L1 mAPH'] = \
+                (ap_dict['Vehicle/L1 mAPH'] + ap_dict['Pedestrian/L1 mAPH'] +
+                 ap_dict['Cyclist/L1 mAPH']) / 3
+            ap_dict['Overall/L2 mAP'] = \
+                (ap_dict['Vehicle/L2 mAP'] + ap_dict['Pedestrian/L2 mAP'] +
+                 ap_dict['Cyclist/L2 mAP']) / 3
+            ap_dict['Overall/L2 mAPH'] = \
+                (ap_dict['Vehicle/L2 mAPH'] + ap_dict['Pedestrian/L2 mAPH'] +
+                 ap_dict['Cyclist/L2 mAPH']) / 3
+            tmp_dir = None
 
         if tmp_dir is not None:
             tmp_dir.cleanup()
@@ -626,6 +682,77 @@ class WaymoDataset(KittiDataset):
 
     def update_skip_type_keys(self, skip_type_keys):
         self._skip_type_keys = skip_type_keys
+
+    def fast_convert_to_waymo(self, results, pklfile_prefix):
+        import tqdm
+
+        bin_file = metrics_pb2.Objects()
+
+        with open(osp.join(self.data_root, 'idx2timestamp.pkl'), 'rb') as fr:
+            idx2timestamp = pkl.load(fr)
+
+        with open(osp.join(self.data_root, 'idx2contextname.pkl'), 'rb') as fr:
+            idx2contextname = pkl.load(fr)
+
+        assert len(results) == len(self.data_infos)
+        new_list = []
+        print('\nStarting fast convert to waymo ...')
+        for idx in tqdm.tqdm(range(len(results))):
+            info = self.data_infos[idx]
+            sample_idx = info['image']['image_idx']
+            sample_idx = f'{sample_idx:07d}'
+
+            lidar_boxes = results[idx]['boxes_3d'].tensor
+            scores = results[idx]['scores_3d']
+            labels = results[idx]['labels_3d']
+            for i in range(len(lidar_boxes)):
+                class_name = self.CLASSES[labels[i].item()]
+                o = self.lidar2waymo_box(
+                    lidar_boxes[i],
+                    scores[i].item(),
+                    class_name,
+                    idx2contextname[sample_idx],
+                    idx2timestamp[sample_idx]
+                )
+                bin_file.objects.append(o)
+
+        if not pklfile_prefix.endswith('.bin'):
+            pklfile_prefix += '.bin'
+        f = open(pklfile_prefix, 'wb')
+        f.write(bin_file.SerializeToString())
+        f.close()
+        print('\nConvert finished.')
+    
+    def lidar2waymo_box(self, in_box, score, class_name, context_name, timestamp):
+
+        box = label_pb2.Label.Box()
+        height = in_box[5].item()
+        heading = in_box[6].item()
+
+        heading = -heading - 0.5 * 3.1415926
+
+        while heading < -3.141593: 
+            heading += 2 * 3.141592
+        while heading >  3.141593:
+            heading -= 2 * 3.141592
+
+        box.center_x = in_box[0].item()
+        box.center_y = in_box[1].item()
+        box.center_z = in_box[2].item() + height / 2
+        box.length = in_box[4].item()
+        box.width = in_box[3].item()
+        box.height = height
+        box.heading = heading
+
+        o = metrics_pb2.Object()
+        o.object.box.CopyFrom(box)
+        o.object.type = self.k2w_cls_map[class_name]
+        o.score = score
+
+        o.context_name = context_name
+        o.frame_timestamp_micros = timestamp
+
+        return o
 
 
 @DATASETS.register_module()
