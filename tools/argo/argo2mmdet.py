@@ -178,8 +178,9 @@ def main(seg_path_list, seg_split_list, info_list, ts2idx, output_dir, save_bin,
 
 if __name__ == '__main__':
 
-    root = '/mnt/weka/scratch/feng.wang/data/lidar/argo/sensor'
-    output_dir = '/mnt/weka/scratch/lve.fan/transdet3d/data/argo2/kitti_format'
+    # please change to your data path
+    root = '/mnt/weka/scratch/lve.fan/data/lidar/argo/sensor'
+    output_dir = '/mnt/weka/scratch/lve.fan/FSD/data/argo2/kitti_format'
     save_bin = True
     ts2idx, seg_path_list, seg_split_list = prepare(root)
 

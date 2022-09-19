@@ -201,8 +201,6 @@ class VoteSegHead(Base3DDecodeHead):
         label_list = []
         vote_target_list = []
         vote_mask_list = []
-        assert bsz < 10
-        cfg = self.train_cfg if self.training else self.test_cfg
 
         for i in range(bsz):
 

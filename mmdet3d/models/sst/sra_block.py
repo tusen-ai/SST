@@ -4,7 +4,7 @@ from torch.utils.checkpoint import checkpoint
 from mmcv.runner import auto_fp16
 from mmcv.cnn import build_norm_layer
 
-from mmdet3d.ops import flat2window, window2flat, SRATensor, DebugSRATensor, spconv
+# from mmdet3d.ops import flat2window, window2flat, SRATensor, DebugSRATensor, spconv
 
 from ipdb import set_trace
 import os

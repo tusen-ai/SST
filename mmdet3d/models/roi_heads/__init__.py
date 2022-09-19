@@ -4,7 +4,7 @@ from .h3d_roi_head import H3DRoIHead
 from .mask_heads import PointwiseSemanticHead, PrimitiveHead
 from .part_aggregation_roi_head import PartAggregationROIHead
 from .roi_extractors import Single3DRoIAwareExtractor, SingleRoIExtractor 
-from .fsd_roi_head import FullySparseROIHead
+from .fsd_roi_head import GroupCorrectionHead
 
 __all__ = [
     'Base3DRoIHead', 'PartAggregationROIHead', 'PointwiseSemanticHead',

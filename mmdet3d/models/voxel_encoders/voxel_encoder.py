@@ -615,7 +615,7 @@ class DynamicScatterVFE(DynamicVFE):
 from mmdet3d.ops import build_mlp
 
 @VOXEL_ENCODERS.register_module()
-class DynamicClusterVFE(DynamicVFE):
+class SIRLayer(DynamicVFE):
 
     def __init__(self,
                  in_channels=4,
@@ -635,14 +635,11 @@ class DynamicClusterVFE(DynamicVFE):
                  return_inv=True,
                  rel_dist_scaler=1.0,
                  with_shortcut=True,
-                 fusion='cat',
-                 pos_fusion='add',
                  xyz_normalizer=[1.0, 1.0, 1.0],
-                 cat_voxel_feats=False,
                  act='relu',
                  dropout=0.0,
                  ):
-        super(DynamicClusterVFE, self).__init__(
+        super().__init__(
             in_channels,
             feat_channels,
             with_distance,
@@ -664,9 +661,6 @@ class DynamicClusterVFE(DynamicVFE):
         self.with_shortcut = with_shortcut
         self._with_rel_mlp = with_rel_mlp
         self.xyz_normalizer = xyz_normalizer
-        self.cat_voxel_feats = cat_voxel_feats
-        # assert with_rel_mlp != with_cluster_center
-        assert fusion == 'cat'
         if with_rel_mlp:
             rel_mlp_hidden_dims.append(in_channels) # not self.in_channels
             self.rel_mlp = build_mlp(rel_mlp_in_channel, rel_mlp_hidden_dims, norm_cfg, act=act)
@@ -751,21 +745,18 @@ class DynamicClusterVFE(DynamicVFE):
                 # need to concat voxel feats if it is not the last vfe
                 feat_per_point = self.map_voxel_center_to_point(voxel_feats, unq_inv)
                 features = torch.cat([point_feats, feat_per_point], dim=1)
-        
 
         voxel_feats = torch.cat(voxel_feats_list, dim=1)
 
         if return_both:
             if self.with_shortcut and point_feats.shape == shortcut.shape:
-                return point_feats + shortcut, voxel_feats, voxel_coors
-            else:
-                return point_feats, voxel_feats, voxel_coors
+                point_feats = point_feats + shortcut
+            return point_feats, voxel_feats, voxel_coors
 
         if self.return_point_feats:
             if self.with_shortcut and point_feats.shape == shortcut.shape:
-                return point_feats + shortcut, voxel_feats
-            else:
-                return point_feats, voxel_feats
+                point_feats = point_feats + shortcut
+            return point_feats, voxel_feats
 
         if return_inv:
             return voxel_feats, voxel_coors, unq_inv

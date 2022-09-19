@@ -6,7 +6,6 @@ import torch.nn as nn
 import copy
 from mmcv.cnn import build_conv_layer, build_norm_layer
 from mmdet3d.models.sst.sra_block import SRABlock
-from mmdet3d.ops import SRATensor, DebugSRATensor, spconv
 
 from ipdb import set_trace
 

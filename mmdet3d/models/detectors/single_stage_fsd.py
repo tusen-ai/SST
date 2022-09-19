@@ -4,9 +4,7 @@ from torch.nn import functional as F
 
 from mmdet.models import DETECTORS
 from mmdet3d.core import bbox3d2result
-from ipdb import set_trace
 
-from .dynamic_voxelnet import DynamicVoxelNet
 from mmdet.models import build_detector
 from ..builder import build_backbone, build_head, build_neck
 
@@ -17,9 +15,6 @@ from scipy.sparse.csgraph import connected_components
 from mmdet.core import multi_apply
 from .single_stage import SingleStage3DDetector
 from mmdet3d.models.segmentors.base import Base3DSegmentor
-from mmdet3d.utils import TorchTimer
-from torch.utils.checkpoint import checkpoint
-timer = TorchTimer(-1)
 
 def fps(points, N):
     idx = furthest_point_sample(points.unsqueeze(0), N)
@@ -343,7 +338,7 @@ class VoteSegmentor(Base3DSegmentor):
     
         
 @DETECTORS.register_module()
-class VoteDetector(SingleStage3DDetector):
+class SingleStageFSD(SingleStage3DDetector):
 
     def __init__(self,
                  backbone,
@@ -358,7 +353,7 @@ class VoteDetector(SingleStage3DDetector):
                  cluster_assigner=None,
                  pretrained=None,
                  init_cfg=None):
-        super(VoteDetector, self).__init__(
+        super(SingleStageFSD, self).__init__(
             backbone=backbone,
             neck=neck,
             bbox_head=bbox_head,
