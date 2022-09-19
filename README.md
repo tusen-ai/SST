@@ -52,10 +52,10 @@ To enable faster SSTInputLayer, clone https://github.com/Abyssaledge/TorchEx, an
 
 
 ## Main results
+### FSD
+Please refer to this [page](https://github.com/tusen-ai/SST/issues/62).
 
-**_All the results of single stage models are reproducible with this repo. We also find that some improvements can usually be obtained by replacing your pillar-based conv backbone with SST.
-So please let us know if you have trouble reproducing the results. Discussions are definitely welcome if you could not obtain satisfactory performances with SST in your projects._**
-
+### SST
 #### Waymo Leaderboard
 
 |         |  #Sweeps | Veh_L1 | Ped_L1 | Cyc_L1  | Veh_L2 | Ped_L2 | Cyc_L2  | 
