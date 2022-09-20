@@ -18,6 +18,7 @@ and
 - Before using this repo, please install [TorchEx](https://github.com/Abyssaledge/TorchEx) and SpConv2 (SpConv 1.x is not supported).
 
 **NEWS**
+- [22-09-19] The code of FSD is released here.
 - [22-09-15] 🔥 FSD is accepted at NeurIPS 2022.
 - [22-06-06] Support SST with CenterHead, cosine similarity in attention, faster SSTInputLayer. See Usage for details.
 - 🔥 SST is accepted at CVPR 2022.
