@@ -21,7 +21,7 @@ and
 - [22-09-19] The code of FSD is released here.
 - [22-09-15] 🔥 FSD is accepted at NeurIPS 2022.
 - [22-06-06] Support SST with CenterHead, cosine similarity in attention, faster SSTInputLayer. See Usage for details.
-- 🔥 SST is accepted at CVPR 2022.
+- [22-03-02] 🔥 SST is accepted at CVPR 2022.
 - Support Weighted NMS (CPU version) in [RangeDet](https://github.com/TuSimple/RangeDet), improving performance of vehicle class by ~1 AP.
 See `Usage` section.
 - We refactored the code to provide more clear function prototypes and a better understanding. See `./configs/sst_refactor`
@@ -38,7 +38,7 @@ See `Usage` section.
 
 Our implementation is based on [MMDetection3D](https://github.com/open-mmlab/mmdetection3d), so just follow their [getting_started](https://github.com/open-mmlab/mmdetection3d/blob/master/docs/getting_started.md) and simply run the script: `run.sh`.
 
-**It is highly recommended to check the data version if users generate data with the official MMDetection3D. MMDetection3D refactors its coordinate definition after v1.0. A hotfix is using our code to re-generate the waymo_dbinfo_train.pkl**
+**ATTENTION: It is highly recommended to check the data version if users generate data with the official MMDetection3D. MMDetection3D refactors its coordinate definition after v1.0. A hotfix is using our code to re-generate the waymo_dbinfo_train.pkl**
 
 ### Fast Waymo Evaluation:
 - Copy `tools/idx2timestamp.pkl` and `tools/idx2contextname.pkl` to `./data/waymo/kitti_format/`.
