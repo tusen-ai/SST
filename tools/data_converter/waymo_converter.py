@@ -137,8 +137,8 @@ class Waymo2KITTI(object):
             img_path = f'{self.image_save_dir}{str(img.name - 1)}/' + \
                 f'{self.prefix}{str(file_idx).zfill(3)}' + \
                 f'{str(frame_idx).zfill(3)}.png'
-            #img = mmcv.imfrombytes(img.image)
-            #mmcv.imwrite(img, img_path)
+            img = mmcv.imfrombytes(img.image)
+            mmcv.imwrite(img, img_path)
 
     def save_calib(self, frame, file_idx, frame_idx):
         """Parse and save the calibration data.

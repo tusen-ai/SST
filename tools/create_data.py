@@ -191,7 +191,7 @@ def waymo_data_prep(root_path,
             prefix=str(i),
             workers=workers,
             test_mode=(split == 'test'))
-        #converter.convert()
+        converter.convert()
     # Generate waymo infos
     out_dir = osp.join(out_dir, 'kitti_format')
     kitti.create_waymo_info_file(out_dir, info_prefix, max_sweeps=max_sweeps)
