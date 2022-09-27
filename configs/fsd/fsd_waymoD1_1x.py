@@ -310,5 +310,5 @@ custom_hooks = [
 ]
 
 optimizer = dict(
-    lr=2e-5,
+    lr=3e-5,
 )
