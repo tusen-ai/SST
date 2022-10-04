@@ -43,6 +43,7 @@ class SSTv2(nn.Module):
         conv_cfg=dict(type='Conv2d', bias=False),
         debug=True,
         in_channel=None,
+        to_bev=True,
         conv_kwargs=dict(kernel_size=3, dilation=2, padding=2, stride=1),
         checkpoint_blocks=[],
         layer_cfg=dict(),
@@ -54,6 +55,7 @@ class SSTv2(nn.Module):
         self.nhead = nhead
         self.checkpoint_blocks = checkpoint_blocks
         self.conv_shortcut = conv_shortcut
+        self.to_bev = to_bev
 
         if in_channel is not None:
             self.linear0 = nn.Linear(in_channel, d_model[0])
@@ -130,9 +132,12 @@ class SSTv2(nn.Module):
             output = block(output, pos_embed_list, ind_dict_list, 
                 padding_mask_list, using_checkpoint = i in self.checkpoint_blocks)
         
-        output = self.recover_bev(output, voxel_info['voxel_coors'], batch_size)
+        if self.to_bev:
+            output = self.recover_bev(output, voxel_info['voxel_coors'], batch_size)
 
+        output_list = []
         if self.num_attached_conv > 0:
+            assert self.to_bev
             for conv in self.conv_layer:
                 temp = conv(output)
                 if temp.shape == output.shape and self.conv_shortcut:
@@ -140,8 +145,11 @@ class SSTv2(nn.Module):
                 else:
                     output = temp
 
-        output_list = []
-        output_list.append(output)
+        if not self.to_bev:
+            output = {'voxel_feats':output, 'voxel_coors':voxel_info['voxel_coors']}
+
+        if len(output_list) == 0: # weird code, just for developing
+            output_list.append(output)
 
         return output_list
         

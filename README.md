@@ -45,6 +45,15 @@ Our implementation is based on [MMDetection3D](https://github.com/open-mmlab/mmd
 - Passing the argument `--eval fast` (See `run.sh`). This argument will directly convert network outputs to Waymo `.bin` format, which is much faster than the old way.
 - Users could further build the multi-thread Waymo evaluation tool ([link](https://github.com/Abyssaledge/waymo-open-dataset-master)) for faster evaluation. 
 
+### For FSD:
+FSD requires segmentation first, so we use an `EnableFSDDetectionHookIter` to enable the detection part after a segmentation warmup. 
+
+If the warmup parameter is not properly modified (which is likely in your customized dataset), the memory cost might be large and the training time will be unstable (caused by CCL in CPU, we will replace it with the GPU version later).
+
+If users do not want to waste time on the `EnableFSDDetectionHookIter`, users could first use our fast pretrain config (e.g., `fsd_sst_encoder_pretrain`) for a once-for-all warmup. The script `tools/model_converters/fsd_pretrain_converter.py` could convert the pretrain checkpoint, which can be loaded for FSD training (with a `load_from='xx'` in config). With the once-for-all pretrain, users could adopt a much short `EnableFSDDetectionHookIter`.
+
+SST based FSD converges slower than SpConv based FSD, so we recommend users adopt the fast pretrain for SST based FSD.
+
 ### For SST:
 We only provide the single-stage model here, as for our two-stage models, please follow [LiDAR-RCNN](https://github.com/TuSimple/LiDAR_RCNN). It's also a good choice to apply other powerful second stage detectors to our single-stage SST.
 
