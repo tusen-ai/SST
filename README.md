@@ -65,7 +65,8 @@ To enable faster SSTInputLayer, clone https://github.com/Abyssaledge/TorchEx, an
 
 ## Main results
 ### FSD
-Please refer to this [page](https://github.com/tusen-ai/SST/issues/62).
+Validation: please refer to this [page](https://github.com/tusen-ai/SST/issues/62).
+Test: please refer to this [submission](https://waymo.com/open/challenges/entry/?timestamp=1665211204047769&challenge=DETECTION_3D&emailId=1cb154ab-1558)
 
 ### SST
 #### Waymo Leaderboard
