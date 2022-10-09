@@ -681,6 +681,113 @@ class FullySparseBboxHead(BaseModule):
                 selected_scores, selected_label_preds))
         return result_list
 
+    def get_bboxes_with_batches(
+        self,
+        rois,
+        cls_score,
+        bbox_pred,
+        valid_roi_mask,
+        class_labels,
+        class_pred,
+        valid_roi_mask_batches,
+        img_metas,
+        cfg=None
+    ):
+        """Generate bboxes from bbox head predictions.
+
+        Args:
+            rois (torch.Tensor): Roi bounding boxes.
+            cls_score (torch.Tensor): Scores of bounding boxes.
+            bbox_pred (torch.Tensor): Bounding boxes predictions
+            class_labels (torch.Tensor): Label of classes, from rpn.
+            class_pred (torch.Tensor): Score for nms. From rpn
+            img_metas (list[dict]): Point cloud and image's meta info.
+            cfg (:obj:`ConfigDict`): Testing config.
+
+        Returns:
+            list[tuple]: Decoded bbox, scores and labels after nms.
+        """
+        assert rois.size(0) == cls_score.size(0) == bbox_pred.size(0)
+        assert isinstance(class_labels, list) and isinstance(class_pred, list) and len(class_labels) == len(class_pred)
+
+        cls_score = cls_score.sigmoid()
+        assert (class_pred[0] >= 0).all()
+
+        if self.test_cfg.get('rcnn_score_nms', False):
+            # assert class_pred[0].shape == cls_score.shape
+            class_pred[0] = cls_score.squeeze(1)
+
+        # regard empty bboxes as false positive
+        rois = rois[valid_roi_mask]
+        cls_score = cls_score[valid_roi_mask]
+        bbox_pred = bbox_pred[valid_roi_mask]
+
+
+        for i in range(len(class_labels)):
+            temp_mask = valid_roi_mask_batches[i]
+            class_labels[i] = class_labels[i][temp_mask]
+            class_pred[i] = class_pred[i][temp_mask]
+
+        if rois.numel() == 0:
+            return [(
+                img_metas[0]['box_type_3d'](rois[:, 1:], rois.size(1) - 1),
+                class_pred[0],
+                class_labels[0]
+            ),]
+
+
+        roi_batch_id = rois[..., 0]
+        roi_boxes = rois[..., 1:]  # boxes without batch id
+        batch_size = int(roi_batch_id.max().item() + 1)
+
+        # decode boxes
+        roi_ry = roi_boxes[..., 6].view(-1)
+        roi_xyz = roi_boxes[..., 0:3].view(-1, 3)
+        local_roi_boxes = roi_boxes.clone().detach()
+        local_roi_boxes[..., 0:3] = 0
+
+        assert local_roi_boxes.size(1) in (7, 9) # with or without velocity
+        if local_roi_boxes.size(1) == 9:
+            # fake zero predicted velocity, which means rcnn do not refine the velocity
+            bbox_pred = F.pad(bbox_pred, (0, 2), 'constant', 0)
+
+        rcnn_boxes3d = self.bbox_coder.decode(local_roi_boxes, bbox_pred)
+        rcnn_boxes3d[..., 0:3] = rotation_3d_in_axis(
+            rcnn_boxes3d[..., 0:3].unsqueeze(1), (roi_ry + np.pi / 2),
+            axis=2).squeeze(1)
+        rcnn_boxes3d[:, 0:3] += roi_xyz
+
+        # post processing
+        result_list = []
+        if cfg.get('multi_class_nms', False) or self.num_classes > 1:
+            nms_func = self.multi_class_nms
+        else:
+            nms_func = self.single_class_nms
+
+        for batch_id in range(batch_size):
+            cur_class_labels = class_labels[batch_id]
+            if batch_size == 1:
+                cur_cls_score = cls_score.view(-1)
+                cur_rcnn_boxes3d = rcnn_boxes3d
+            else:
+                roi_batch_mask = roi_batch_id == batch_id
+                cur_cls_score = cls_score[roi_batch_mask].view(-1)
+                cur_rcnn_boxes3d = rcnn_boxes3d[roi_batch_mask]
+
+            cur_box_prob = class_pred[batch_id]
+            selected = nms_func(cur_box_prob, cur_class_labels, cur_rcnn_boxes3d,
+                                cfg.score_thr, cfg.nms_thr,
+                                img_metas[batch_id],
+                                cfg.use_rotate_nms)
+            selected_bboxes = cur_rcnn_boxes3d[selected]
+            selected_label_preds = cur_class_labels[selected]
+            selected_scores = cur_cls_score[selected]
+
+            result_list.append(
+                (img_metas[batch_id]['box_type_3d'](selected_bboxes, selected_bboxes.size(1)),
+                selected_scores, selected_label_preds))
+        return result_list
+
     def multi_class_nms(self,
                         box_probs,
                         labels, # labels from rpn
