@@ -699,8 +699,10 @@ class FullySparseBboxHead(BaseModule):
             rois (torch.Tensor): Roi bounding boxes.
             cls_score (torch.Tensor): Scores of bounding boxes.
             bbox_pred (torch.Tensor): Bounding boxes predictions
-            class_labels (torch.Tensor): Label of classes, from rpn.
-            class_pred (torch.Tensor): Score for nms. From rpn
+            valid_roi_mask (torch.Tensor): Mask of valid rois in total.
+            class_labels (list[torch.Tensor]): Label of classes, from rpn.
+            class_pred (list[torch.Tensor]): Score for nms. From rpn
+            valid_roi_mask_batches (list[torch.Tensor]): Mask of valid rois in batches.
             img_metas (list[dict]): Point cloud and image's meta info.
             cfg (:obj:`ConfigDict`): Testing config.
 

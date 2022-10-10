@@ -420,12 +420,16 @@ class GroupCorrectionHeadV2(Base3DRoIHead):
                 pts_batch_idx,
                 sample_results
             )
+            # update the name of loss from different heads
             temp_loss = bbox_results['loss_bbox']
             name_keys = list(temp_loss.keys())
             for key in name_keys:
                 new_key = f"{key}_{head_index}"
                 temp_loss.update({new_key:temp_loss.pop(key)})
 
+            # 1. sample scores and labels according to the sample_results
+            # 2. divide the valid_roi_mask to batches
+            # Todo: Consider the situation about sample_result.add_gt_as_proposals == True
             cls_preds = []
             labels_3d = []
             valid_roi_mask_batches = []
@@ -437,6 +441,7 @@ class GroupCorrectionHeadV2(Base3DRoIHead):
                 labels_3d.append(batch_labels[sample_idx])
                 valid_roi_mask_batches.append(bbox_results['valid_roi_mask'][num_rois:num_rois+len(sample_idx)])
                 num_rois += len(sample_idx)
+            assert num_rois == rois.shape[0] == bbox_results['cls_score'].shape[0] == bbox_results['bbox_pred'].shape[0] == bbox_results['valid_roi_mask'].shape[0]
             proposal_list = self.bbox_head[head_index].get_bboxes_with_batches(
                 rois,
                 bbox_results['cls_score'],
