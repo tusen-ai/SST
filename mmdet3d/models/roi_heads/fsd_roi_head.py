@@ -429,14 +429,23 @@ class GroupCorrectionHeadV2(Base3DRoIHead):
 
             # 1. sample scores and labels according to the sample_results
             # 2. divide the valid_roi_mask to batches
-            # Todo: Consider the situation about sample_result.add_gt_as_proposals == True
             cls_preds = []
             labels_3d = []
             valid_roi_mask_batches = []
             num_rois = 0
             for batch_idx in range(len(sample_results)):
                 batch_boxes, batch_scores, batch_labels = proposal_list[batch_idx]
+                no_proposal = len(batch_boxes) == 0
+                if no_proposal:
+                    # print('*******fake a box*******')
+                    batch_scores = torch.tensor([0.0], dtype=torch.float32, device=batch_boxes.device)
+                    batch_labels = torch.tensor([0], dtype=torch.int64, device=batch_boxes.device)
+                if self.bbox_sampler[head_index].add_gt_as_proposals and len(gt_bboxes_3d[batch_idx].tensor) > 0:
+                    scores_infty = batch_scores.new_ones(len(gt_bboxes_3d[batch_idx].tensor)) * 10000
+                    batch_scores = torch.cat([scores_infty, batch_scores], dim=0)
+                    batch_labels = torch.cat([gt_labels_3d[batch_idx], batch_labels], dim=0)
                 sample_idx = torch.cat([sample_results[batch_idx].pos_inds, sample_results[batch_idx].neg_inds])
+                assert sample_idx.max().item() < len(batch_scores)
                 cls_preds.append(batch_scores[sample_idx])
                 labels_3d.append(batch_labels[sample_idx])
                 valid_roi_mask_batches.append(bbox_results['valid_roi_mask'][num_rois:num_rois+len(sample_idx)])
