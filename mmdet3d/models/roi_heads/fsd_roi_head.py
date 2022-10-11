@@ -441,8 +441,8 @@ class GroupCorrectionHeadV2(Base3DRoIHead):
                     batch_scores = torch.tensor([0.0], dtype=torch.float32, device=batch_boxes.device)
                     batch_labels = torch.tensor([0], dtype=torch.int64, device=batch_boxes.device)
                 if self.bbox_sampler[head_index].add_gt_as_proposals and len(gt_bboxes_3d[batch_idx].tensor) > 0:
-                    scores_infty = batch_scores.new_ones(len(gt_bboxes_3d[batch_idx].tensor)) * 10000
-                    batch_scores = torch.cat([scores_infty, batch_scores], dim=0)
+                    scores_ones = batch_scores.new_ones(len(gt_bboxes_3d[batch_idx].tensor))
+                    batch_scores = torch.cat([scores_ones, batch_scores], dim=0)
                     batch_labels = torch.cat([gt_labels_3d[batch_idx], batch_labels], dim=0)
                 sample_idx = torch.cat([sample_results[batch_idx].pos_inds, sample_results[batch_idx].neg_inds])
                 assert sample_idx.max().item() < len(batch_scores)
@@ -494,35 +494,37 @@ class GroupCorrectionHeadV2(Base3DRoIHead):
 
 
         assert len(proposal_list) == 1, 'only support bsz==1 to make cls_preds and labels_3d consistent with bbox_results'
-        rois = bbox3d2roi([res[0].tensor for res in proposal_list])
-        cls_preds = [res[1] for res in proposal_list]
-        labels_3d = [res[2] for res in proposal_list]
+        for head_index in range(self.num_heads):
 
-        if len(rois) == 0:
-            # fake prediction without velocity dims
-            rois = torch.tensor([[0,0,0,5,1,1,1,0]], dtype=rois.dtype, device=rois.device)
-            cls_preds = [torch.tensor([0.0], dtype=torch.float32, device=rois.device)]
-            labels_3d = [torch.tensor([0], dtype=torch.int64, device=rois.device)]
-           
+            rois = bbox3d2roi([res[0].tensor for res in proposal_list])
+            cls_preds = [res[1] for res in proposal_list]
+            labels_3d = [res[2] for res in proposal_list]
 
-        # cls_preds = cls_preds[0]
-        # labels_3d = labels_3d[0]
+            if len(rois) == 0:
+                # fake prediction without velocity dims
+                rois = torch.tensor([[0,0,0,5,1,1,1,0]], dtype=rois.dtype, device=rois.device)
+                cls_preds = [torch.tensor([0.0], dtype=torch.float32, device=rois.device)]
+                labels_3d = [torch.tensor([0], dtype=torch.int64, device=rois.device)]
+            
 
-        bbox_results = self._bbox_forward(pts_xyz, pts_feats, pts_batch_inds, rois)
+            # cls_preds = cls_preds[0]
+            # labels_3d = labels_3d[0]
 
-        bbox_list = self.bbox_head.get_bboxes(
-            rois,
-            bbox_results['cls_score'],
-            bbox_results['bbox_pred'],
-            bbox_results['valid_roi_mask'],
-            labels_3d,
-            cls_preds,
-            img_metas,
-            cfg=self.test_cfg)
+            bbox_results = self._bbox_forward(head_index, pts_xyz, pts_feats, pts_batch_inds, rois)
+
+            proposal_list = self.bbox_head[head_index].get_bboxes(
+                rois,
+                bbox_results['cls_score'],
+                bbox_results['bbox_pred'],
+                bbox_results['valid_roi_mask'],
+                labels_3d,
+                cls_preds,
+                img_metas,
+                cfg=self.test_cfg)
 
         bbox_results = [
             bbox3d2result(bboxes, scores, labels)
-            for bboxes, scores, labels in bbox_list
+            for bboxes, scores, labels in proposal_list
         ]
         return bbox_results
 
