@@ -16,6 +16,11 @@ from mmdet.core import multi_apply
 from .single_stage import SingleStage3DDetector
 from mmdet3d.models.segmentors.base import Base3DSegmentor
 
+try:
+    from torchex import connected_components as cc_gpu
+except ImportError:
+    cc_gpu = None
+
 def fps(points, N):
     idx = furthest_point_sample(points.unsqueeze(0), N)
     idx = idx.squeeze(0).long()
@@ -27,6 +32,14 @@ def filter_almost_empty(coors, min_points):
     cnt_per_point = unq_cnt[unq_inv]
     valid_mask = cnt_per_point >= min_points
     return valid_mask
+
+def find_connected_componets_gpu(points, batch_idx, dist):
+
+    assert len(points) > 0
+    assert cc_gpu is not None
+    components_inds = cc_gpu(points, batch_idx, dist, 100, 2, False)
+    assert len(torch.unique(components_inds)) == components_inds.max().item() + 1
+    return components_inds
 
 def find_connected_componets(points, batch_idx, dist):
 
@@ -860,6 +873,7 @@ class ClusterAssigner(torch.nn.Module):
         point_cloud_range,
         connected_dist,
         class_names=['Car', 'Cyclist', 'Pedestrian'],
+        gpu_clustering=(False, False),
     ):
         super().__init__()
         self.cluster_voxel_size = cluster_voxel_size
@@ -867,6 +881,7 @@ class ClusterAssigner(torch.nn.Module):
         self.connected_dist = connected_dist
         self.point_cloud_range = point_cloud_range
         self.class_names = class_names
+        self.gpu_clustering = gpu_clustering
 
     @torch.no_grad()
     def forward(self, points_list, batch_idx_list, gt_bboxes_3d=None, gt_labels_3d=None, origin_points=None):
@@ -916,7 +931,10 @@ class ClusterAssigner(torch.nn.Module):
         if self.training:
             cluster_inds = find_connected_componets(sampled_centers, voxel_coors[:, 0], dist)
         else:
-            cluster_inds = find_connected_componets_single_batch(sampled_centers, voxel_coors[:, 0], dist)
+            if self.gpu_clustering[1]:
+                cluster_inds = find_connected_componets_gpu(sampled_centers, voxel_coors[:, 0], dist)
+            else:
+                cluster_inds = find_connected_componets_single_batch(sampled_centers, voxel_coors[:, 0], dist)
         assert len(cluster_inds) == len(sampled_centers)
 
         cluster_inds_per_point = cluster_inds[inv_inds]
