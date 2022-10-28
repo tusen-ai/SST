@@ -163,6 +163,7 @@ class VoteSegmentor(Base3DSegmentor):
                  segmentation_head,
                  decode_neck=None,
                  auxiliary_head=None,
+                 voxel_downsampling_size=None,
                  train_cfg=None,
                  test_cfg=None,
                  init_cfg=None,
@@ -192,6 +193,7 @@ class VoteSegmentor(Base3DSegmentor):
         self.save_list = []
         self.point_cloud_range = voxel_layer['point_cloud_range']
         self.voxel_size = voxel_layer['voxel_size']
+        self.voxel_downsampling_size = voxel_downsampling_size
         self.tanh_dims = tanh_dims
     
     def encode_decode(self, ):
@@ -256,7 +258,18 @@ class VoteSegmentor(Base3DSegmentor):
         out_data[shuffle_inds] = temp_data
 
         return out_data
-    
+
+    def voxel_downsample(self, points_list):
+        device = points_list[0].device
+        out_points_list = []
+        voxel_size = torch.tensor(self.voxel_downsampling_size, device=device)
+        pc_range = torch.tensor(self.point_cloud_range, device=device)
+
+        for points in points_list:
+            coors = torch.div(points[:, :3] - pc_range[None, :3], voxel_size[None, :], rounding_mode='floor').long()
+            out_points, new_coors = scatter_v2(points, coors, mode='avg', return_inv=False)
+            out_points_list.append(out_points)
+        return out_points_list
 
     def forward_train(self,
                       points,
@@ -272,6 +285,8 @@ class VoteSegmentor(Base3DSegmentor):
             # a hack way to scale the intensity and elongation in WOD
             points = [torch.cat([p[:, :3], torch.tanh(p[:, 3:])], dim=1) for p in points]
         
+        if self.voxel_downsampling_size is not None:
+            points = self.voxel_downsample(points)
 
         labels, vote_targets, vote_mask = self.segmentation_head.get_targets(points, gt_bboxes_3d, gt_labels_3d)
 
@@ -323,6 +338,8 @@ class VoteSegmentor(Base3DSegmentor):
         elif points[0].size(1) in (4,5):
             points = [torch.cat([p[:, :3], torch.tanh(p[:, 3:])], dim=1) for p in points]
 
+        if self.voxel_downsampling_size is not None:
+            points = self.voxel_downsample(points)
 
         seg_pred = []
         x, pts_coors, points = self.extract_feat(points, img_metas)
