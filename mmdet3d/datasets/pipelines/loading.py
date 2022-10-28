@@ -364,10 +364,10 @@ class LoadPointsFromFile(object):
                  coord_type,
                  load_dim=6,
                  use_dim=[0, 1, 2],
-                 tanh_dim=None,
                  shift_height=False,
                  use_color=False,
                  file_client_args=dict(backend='disk'),
+                 tanh_dim=None,
                  ):
         self.shift_height = shift_height
         self.use_color = use_color
