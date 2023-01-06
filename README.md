@@ -10,7 +10,10 @@ This is the official implementation of:
 and
 [Embracing Single Stride 3D Object Detector with Sparse Transformer](https://arxiv.org/pdf/2112.06375.pdf).
 
-**🔥 FSD Preview Release**
+🔥 The code of our new work [FSD++](https://github.com/tusen-ai/SST/files/10356776/fsdpp_arxiv.pdf) is will released soon.
+
+
+**FSD Preview Release**
 - Code of FSD on Waymo is released. See `./configs/fsd/fsd_waymoD1_1x.py`
 - We provide the tools for processing Argoverse 2 dataset in `./tools/argo`. We will release the instruction and configs of Argo2 model later.
 - A very fast Waymo evaluation, see Usage section for detailed instructions. The whole evaluation process of FSD on Waymo costs less than **10min** with 8 2080Ti GPUs.
