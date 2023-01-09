@@ -10,7 +10,7 @@ This is the official implementation of:
 and
 [Embracing Single Stride 3D Object Detector with Sparse Transformer](https://arxiv.org/pdf/2112.06375.pdf).
 
-🔥 The code of our new work [FSD++](https://github.com/tusen-ai/SST/files/10356776/fsdpp_arxiv.pdf) is will released soon.
+🔥 The code of our new work [FSD++](https://arxiv.org/abs/2301.02562) will be released soon.
 
 
 **FSD Preview Release**
