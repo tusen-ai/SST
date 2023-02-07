@@ -122,7 +122,7 @@ data
 *.npz
 *.pkl.json
 *.log.json
-work_dirs/
+work_dirs
 exps/
 *~
 
