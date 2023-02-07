@@ -863,6 +863,7 @@ class MultiSweepsWaymoDataset(WaymoDataset):
             sweeps=info['sweeps'],
             timestamp=info['timestamp'],
             pose=info['pose'],
+            sweeps_future=info.get('sweeps_future', None)
             )
 
         if not self.test_mode:
