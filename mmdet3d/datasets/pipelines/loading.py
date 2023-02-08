@@ -976,7 +976,7 @@ class LoadPointsFromMultiFutureSweepsWaymo(LoadPointsFromMultiSweeps):
                  close_radius=1.0,
                  t_dim=3,
                  return_list=False,
-                 jump_frame=False,
+                 data_aug=False,
                  test_mode=False):
         super().__init__(
                  sweeps_num=sweeps_num,
@@ -991,7 +991,7 @@ class LoadPointsFromMultiFutureSweepsWaymo(LoadPointsFromMultiSweeps):
             self.use_dim = list(range(self.use_dim))
         self.t_dim = t_dim
         self.return_list = return_list
-        self.jump_frame = jump_frame
+        self.data_aug = data_aug
 
     def _remove_close(self, points, radius=1.0):
         """Removes point too close within a certain radius from origin.
@@ -1036,7 +1036,7 @@ class LoadPointsFromMultiFutureSweepsWaymo(LoadPointsFromMultiSweeps):
                 else:
                     sweep_points_list.append(points)
         else: 
-            if self.jump_frame == True:
+            if self.data_aug == True:
                 if hasattr(self, 'sweep_choices'):
                     choices = self.sweep_choices
                 elif len(results['sweeps']) <= 2 * self.sweeps_num[0] + 1:
@@ -1101,7 +1101,7 @@ class LoadPointsFromMultiFutureSweepsWaymo(LoadPointsFromMultiSweeps):
                 else:
                     sweep_points_list.append(points)
         else:
-            if self.jump_frame == True:
+            if self.data_aug == True:
                 if hasattr(self, 'sweep_choices'):
                     choices = self.sweep_choices
                 elif len(results['sweeps_future']) <= 2 * self.sweeps_num[1] + 1:
@@ -1202,7 +1202,7 @@ class LoadPointsFromMultiFutureSweepsWaymoAug(LoadPointsFromMultiSweeps):
                  close_radius=1.0,
                  t_dim=3,
                  return_list=False,
-                 jump_frame=False,
+                 data_aug=False,
                  test_mode=False):
         super().__init__(
                  sweeps_num=sweeps_num,
@@ -1217,7 +1217,7 @@ class LoadPointsFromMultiFutureSweepsWaymoAug(LoadPointsFromMultiSweeps):
             self.use_dim = list(range(self.use_dim))
         self.t_dim = t_dim
         self.return_list = return_list
-        self.jump_frame = jump_frame
+        self.data_aug = data_aug
 
     def _remove_close(self, points, radius=1.0):
         if isinstance(points, np.ndarray):
@@ -1246,7 +1246,7 @@ class LoadPointsFromMultiFutureSweepsWaymoAug(LoadPointsFromMultiSweeps):
         # augmentation
         sweep_points_list = []
         wait_list = []
-        if self.jump_frame == True:
+        if self.data_aug == True:
             wait_list = np.concatenate((np.arange(self.sweeps_num[0],0,step=2),np.arange(self.sweeps_num[1],step=2)))
         else:
             wait_list = np.concatenate((np.arange(self.sweeps_num[0],0),np.arange(self.sweeps_num[1])))
@@ -1347,6 +1347,198 @@ class LoadPointsFromMultiFutureSweepsWaymoAug(LoadPointsFromMultiSweeps):
         # overlap now frame
         sweep_points_list.append(points)
 
+        if self.return_list:
+            results['points_list'] = sweep_points_list
+            return results
+
+        points = points.cat(sweep_points_list)
+        results['points'] = points
+        return results
+
+    def __repr__(self):
+        """str: Return a string that describes the module."""
+        return f'{self.__class__.__name__}(sweeps_num={self.sweeps_num})'
+
+
+
+
+
+@PIPELINES.register_module()
+class LoadPointsFromPastFutureSweepsWaymo(LoadPointsFromMultiSweeps):
+    """Load points from multiple sweeps.
+
+    This is usually used for nuScenes dataset to utilize previous sweeps.
+
+    Args:
+        sweeps_num (int): Number of sweeps. Defaults to 10.
+        load_dim (int): Dimension number of the loaded points. Defaults to 5.
+        use_dim (list[int]): Which dimension to use. Defaults to [0, 1, 2, 4].
+        file_client_args (dict): Config dict of file clients, refer to
+            https://github.com/open-mmlab/mmcv/blob/master/mmcv/fileio/file_client.py
+            for more details. Defaults to dict(backend='disk').
+        pad_empty_sweeps (bool): Whether to repeat keyframe when
+            sweeps is empty. Defaults to False.
+        remove_close (bool): Whether to remove close points.
+            Defaults to False.
+        test_mode (bool): If test_model=True used for testing, it will not
+            randomly sample sweeps but select the nearest N frames.
+            Defaults to False.
+    """
+
+    def __init__(self,
+                 sweeps_num=[10,10],
+                 wait_list=[-5,-4,-3,-2,-1,0,1,2,3,4,5],
+                 load_dim=5,
+                 use_dim=[0, 1, 2, 4],
+                 file_client_args=dict(backend='disk'),
+                 pad_empty_sweeps=False,
+                 remove_close=False,
+                 close_radius=1.0,
+                 t_dim=3,
+                 return_list=False,
+                 data_aug=False,
+                 test_mode=False):
+        super().__init__(
+                 sweeps_num=sweeps_num,
+                 load_dim=load_dim,
+                 use_dim=use_dim,
+                 file_client_args=file_client_args,
+                 pad_empty_sweeps=pad_empty_sweeps,
+                 remove_close=remove_close,
+                 test_mode=test_mode)
+        self.close_radius = close_radius
+        if isinstance(self.use_dim, int):
+            self.use_dim = list(range(self.use_dim))
+        self.t_dim = t_dim
+        self.wait_list=wait_list
+        self.return_list = return_list
+        self.data_aug = data_aug
+
+    def _remove_close(self, points, radius=1.0):
+        if isinstance(points, np.ndarray):
+            points_numpy = points
+        elif isinstance(points, BasePoints):
+            points_numpy = points.tensor.numpy()
+        else:
+            raise NotImplementedError
+        r = np.linalg.norm(points_numpy[:, :2], ord=2, axis=1)
+        not_close = r > radius
+        return points[not_close]
+
+    def __call__(self, results):
+
+        points = results['points']
+
+        if self.t_dim == points.tensor.size(-1):
+            padding = points.tensor.new_zeros(len(points.tensor))[:, None]
+            points.tensor = torch.cat([points.tensor, padding], dim=1)
+            points.points_dim += 1
+        elif self.t_dim < points.tensor.size(-1):
+            points.tensor[:, self.t_dim] = 0
+        else:
+            raise ValueError
+
+        # augmentation
+        sweep_points_list = []
+        choices = self.wait_list
+        if self.data_aug == True:
+            p = random.random()
+            if p < 0.2:
+                len_choices = (len(wait_list)/2).astype(np.int)
+                choices = random.sample(self.wait_list, len_choices)
+            else:
+                choices = self.wait_list
+        
+        for frame_num in choices:
+            # read past sweeps: 
+            if frame_num < 0:
+                idx = -1 * frame_num - 1
+                if self.pad_empty_sweeps and len(results['sweeps']) == 0:
+                    if self.remove_close:
+                        sweep_points_list.append(self._remove_close(points, self.close_radius))
+                    else:
+                        sweep_points_list.append(points)
+                else:
+                    if idx < len(results['sweeps']):
+                        sweep = results['sweeps'][idx]
+                        data_path = os.path.join(os.path.dirname(results['pts_filename']), os.path.basename(sweep['velodyne_path']))
+                        points_sweep = self._load_points(data_path)
+                        points_sweep = np.copy(points_sweep).reshape(-1, self.load_dim)
+                        if self.remove_close:
+                            points_sweep = self._remove_close(points_sweep, self.close_radius)
+
+                        curr_pose = results['pose']
+                        past_pose = sweep['pose']
+
+                        past2world_rot = past_pose[0:3, 0:3]
+                        past2world_trans = past_pose[0:3, 3]
+                        world2curr_pose = np.linalg.inv(curr_pose)
+                        world2curr_rot = world2curr_pose[0:3, 0:3]
+                        world2curr_trans = world2curr_pose[0:3, 3]
+
+                        past_points = points_sweep[:, :3]
+                        past_pc_in_world = np.einsum('ij,nj->ni', past2world_rot, past_points) + past2world_trans[None, :]
+                        past_pc_in_curr = np.einsum('ij,nj->ni', world2curr_rot, past_pc_in_world) + world2curr_trans[None, :]
+
+                        points_sweep[:, :3] = past_pc_in_curr
+                        points_sweep = points_sweep[:, self.use_dim]
+
+                        if self.t_dim == points_sweep.shape[-1]:
+                            padding = np.zeros(len(points_sweep), dtype=points_sweep.dtype)[:, None] + frame_num
+                            points_sweep = np.concatenate([points_sweep, padding], axis=1)
+                        elif self.t_dim < points_sweep.shape[-1]:
+                            points_sweep[:, self.t_dim] = frame_num
+
+                        assert points.points_dim == points_sweep.shape[-1]
+                        points_sweep = points.new_point(points_sweep)
+                        sweep_points_list.append(points_sweep)
+            elif frame_num == 0:
+                # overlap now frame
+                sweep_points_list.append(points)
+            # read future sweeps
+            else: 
+                idx = frame_num - 1
+                if self.pad_empty_sweeps and len(results['sweeps_future']) == 0:
+                    if self.remove_close:
+                        sweep_points_list.append(self._remove_close(points, self.close_radius))
+                    else:
+                        sweep_points_list.append(points)
+                else:
+                    # overlap
+                    if idx < len(results['sweeps_future']):
+                        sweep = results['sweeps_future'][idx]
+                        data_path = os.path.join(os.path.dirname(results['pts_filename']), os.path.basename(sweep['velodyne_path']))
+                        points_sweep = self._load_points(data_path)
+                        points_sweep = np.copy(points_sweep).reshape(-1, self.load_dim)
+                        if self.remove_close:
+                            points_sweep = self._remove_close(points_sweep, self.close_radius)
+
+                        curr_pose = results['pose']
+                        past_pose = sweep['pose']
+
+                        past2world_rot = past_pose[0:3, 0:3]
+                        past2world_trans = past_pose[0:3, 3]
+                        world2curr_pose = np.linalg.inv(curr_pose)
+                        world2curr_rot = world2curr_pose[0:3, 0:3]
+                        world2curr_trans = world2curr_pose[0:3, 3]
+
+                        past_points = points_sweep[:, :3]
+                        past_pc_in_world = np.einsum('ij,nj->ni', past2world_rot, past_points) + past2world_trans[None, :]
+                        past_pc_in_curr = np.einsum('ij,nj->ni', world2curr_rot, past_pc_in_world) + world2curr_trans[None, :]
+
+                        points_sweep[:, :3] = past_pc_in_curr
+                        points_sweep = points_sweep[:, self.use_dim]
+
+                        if self.t_dim == points_sweep.shape[-1]:
+                            padding = np.zeros(len(points_sweep), dtype=points_sweep.dtype)[:, None] + frame_num
+                            points_sweep = np.concatenate([points_sweep, padding], axis=1)
+                        elif self.t_dim < points_sweep.shape[-1]:
+                            points_sweep[:, self.t_dim] = frame_num
+
+                        assert points.points_dim == points_sweep.shape[-1]
+                        points_sweep = points.new_point(points_sweep)
+                        sweep_points_list.append(points_sweep)
+        
         if self.return_list:
             results['points_list'] = sweep_points_list
             return results
