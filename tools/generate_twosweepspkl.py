@@ -39,7 +39,6 @@ def read_pickle(work_path):
     return data
 
 
-    
 
 def main():
     pkl_path = '/mnt/weka/scratch/shutong.jiang/SST/data/waymo/kitti_format/waymo_infos_train.pkl'
