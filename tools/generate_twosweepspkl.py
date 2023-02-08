@@ -28,12 +28,13 @@ def read_pickle(work_path):
     for info_frame in info:
         index = info.index(info_frame)
         for i in range(1, 11):
-            if index + i < len(info):
-                if info[index+i]['session'] == info_frame['session'] and info[index+i]['pic_num']  <= info_frame['pic_num'] + 10:
+            idx_frame = index + i
+            if idx_frame < len(info):
+                if info[idx_frame]['session'] == info_frame['session'] and info[idx_frame]['pic_num']  <= info_frame['pic_num'] + 10:
                     sweep = {}
-                    sweep['velodyne_path']  = data[info[index+i]['num']]['point_cloud']['velodyne_path']   
-                    sweep['timestamp'] = data[info[index+i]['num']]['timestamp']
-                    sweep['pose'] = data[info[index+i]['num']]['pose']
+                    sweep['velodyne_path']  = data[info[idx_frame]['num']]['point_cloud']['velodyne_path']   
+                    sweep['timestamp'] = data[info[idx_frame]['num']]['timestamp']
+                    sweep['pose'] = data[info[idx_frame]['num']]['pose']
                     data[info_frame['num']]['sweeps_future'].append(sweep)
 
     return data
