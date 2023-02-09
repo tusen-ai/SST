@@ -44,13 +44,13 @@ def read_pickle(work_path):
 def main():
     pkl_path = '/mnt/weka/scratch/shutong.jiang/SST/data/waymo/kitti_format/waymo_infos_train.pkl'
     info = read_pickle(pkl_path)
-    output_path = '/mnt/weka/scratch/shutong.jiang/SST/data/kitti_format/waymo_infos_train_twosweeps.pkl'
+    output_path = '/mnt/weka/scratch/shutong.jiang/SST/data/kitti_format/waymo_infos_train_futuresweeps.pkl'
     with open(output_path, "wb") as f:
         pickle.dump(info, f)
 
     pkl_path = '/mnt/weka/scratch/shutong.jiang/SST/data/waymo/kitti_format/waymo_infos_val.pkl'
     info = read_pickle(pkl_path)
-    output_path = '/mnt/weka/scratch/shutong.jiang/SST/data/kitti_format/waymo_infos_val_twosweeps.pkl'
+    output_path = '/mnt/weka/scratch/shutong.jiang/SST/data/kitti_format/waymo_infos_val_futuresweeps.pkl'
     with open(output_path, "wb") as f:
         pickle.dump(info, f)
 
