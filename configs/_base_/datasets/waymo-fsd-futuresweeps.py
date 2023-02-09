@@ -29,7 +29,7 @@ db_sampler = dict(
 
 extra_sweeps_num = [2,2]
 wait_list =[-2, -1, 0, 1, 2]
-#modify:wait_list & data_aug
+
 train_pipeline = [
     dict(
         type='LoadPointsFromFile',

@@ -1029,62 +1029,25 @@ class LoadPointsFromPastFutureSweepsWaymo(LoadPointsFromMultiSweeps):
         
         for frame_num in choices:
             # read past sweeps: 
-            if frame_num < 0:
-                idx = -1 * frame_num - 1
-                if self.pad_empty_sweeps and len(results['sweeps']) == 0:
-                    if self.remove_close:
-                        sweep_points_list.append(self._remove_close(points, self.close_radius))
-                    else:
-                        sweep_points_list.append(points)
-                else:
-                    if idx < len(results['sweeps']):
-                        sweep = results['sweeps'][idx]
-                        data_path = os.path.join(os.path.dirname(results['pts_filename']), os.path.basename(sweep['velodyne_path']))
-                        points_sweep = self._load_points(data_path)
-                        points_sweep = np.copy(points_sweep).reshape(-1, self.load_dim)
-                        if self.remove_close:
-                            points_sweep = self._remove_close(points_sweep, self.close_radius)
-
-                        curr_pose = results['pose']
-                        past_pose = sweep['pose']
-
-                        past2world_rot = past_pose[0:3, 0:3]
-                        past2world_trans = past_pose[0:3, 3]
-                        world2curr_pose = np.linalg.inv(curr_pose)
-                        world2curr_rot = world2curr_pose[0:3, 0:3]
-                        world2curr_trans = world2curr_pose[0:3, 3]
-
-                        past_points = points_sweep[:, :3]
-                        past_pc_in_world = np.einsum('ij,nj->ni', past2world_rot, past_points) + past2world_trans[None, :]
-                        past_pc_in_curr = np.einsum('ij,nj->ni', world2curr_rot, past_pc_in_world) + world2curr_trans[None, :]
-
-                        points_sweep[:, :3] = past_pc_in_curr
-                        points_sweep = points_sweep[:, self.use_dim]
-
-                        if self.t_dim == points_sweep.shape[-1]:
-                            padding = np.zeros(len(points_sweep), dtype=points_sweep.dtype)[:, None] + frame_num
-                            points_sweep = np.concatenate([points_sweep, padding], axis=1)
-                        elif self.t_dim < points_sweep.shape[-1]:
-                            points_sweep[:, self.t_dim] = frame_num
-
-                        assert points.points_dim == points_sweep.shape[-1]
-                        points_sweep = points.new_point(points_sweep)
-                        sweep_points_list.append(points_sweep)
-            elif frame_num == 0:
+            if frame_num == 0:
                 # overlap now frame
                 sweep_points_list.append(points)
-            # read future sweeps
-            else: 
-                idx = frame_num - 1
-                if self.pad_empty_sweeps and len(results['sweeps_future']) == 0:
+            else:
+                if frame_num < 0:
+                    idx = -1 * frame_num - 1
+                    sweep_type = 'sweeps'
+                else: 
+                    idx = frame_num - 1
+                    sweep_type = 'sweeps_future'
+                # overlap
+                if self.pad_empty_sweeps and len(results[sweep_type]) == 0:
                     if self.remove_close:
                         sweep_points_list.append(self._remove_close(points, self.close_radius))
                     else:
                         sweep_points_list.append(points)
                 else:
-                    # overlap
-                    if idx < len(results['sweeps_future']):
-                        sweep = results['sweeps_future'][idx]
+                    if idx < len(results[sweep_type]):
+                        sweep = results[sweep_type][idx]
                         data_path = os.path.join(os.path.dirname(results['pts_filename']), os.path.basename(sweep['velodyne_path']))
                         points_sweep = self._load_points(data_path)
                         points_sweep = np.copy(points_sweep).reshape(-1, self.load_dim)
@@ -1116,6 +1079,8 @@ class LoadPointsFromPastFutureSweepsWaymo(LoadPointsFromMultiSweeps):
                         assert points.points_dim == points_sweep.shape[-1]
                         points_sweep = points.new_point(points_sweep)
                         sweep_points_list.append(points_sweep)
+
+
         
         if self.return_list:
             results['points_list'] = sweep_points_list
