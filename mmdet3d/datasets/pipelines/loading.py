@@ -1022,10 +1022,10 @@ class LoadPointsFromPastFutureSweepsWaymo(LoadPointsFromMultiSweeps):
         if self.data_aug == True:
             p = random.random()
             if p < 0.2:
-                len_choices = (len(wait_list)/2).astype(np.int)
+                len_choices = int(len(self.wait_list)/2)
                 choices = random.sample(self.wait_list, len_choices)
-            else:
-                choices = self.wait_list
+                if 0 not in choices:
+                    choices.append(0)  
         
         for frame_num in choices:
             # read past sweeps: 
