@@ -1,7 +1,7 @@
 from .single_stage_fsd import SingleStageFSD
 import torch
 from mmdet.models import DETECTORS
-from mmdet3d.core import bbox3d2result
+from mmdet3d.core import bbox3d2result, merge_augs_better
 from .. import builder
 
 @DETECTORS.register_module()
@@ -212,6 +212,20 @@ class FSD(SingleStageFSD):
         )
 
         return results
+
+    def aug_test(self, points, img_metas, img, **kwargs):
+        """Test function with augmentaiton."""
+        assert len(points) == len(img_metas)
+        aug_result_list = []
+        for p, meta, in zip(points, img_metas):
+            this_result = self.simple_test(p, meta)
+            assert len(this_result) == 1, 'Assuming single-sample inference'
+            aug_result_list.append(this_result[0])
+
+        merged_result = merge_augs_better(aug_result_list, img_metas, self.test_cfg['tta'], points[0][0].device)
+
+        return [merged_result,]
+    
     
 
     def extract_fg_by_gt(self, point_list, gt_bboxes_3d, gt_labels_3d, extra_width):

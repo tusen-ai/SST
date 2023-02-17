@@ -3,10 +3,10 @@ import torch
 from . import iou3d_cuda
 
 # to be released
-# try:
-#     import weighted_nms_ext
-# except Exception as e:
-#     print(f'Error {e} when import weighted_nms.')
+try:
+    import weighted_nms_ext
+except Exception as e:
+    print(f'Error {e} when import weighted_nms.')
 
 
 def boxes_iou_bev(boxes_a, boxes_b):

@@ -272,14 +272,6 @@ model = dict(
             min_bbox_size=0,
             max_num=500,
         ),
-        tta=dict(
-            nms_thr=0.25,
-            wnms=True,
-            wnms_merge_thr=(0.5, 0.5, 0.5),
-            num_classes=num_classes,
-            mean_score=True,
-            
-        ),
     ),
     cluster_assigner=dict(
         cluster_voxel_size=dict(
@@ -310,15 +302,11 @@ data = dict(
     workers_per_gpu=4,
     train=dict(
         type='RepeatDataset',
-        times=1,
+        times=5,
         dataset=dict(
+            ann_file='./data/waymo/kitti_format/waymo_infos_train_futuresweeps_10_seg.pkl',
             load_interval=1)
     ),
-    test=dict(
-        # ann_file='./data/waymo/kitti_format/waymo_infos_test_futuresweeps.pkl',
-        ann_file='./data/waymo/kitti_format/waymo_infos_val_futuresweeps_mini.pkl',
-        split='training'
-    )
 )
 log_config=dict(
     interval=50,
@@ -326,7 +314,7 @@ log_config=dict(
 
 custom_hooks = [
     dict(type='DisableAugmentationHook', num_last_epochs=1, skip_type_keys=('ObjectSample', 'RandomFlip3D', 'GlobalRotScaleTrans')),
-    dict(type='EnableFSDDetectionHookIter', enable_after_iter=8000, threshold_buffer=0.3, buffer_iter=10000)
+    dict(type='EnableFSDDetectionHookIter', enable_after_iter=6000, threshold_buffer=0.4, buffer_iter=5000)
 ]
 
 optimizer = dict(

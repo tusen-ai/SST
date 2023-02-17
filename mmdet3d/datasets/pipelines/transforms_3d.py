@@ -557,6 +557,11 @@ class GlobalRotScaleTrans(object):
         for key in input_dict['bbox3d_fields']:
             input_dict[key].translate(trans_factor)
 
+    def _random_rot(self, input_dict):
+        rotation = self.rot_range
+        noise_rotation = np.random.uniform(rotation[0], rotation[1])
+        input_dict['pcd_rot_angle'] = noise_rotation
+
     def _rot_bbox_points(self, input_dict):
         """Private function to rotate bounding boxes and points.
 
@@ -568,8 +573,9 @@ class GlobalRotScaleTrans(object):
                 and keys in input_dict['bbox3d_fields'] are updated \
                 in the result dict.
         """
-        rotation = self.rot_range
-        noise_rotation = np.random.uniform(rotation[0], rotation[1])
+        # rotation = self.rot_range
+        # noise_rotation = np.random.uniform(rotation[0], rotation[1])
+        noise_rotation = input_dict['pcd_rot_angle']
 
         # if no bbox in input_dict, only rotate points
         if len(input_dict['bbox3d_fields']) == 0:
@@ -636,6 +642,8 @@ class GlobalRotScaleTrans(object):
         if 'transformation_3d_flow' not in input_dict:
             input_dict['transformation_3d_flow'] = []
 
+        if 'pcd_rot_angle' not in input_dict:
+            self._random_rot(input_dict)
         self._rot_bbox_points(input_dict)
 
         if 'pcd_scale_factor' not in input_dict:

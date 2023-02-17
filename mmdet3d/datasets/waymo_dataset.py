@@ -105,6 +105,7 @@ class WaymoDataset(KittiDataset):
             'Sign': label_pb2.Label.TYPE_SIGN,
             'Cyclist': label_pb2.Label.TYPE_CYCLIST,
         }
+        self.minival = True if 'mini' in ann_file else False
 
     def _get_pts_filename(self, idx):
         pts_filename = osp.join(self.root_split, self.pts_prefix,
@@ -402,13 +403,17 @@ class WaymoDataset(KittiDataset):
             waymo_root = osp.join(self.data_root.split('kitti_format')[0], 'waymo_format')
             self.fast_convert_to_waymo(results, pklfile_prefix)
             import subprocess
+            gt_file_name = 'gt_mini_val.bin' if self.minival else 'gt.bin'
             ret_bytes = subprocess.check_output(
                 'mmdet3d/core/evaluation/waymo_utils/' +
                 f'compute_detection_metrics_main {pklfile_prefix}.bin ' +
-                f'{waymo_root}/gt.bin',
+                f'{waymo_root}/{gt_file_name}',
                 shell=True)
             ret_texts = ret_bytes.decode('utf-8')
             print_log(ret_texts)
+            txt_path = f'{pklfile_prefix}.txt'
+            with open(txt_path, 'w') as fw:
+                fw.write(ret_texts)
             # parse the text to get ap_dict
             ap_dict = {
                 'Vehicle/L1 mAP': 0,

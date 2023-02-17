@@ -1,5 +1,5 @@
 _base_ = [
-    '../_base_/datasets/waymo-fsd-futuresweeps-framedrop.py',
+    '../_base_/datasets/waymo-fsd-9f-no-cp.py',
     '../_base_/schedules/cosine_2x.py',
     '../_base_/default_runtime.py',
 ]
