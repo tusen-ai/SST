@@ -944,6 +944,93 @@ class LoadPointsFromFileResetLast(LoadPointsFromFile):
 
         return results
 
+
+@PIPELINES.register_module()
+class LoadPointsWithClassFromFileResetLast(LoadPointsFromFile):
+
+    def __init__(self,
+                 coord_type,
+                 load_dim=6,
+                 use_dim=[0, 1, 2, 3],
+                 shift_height=False,
+                 use_color=False,
+                 append_last=False,
+                 file_client_args=dict(backend='disk'),
+                 reset_value=0,
+                 one_hot_dims=30,
+                 name2label={'Car':2, 'Pedestrian':9, 'Cyclist':10}):
+        super().__init__(
+                 coord_type,
+                 load_dim,
+                 use_dim,
+                 shift_height,
+                 use_color,
+                 file_client_args,
+        )
+        self.reset_value = reset_value
+        self.append_last = append_last
+        self.one_hot_dims = one_hot_dims
+        self.name2label = name2label
+
+    def __call__(self, results):
+        """Call function to load points data from file.
+
+        Args:
+            results (dict): Result dict containing point clouds data.
+
+        Returns:
+            dict: The result dict containing the point clouds data. \
+                Added key and value are described below.
+
+                - points (:obj:`BasePoints`): Point clouds data.
+        """
+        pts_filename = results['pts_filename']
+        points = self._load_points(pts_filename)
+        points = points.reshape(-1, self.load_dim)
+        points = points[:, self.use_dim]
+        attribute_dims = None
+
+        if self.shift_height:
+            floor_height = np.percentile(points[:, 2], 0.99)
+            height = points[:, 2] - floor_height
+            points = np.concatenate(
+                [points[:, :3],
+                 np.expand_dims(height, 1), points[:, 3:]], 1)
+            attribute_dims = dict(height=3)
+
+        if self.use_color:
+            assert len(self.use_dim) >= 6
+            if attribute_dims is None:
+                attribute_dims = dict()
+            attribute_dims.update(
+                dict(color=[
+                    points.shape[1] - 3,
+                    points.shape[1] - 2,
+                    points.shape[1] - 1,
+                ]))
+
+        class_name = os.path.basename(pts_filename).split('_')[1]
+        class_label = self.name2label[class_name]
+        classes = np.zeros(points.shape[0], dtype=np.int64) + class_label
+        one_hot = torch.nn.functional.one_hot(torch.tensor(classes), num_classes=self.one_hot_dims)
+        one_hot = one_hot.numpy().astype(points.dtype)
+        points = np.concatenate([points, one_hot], 1)
+        if attribute_dims is None:
+            attribute_dims = dict()
+        attribute_dims.update(dict(classes=list(range(points.shape[1] - self.one_hot_dims, points.shape[1]))))
+        points_class = get_points_type(self.coord_type)
+        points = points_class(
+            points, points_dim=points.shape[-1], attribute_dims=attribute_dims)
+        if self.append_last:
+            points.tensor = torch.nn.functional.pad(points.tensor, (0, 1), 'constant', float(self.reset_value))
+            points.points_dim += 1
+        else:
+            points.tensor[:, -1] = float(self.reset_value)
+        results['points'] = points
+
+        return results
+
+
 @PIPELINES.register_module()
 class LoadPointsFromPastFutureSweepsWaymo(LoadPointsFromMultiSweeps):
     """Load points from multiple sweeps.
