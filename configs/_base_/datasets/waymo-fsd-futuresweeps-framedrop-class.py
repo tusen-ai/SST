@@ -22,12 +22,14 @@ db_sampler = dict(
     classes=class_names,
     sample_groups=dict(Car=5, Pedestrian=5, Cyclist=3),
     points_loader=dict(
-        type='LoadPointsFromFileResetLast',
+        type='LoadPointsWithClassFromFileResetLast',
         coord_type='LIDAR',
         load_dim=5,
         use_dim=[0, 1, 2, 3, 4],
         append_last=True,
-        file_client_args=file_client_args))
+        file_client_args=file_client_args,
+        one_hot_dims=one_hot_dims,
+        name2label={'Car':2, 'Pedestrian':9, 'Cyclist':10}))
 
 extra_sweeps_num = [4,4]
 wait_list =[-8,-6,-4,-2,0,2,4,6,8]
@@ -59,7 +61,7 @@ train_pipeline = [
         with_bbox_3d=True,
         with_label_3d=True,
         file_client_args=file_client_args),
-    # dict(type='ObjectSample', db_sampler=db_sampler),
+    dict(type='ObjectSample', db_sampler=db_sampler),
     dict(
         type='RandomFlip3D',
         sync_2d=False,
