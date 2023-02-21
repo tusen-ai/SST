@@ -1022,7 +1022,7 @@ class LoadPointsFromPastFutureSweepsWaymo(LoadPointsFromMultiSweeps):
         # augmentation
         sweep_points_list = []
         choices = self.wait_list
-        if self.data_aug == True:
+        if self.data_aug and (not self.test_mode):
             p = random.random()
             if p < 0.2:
                 len_choices = int(len(self.wait_list)/2)
@@ -1074,6 +1074,321 @@ class LoadPointsFromPastFutureSweepsWaymo(LoadPointsFromMultiSweeps):
                         points_sweep = points_sweep[:, self.use_dim]
 
                         if self.t_dim == points_sweep.shape[-1]:
+                            padding = np.zeros(len(points_sweep), dtype=points_sweep.dtype)[:, None] + frame_num
+                            points_sweep = np.concatenate([points_sweep, padding], axis=1)
+                        elif self.t_dim < points_sweep.shape[-1]:
+                            points_sweep[:, self.t_dim] = frame_num
+
+                        assert points.points_dim == points_sweep.shape[-1]
+                        points_sweep = points.new_point(points_sweep)
+                        sweep_points_list.append(points_sweep)
+
+
+        
+        if self.return_list:
+            results['points_list'] = sweep_points_list
+            return results
+
+        points = points.cat(sweep_points_list)
+        results['points'] = points
+        return results
+
+    def __repr__(self):
+        """str: Return a string that describes the module."""
+        return f'{self.__class__.__name__}(sweeps_num={self.sweeps_num})'
+
+@PIPELINES.register_module()
+class LoadPointsWithClassFromFile(LoadPointsFromFile):
+    """Load points with class Label from file.
+
+    Args:
+        coord_type (str): The type of coordinates of points cloud.
+            Available options includes:
+            - 'LIDAR': Points in LiDAR coordinates.
+            - 'DEPTH': Points in depth coordinates, usually for indoor dataset.
+            - 'CAMERA': Points in camera coordinates.
+        load_dim (int): The dimension of the loaded points.
+            Defaults to 6.
+        use_dim (list[int]): Which dimensions of the points to be used.
+            Defaults to [0, 1, 2]. For KITTI dataset, set use_dim=4
+            or use_dim=[0, 1, 2, 3] to use the intensity dimension.
+        shift_height (bool): Whether to use shifted height. Defaults to False.
+        use_color (bool): Whether to use color features. Defaults to False.
+        file_client_args (dict): Config dict of file clients, refer to
+            https://github.com/open-mmlab/mmcv/blob/master/mmcv/fileio/file_client.py
+            for more details. Defaults to dict(backend='disk').
+        class_root (str): The root path of class label files.
+    """
+
+    def __init__(self,
+                 coord_type,
+                 load_dim=6,
+                 use_dim=[0, 1, 2],
+                 shift_height=False,
+                 use_color=False,
+                 file_client_args=dict(backend='disk'),
+                 tanh_dim=None,
+                 one_hot_dims=30,
+                 class_root='data/waymo/kitti_format/training/velodyne_label/'
+                 ):
+        super().__init__(
+                 coord_type,
+                 load_dim,
+                 use_dim,
+                 shift_height,
+                 use_color,
+                 file_client_args,
+                 tanh_dim
+        )
+        self.one_hot_dims = one_hot_dims
+        self.class_root=class_root
+
+    def _load_classes(self, class_filename):
+        """Private function to load class label.
+
+        Args:
+            pts_filename (str): Filename of class label.
+
+        Returns:
+            np.ndarray: An array containing class label.
+        """
+        if self.file_client is None:
+            self.file_client = mmcv.FileClient(**self.file_client_args)
+        try:
+            class_bytes = self.file_client.get(class_filename)
+            classes = np.frombuffer(class_bytes, dtype=np.uint8)
+        except ConnectionError:
+            mmcv.check_file_exist(class_filename)
+            if class_filename.endswith('.npy'):
+                classes = np.load(class_filename)
+            else:
+                classes = np.fromfile(class_filename, dtype=np.uint8)
+
+        return classes
+
+
+    def __call__(self, results):
+        """Call function to load points data from file.
+
+        Args:
+            results (dict): Result dict containing point clouds data.
+
+        Returns:
+            dict: The result dict containing the point clouds data. \
+                Added key and value are described below.
+
+                - points (:obj:`BasePoints`): Point clouds data.
+        """
+        pts_filename = results['pts_filename']
+        points = self._load_points(pts_filename)
+        points = points.reshape(-1, self.load_dim)
+        points = points[:, self.use_dim]
+        attribute_dims = None
+
+        if self.tanh_dim is not None:
+            # only used for SST. FSD applies tanh in the segmentation model.
+            assert isinstance(self.tanh_dim, list)
+            assert max(self.tanh_dim) < points.shape[1]
+            assert min(self.tanh_dim) > 2
+            points[:, self.tanh_dim] = np.tanh(points[:, self.tanh_dim])
+
+        if self.shift_height:
+            floor_height = np.percentile(points[:, 2], 0.99)
+            height = points[:, 2] - floor_height
+            points = np.concatenate(
+                [points[:, :3],
+                 np.expand_dims(height, 1), points[:, 3:]], 1)
+            attribute_dims = dict(height=3)
+
+        if self.use_color:
+            assert len(self.use_dim) >= 6
+            if attribute_dims is None:
+                attribute_dims = dict()
+            attribute_dims.update(
+                dict(color=[
+                    points.shape[1] - 3,
+                    points.shape[1] - 2,
+                    points.shape[1] - 1,
+                ]))
+
+        class_filename = os.path.join(self.class_root, os.path.basename(pts_filename))
+        classes = self._load_classes(class_filename)
+        one_hot = torch.nn.functional.one_hot(torch.tensor(classes, dtype=torch.int64), num_classes=self.one_hot_dims)
+        one_hot = one_hot.numpy().astype(points.dtype)
+        points = np.concatenate([points, one_hot], 1)
+        if attribute_dims is None:
+            attribute_dims = dict()
+        attribute_dims.update(dict(classes=list(range(points.shape[1] - self.one_hot_dims, points.shape[1]))))
+        points_class = get_points_type(self.coord_type)
+        points = points_class(
+            points, points_dim=points.shape[-1], attribute_dims=attribute_dims)
+        results['points'] = points
+
+        return results
+
+
+@PIPELINES.register_module()
+class LoadPointsWithClassFromPastFutureSweepsWaymo(LoadPointsFromMultiSweeps):
+    """Load points from multiple sweeps.
+
+    This is usually used for nuScenes dataset to utilize previous sweeps.
+
+    Args:
+        sweeps_num (int): Number of sweeps. Defaults to 10.
+        load_dim (int): Dimension number of the loaded points. Defaults to 5.
+        use_dim (list[int]): Which dimension to use. Defaults to [0, 1, 2, 4].
+        file_client_args (dict): Config dict of file clients, refer to
+            https://github.com/open-mmlab/mmcv/blob/master/mmcv/fileio/file_client.py
+            for more details. Defaults to dict(backend='disk').
+        pad_empty_sweeps (bool): Whether to repeat keyframe when
+            sweeps is empty. Defaults to False.
+        remove_close (bool): Whether to remove close points.
+            Defaults to False.
+        test_mode (bool): If test_model=True used for testing, it will not
+            randomly sample sweeps but select the nearest N frames.
+            Defaults to False.
+    """
+
+    def __init__(self,
+                 sweeps_num=[10,10],
+                 wait_list=[-5,-4,-3,-2,-1,0,1,2,3,4,5],
+                 load_dim=5,
+                 use_dim=[0, 1, 2, 4],
+                 file_client_args=dict(backend='disk'),
+                 pad_empty_sweeps=False,
+                 remove_close=False,
+                 close_radius=1.0,
+                 t_dim=3,
+                 return_list=False,
+                 data_aug=False,
+                 test_mode=False,
+                 one_hot_dims=30,
+                 class_root='data/waymo/kitti_format/training/velodyne_label/'):
+        super().__init__(
+                 sweeps_num=sweeps_num,
+                 load_dim=load_dim,
+                 use_dim=use_dim,
+                 file_client_args=file_client_args,
+                 pad_empty_sweeps=pad_empty_sweeps,
+                 remove_close=remove_close,
+                 test_mode=test_mode)
+        self.close_radius = close_radius
+        if isinstance(self.use_dim, int):
+            self.use_dim = list(range(self.use_dim))
+        self.t_dim = t_dim
+        self.wait_list=wait_list
+        self.return_list = return_list
+        self.data_aug = data_aug
+        self.one_hot_dims = one_hot_dims
+        self.class_root = class_root
+
+    def _load_classes(self, class_filename):
+        """Private function to load class label.
+
+        Args:
+            pts_filename (str): Filename of class label.
+
+        Returns:
+            np.ndarray: An array containing class label.
+        """
+        if self.file_client is None:
+            self.file_client = mmcv.FileClient(**self.file_client_args)
+        try:
+            class_bytes = self.file_client.get(class_filename)
+            classes = np.frombuffer(class_bytes, dtype=np.uint8)
+        except ConnectionError:
+            mmcv.check_file_exist(class_filename)
+            if class_filename.endswith('.npy'):
+                classes = np.load(class_filename)
+            else:
+                classes = np.fromfile(class_filename, dtype=np.uint8)
+
+        return classes
+
+    def _remove_close(self, points, radius=1.0):
+        if isinstance(points, np.ndarray):
+            points_numpy = points
+        elif isinstance(points, BasePoints):
+            points_numpy = points.tensor.numpy()
+        else:
+            raise NotImplementedError
+        r = np.linalg.norm(points_numpy[:, :2], ord=2, axis=1)
+        not_close = r > radius
+        return points[not_close]
+
+    def __call__(self, results):
+
+        points = results['points']
+
+        if self.t_dim == points.tensor.size(-1) or self.t_dim == -1:
+            padding = points.tensor.new_zeros(len(points.tensor))[:, None]
+            points.tensor = torch.cat([points.tensor, padding], dim=1)
+            points.points_dim += 1
+        elif self.t_dim < points.tensor.size(-1):
+            points.tensor[:, self.t_dim] = 0
+        else:
+            raise ValueError
+
+        # augmentation
+        sweep_points_list = []
+        choices = self.wait_list
+        if self.data_aug and (not self.test_mode):
+            p = random.random()
+            if p < 0.2:
+                len_choices = int(len(self.wait_list)/2)
+                choices = random.sample(self.wait_list, len_choices)
+                if 0 not in choices:
+                    choices.append(0)  
+        
+        for frame_num in choices:
+            # read past sweeps: 
+            if frame_num == 0:
+                # overlap now frame
+                sweep_points_list.append(points)
+            else:
+                if frame_num < 0:
+                    idx = -1 * frame_num - 1
+                    sweep_type = 'sweeps'
+                else: 
+                    idx = frame_num - 1
+                    sweep_type = 'sweeps_future'
+                # overlap
+                if self.pad_empty_sweeps and len(results[sweep_type]) == 0:
+                    if self.remove_close:
+                        sweep_points_list.append(self._remove_close(points, self.close_radius))
+                    else:
+                        sweep_points_list.append(points)
+                else:
+                    if idx < len(results[sweep_type]):
+                        sweep = results[sweep_type][idx]
+                        data_path = os.path.join(os.path.dirname(results['pts_filename']), os.path.basename(sweep['velodyne_path']))
+                        points_sweep = self._load_points(data_path)
+                        points_sweep = points_sweep.reshape(-1, self.load_dim)
+                        points_sweep = points_sweep[:, self.use_dim]
+                        class_filename = os.path.join(self.class_root, os.path.basename(sweep['velodyne_path']))
+                        classes = self._load_classes(class_filename)
+                        one_hot = torch.nn.functional.one_hot(torch.tensor(classes, dtype=torch.int64), num_classes=self.one_hot_dims)
+                        one_hot = one_hot.numpy().astype(points_sweep.dtype)
+                        points_sweep = np.concatenate([points_sweep, one_hot], 1)
+                        if self.remove_close:
+                            points_sweep = self._remove_close(points_sweep, self.close_radius)
+
+                        curr_pose = results['pose']
+                        past_pose = sweep['pose']
+
+                        past2world_rot = past_pose[0:3, 0:3]
+                        past2world_trans = past_pose[0:3, 3]
+                        world2curr_pose = np.linalg.inv(curr_pose)
+                        world2curr_rot = world2curr_pose[0:3, 0:3]
+                        world2curr_trans = world2curr_pose[0:3, 3]
+
+                        past_points = points_sweep[:, :3]
+                        past_pc_in_world = np.einsum('ij,nj->ni', past2world_rot, past_points) + past2world_trans[None, :]
+                        past_pc_in_curr = np.einsum('ij,nj->ni', world2curr_rot, past_pc_in_world) + world2curr_trans[None, :]
+
+                        points_sweep[:, :3] = past_pc_in_curr
+
+                        if self.t_dim == points_sweep.shape[-1] or self.t_dim == -1:
                             padding = np.zeros(len(points_sweep), dtype=points_sweep.dtype)[:, None] + frame_num
                             points_sweep = np.concatenate([points_sweep, padding], axis=1)
                         elif self.t_dim < points_sweep.shape[-1]:
