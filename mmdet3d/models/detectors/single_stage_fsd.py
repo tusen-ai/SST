@@ -738,7 +738,7 @@ class SingleStageFSD(SingleStage3DDetector):
         else:
             seg_scores = seg_scores[:, cls_id]
             cls_score_thr = self.cfg['score_thresh'][cls_id]
-            if self.training:
+            if self.training and self.runtime_info is not None:
                 buffer_thr = self.runtime_info.get('threshold_buffer', 0)
             else:
                 buffer_thr = 0
@@ -790,13 +790,8 @@ class SingleStageFSD(SingleStage3DDetector):
         return full_data
 
     def group_sample(self, dict_to_sample, offset):
-
-        """
-        For argoverse 2 dataset, where the number of classes is large
-        """
-
         bsz = dict_to_sample['batch_idx'].max().item() + 1
-        assert bsz == 1, "Maybe some codes need to be modified if bsz > 1"
+        assert bsz == 1, "Maybe some codes need to be modified if bsz > 1, this will be updated very soon"
         # combine all classes as fg class.
         cfg = self.train_cfg if self.training else self.test_cfg
 
@@ -813,33 +808,37 @@ class SingleStageFSD(SingleStage3DDetector):
 
 
         cls_score_thrs = cfg['score_thresh']
-        group_lens = cfg['group_lens']
-        num_groups = len(group_lens)
+        group_names = cfg['group_names']
+        class_names = cfg['class_names']
+        num_groups = len(group_names)
         assert num_groups == len(cls_score_thrs)
         assert isinstance(cls_score_thrs, (list, tuple))
-        grouped_score = self.gather_group(seg_scores[:, :-1], group_lens) # without background score
+        grouped_score = self.gather_group_by_names(seg_scores[:, :-1]) # without background score
 
-        beg = 0
-        for i, group_len in enumerate(group_lens):
-            end = beg + group_len
+        for i in range(num_groups):
 
-            fg_mask = grouped_score[:, i] > cls_score_thrs[i]
+            fg_mask = self.get_fg_mask(grouped_score, None, i, None, None, None)
 
             if not fg_mask.any():
                 fg_mask[0] = True # at least one point
 
             fg_mask_list.append(fg_mask)
 
-            this_offset = offset[fg_mask, beg:end, :] 
-            offset_weight = self.get_offset_weight(seg_logits[fg_mask, beg:end])
+            tmp_idx = []
+            for name in group_names[i]:
+                tmp_idx.append(class_names.index(name))
+
+            this_offset = offset[:, tmp_idx, :] 
+            this_offset = this_offset[fg_mask, ...]
+            this_logits = seg_logits[:, tmp_idx]
+            this_logits = this_logits[fg_mask, :]
+
+            offset_weight = self.get_offset_weight(this_logits)
             assert torch.isclose(offset_weight.sum(1), offset_weight.new_ones(len(offset_weight))).all()
             this_offset = (this_offset * offset_weight[:, :, None]).sum(dim=1)
             this_points = seg_points[fg_mask, :]
             this_centers = this_points + this_offset
             center_preds_list.append(this_centers)
-            beg = end
-        assert end == 26, 'for 26class argo'
-
 
         output_dict = {}
         for data_name in dict_to_sample:
@@ -876,6 +875,20 @@ class SingleStageFSD(SingleStage3DDetector):
         assert end == scores.size(1) == sum(group_lens)
         gathered_score = torch.stack(score_per_group, dim=1)
         assert gathered_score.size(1) == len(group_lens)
+        return  gathered_score
+
+    def gather_group_by_names(self, scores):
+        groups = self.cfg['group_names']
+        class_names = self.cfg['class_names']
+        assert (scores >= 0).all()
+        score_per_group = []
+        for g in groups:
+            tmp_idx = []
+            for name in g:
+                tmp_idx.append(class_names.index(name))
+            score_per_group.append(scores[:, tmp_idx].sum(1))
+
+        gathered_score = torch.stack(score_per_group, dim=1)
         return  gathered_score
 
 

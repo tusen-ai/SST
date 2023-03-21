@@ -323,7 +323,7 @@ class ObjectSample(object):
                 input_dict['img'] = sampled_dict['img']
 
         input_dict['gt_bboxes_3d'] = gt_bboxes_3d
-        input_dict['gt_labels_3d'] = gt_labels_3d.astype(np.long)
+        input_dict['gt_labels_3d'] = gt_labels_3d.astype(np.int64)
         input_dict['points'] = points
 
         return input_dict
@@ -719,7 +719,7 @@ class ObjectRangeFilter(object):
         # using mask to index gt_labels_3d will cause bug when
         # len(gt_labels_3d) == 1, where mask=1 will be interpreted
         # as gt_labels_3d[1] and cause out of index error
-        gt_labels_3d = gt_labels_3d[mask.numpy().astype(np.bool)]
+        gt_labels_3d = gt_labels_3d[mask.numpy().astype(bool)]
 
         # limit rad to [-pi, pi]
         gt_bboxes_3d.limit_yaw(offset=0.5, period=2 * np.pi)

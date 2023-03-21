@@ -157,15 +157,14 @@ class VoteSegHead(Base3DDecodeHead):
                     tp = (pred_true & real_true).sum().float()
                     loss[f'recall_{name}'] = tp / (real_true.sum().float() + 1e-5)
             else:
+                group_names = train_cfg['group_names']
                 score = seg_logit.softmax(1)
-                group_lens = train_cfg['group_lens']
-                group_score = self.gather_group(score[:, :-1], group_lens)
+                group_score = self.gather_group_by_names(score[:, :-1])
                 num_fg = score.new_zeros(1)
-                for gi in range(len(group_lens)):
+                for gi in range(len(group_names)):
                     pred_true = group_score[:, gi] > score_thresh[gi]
                     num_fg += pred_true.sum().float()
-                    for i in range(group_lens[gi]):
-                        name = train_cfg['group_names'][gi][i]
+                    for name in group_names[gi]:
                         real_true = seg_label == train_cfg['class_names'].index(name)
                         tp = (pred_true & real_true).sum().float()
                         loss[f'recall_{name}'] = tp / (real_true.sum().float() + 1e-5)
@@ -194,6 +193,20 @@ class VoteSegHead(Base3DDecodeHead):
         assert end == scores.size(1) == sum(group_lens)
         gathered_score = torch.stack(score_per_group, dim=1)
         assert gathered_score.size(1) == len(group_lens)
+        return  gathered_score
+
+    def gather_group_by_names(self, scores):
+        groups = self.train_cfg['group_names']
+        class_names = self.train_cfg['class_names']
+        assert (scores >= 0).all()
+        score_per_group = []
+        for g in groups:
+            tmp_idx = []
+            for name in g:
+                tmp_idx.append(class_names.index(name))
+            score_per_group.append(scores[:, tmp_idx].sum(1))
+
+        gathered_score = torch.stack(score_per_group, dim=1)
         return  gathered_score
 
     def get_targets(self, points_list, gt_bboxes_list, gt_labels_list):

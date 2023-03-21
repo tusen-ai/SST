@@ -10,7 +10,7 @@ This is the official implementation of:
 and
 [Embracing Single Stride 3D Object Detector with Sparse Transformer](https://arxiv.org/pdf/2112.06375.pdf).
 
-🔥 The code of our new work [FSD++](https://arxiv.org/abs/2301.02562) will be released soon.
+🔥 We release FSD model on Argoverse 2 dataset, see [instructions](https://github.com/tusen-ai/SST/blob/main/instructions.md)
 
 
 **FSD Preview Release**
@@ -21,6 +21,7 @@ and
 - Before using this repo, please install [TorchEx](https://github.com/Abyssaledge/TorchEx), [SpConv2](https://github.com/traveller59/spconv) (SpConv 1.x is not supported) and [torch_scatter](https://github.com/rusty1s/pytorch_scatter).
 
 **NEWS**
+- [23-03-21] The Argoverse 2 model of FSD is released.
 - [22-09-19] The code of FSD is released here.
 - [22-09-15] 🔥 FSD is accepted at NeurIPS 2022.
 - [22-06-06] Support SST with CenterHead, cosine similarity in attention, faster SSTInputLayer. See Usage for details.
@@ -103,10 +104,10 @@ Please consider citing our work as follows if it is helpful.
 }
 ```
 ```
-@article{fan2022fully,
+@inproceedings{fan2022fully,
   title={{Fully Sparse 3D Object Detection}},
   author={Fan, Lue and Wang, Feng and Wang, Naiyan and Zhang, Zhaoxiang},
-  journal={arXiv preprint arXiv:2207.10035},
+  booktitle={NeurIPS},
   year={2022}
 }
 ```
