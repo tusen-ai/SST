@@ -15,7 +15,6 @@ and
 
 **FSD Preview Release**
 - Code of FSD on Waymo is released. See `./configs/fsd/fsd_waymoD1_1x.py`
-- We provide the tools for processing Argoverse 2 dataset in `./tools/argo`. We will release the instruction and configs of Argo2 model later.
 - A very fast Waymo evaluation, see Usage section for detailed instructions. The whole evaluation process of FSD on Waymo costs less than **10min** with 8 2080Ti GPUs.
 - We cannot distribute model weights of FSD due to the [license of WOD](https://waymo.com/open/terms). Users could contact us for the private model weights.
 - Before using this repo, please install [TorchEx](https://github.com/Abyssaledge/TorchEx), [SpConv2](https://github.com/traveller59/spconv) (SpConv 1.x is not supported) and [torch_scatter](https://github.com/rusty1s/pytorch_scatter).
