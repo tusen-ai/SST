@@ -14,6 +14,7 @@ Users could follow the [instructions](https://github.com/tusen-ai/SST/blob/main/
 
 
 **NEWS**
+- [23-03-29] 🔥 We develop a high-performance offline detector CTRL, preview the single-model performance in [leaderboard](https://waymo.com/open/challenges/entry/?challenge=DETECTION_3D&challengeId=DETECTION_3D&emailId=1cb154ab-1558&timestamp=1678678070312349).
 - [23-03-21] 🔥 The Argoverse 2 model of FSD is released. See [instructions](https://github.com/tusen-ai/SST/blob/main/instructions.md).
 - [22-09-19] The code of FSD is released here.
 - [22-09-15] FSD is accepted at NeurIPS 2022.
@@ -27,6 +28,8 @@ Users could follow the [instructions](https://github.com/tusen-ai/SST/blob/main/
 
 ## Citation
 Please consider citing our work as follows if it is helpful.
+
+**Since FSD is accidentally excluded in Google Scholar search results, if possible, please kindly consider citing the journal version of FSD as well**.
 ```
 @inproceedings{fan2022embracing,
   title={{Embracing Single Stride 3D Object Detector with Sparse Transformer}},
@@ -43,7 +46,6 @@ Please consider citing our work as follows if it is helpful.
   year={2022}
 }
 ```
-Since FSD is accidentally excluded in Google Scholar search results, if possible, please kindly consider citing the journal version of FSD:
 ```
 @article{fan2023super,
   title={Super Sparse 3D Object Detection},
