@@ -36,7 +36,65 @@ To enable faster SSTInputLayer, clone https://github.com/Abyssaledge/TorchEx, an
 
 ## FSD on Argoverse 2 Dataset
 ### Data preprocessing
-Users could use the scripts in `./tools/argo` to convert argoverse dataset into MMDet3D format. Detailed instructions will be followed very soon.
+Users could use the scripts in `./tools/argo` to convert argoverse dataset into MMDet3D format.
+#### Step 1. 
+Download the Argoverse 2 Sensor Dataset from the [official website](https://www.argoverse.org/av2.html#download-link), and extract and organize the file into the following structure:
+```
+SST
+├── data
+│   ├── argo2
+│   │   │── argo2_format
+│   │   │   │   │──sensor
+│   │   │   │   │   │──train
+│   │   │   │   │   │   │──...
+│   │   │   │   │   │──val
+│   │   │   │   │   │   │──...
+│   │   │   │   │   │──test
+│   │   │   │   │   │   │──0c6e62d7-bdfa-3061-8d3d-03b13aa21f68
+│   │   │   │   │   │   │──0f0cdd79-bc6c-35cd-9d99-7ae2fc7e165c
+│   │   │   │   │   │   │──...
+│   │   │── kitti_format (empty now)
+```
+#### Step 2.
+Install [av2-api](https://github.com/argoverse/av2-api): 
+```
+pip install av2
+```
+Note there might be path and numpy version issues according to the api version, see [this](https://github.com/tusen-ai/SST/issues/92) for solution.
+#### Step 3. 
+Use the script `./tools/argo/argo2mmdet.py` to convert raw argo data into KITTI format. **Note I hardcode the file path in the script, while users should change these paths accordingly**.
+
+#### Step 4.
+Use  `./tools/argo/create_argo_gt_database.py` to generate GT database for CopyPaste augmentaion. **Users also need to change the hardcoded paths themself.**
+
+#### Step 5.
+Use `./tools/argo/gather_argo2_anno_feather.py` to extract validation GTs into a single file for evaluation.
+
+#### Eventually, the directory will be organized to:
+```
+SST
+├── data
+│   ├── argo2
+│   │   │── argo2_format
+│   │   │   │   │──sensor
+│   │   │   │   │   │──train
+│   │   │   │   │   │   │──...
+│   │   │   │   │   │──val
+│   │   │   │   │   │   │──...
+│   │   │   │   │   │──test
+│   │   │   │   │   │   │──0c6e62d7-bdfa-3061-8d3d-03b13aa21f68
+│   │   │   │   │   │   │──0f0cdd79-bc6c-35cd-9d99-7ae2fc7e165c
+│   │   │   │   │   │   │──...
+│   │   │   │   │   │──val_anno.feather (from Step 4)
+│   │   │── kitti_format
+│   │   │   │   │──argo2_infos_train.pkl
+│   │   │   │   │──argo2_infos_val.pkl
+│   │   │   │   │──argo2_infos_test.pkl
+│   │   │   │   │──argo2_infos_trainval.pkl
+│   │   │   │   │──training
+│   │   │   │   │──testing
+│   │   │   │   │──argo2_gt_database
+```
 
 ### Training
 We provide simple commands in `run_argo.sh`.\
