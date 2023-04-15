@@ -391,6 +391,9 @@ class SingleStageFSD(SingleStage3DDetector):
             test_cfg=test_cfg,
             init_cfg=init_cfg,
             pretrained=pretrained)
+
+        self.runtime_info = dict()
+
         if voxel_layer is not None:
             self.voxel_layer = Voxelization(**voxel_layer)
         if voxel_encoder is not None:
@@ -468,7 +471,8 @@ class SingleStageFSD(SingleStage3DDetector):
                       gt_labels_3d,
                       gt_bboxes_ignore=None,
                       runtime_info=None):
-        self.runtime_info = runtime_info # stupid way to get arguements from children class
+        if runtime_info is not None:
+            self.runtime_info = runtime_info # stupid way to get arguements from children class
         losses = {}
         gt_bboxes_3d = [b[l>=0] for b, l in zip(gt_bboxes_3d, gt_labels_3d)]
         gt_labels_3d = [l[l>=0] for l in gt_labels_3d]
@@ -790,8 +794,8 @@ class SingleStageFSD(SingleStage3DDetector):
         return full_data
 
     def group_sample(self, dict_to_sample, offset):
-        bsz = dict_to_sample['batch_idx'].max().item() + 1
-        assert bsz == 1, "Maybe some codes need to be modified if bsz > 1, this will be updated very soon"
+        batch_idx = dict_to_sample['batch_idx']
+        bsz = batch_idx.max().item() + 1
         # combine all classes as fg class.
         cfg = self.train_cfg if self.training else self.test_cfg
 
@@ -819,8 +823,9 @@ class SingleStageFSD(SingleStage3DDetector):
 
             fg_mask = self.get_fg_mask(grouped_score, None, i, None, None, None)
 
-            if not fg_mask.any():
-                fg_mask[0] = True # at least one point
+            if len(torch.unique(batch_idx[fg_mask])) < bsz:
+                one_random_pos_per_sample = self.get_sample_beg_position(batch_idx, fg_mask)
+                fg_mask[one_random_pos_per_sample] = True # at least one point per sample
 
             fg_mask_list.append(fg_mask)
 

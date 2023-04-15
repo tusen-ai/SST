@@ -100,7 +100,8 @@ SST
 We provide simple commands in `run_argo.sh`.\
 For now, we adopt a segmentation pretrain in `./configs/argo/argo_onestage_12e.py`. The segmentation pretrain model can be downloaded from this [site](https://share.weiyun.com/YyJZ0fqs).
 After downloading, move it to `./data/pretrain/argo_segmentation_pretrain.pth`. \
-Note that we only support batchsize 1 per GPU for argo now, and we will update multi-sampler version very soon.
+~~Note that we only support batchsize 1 per GPU for argo now, and we will update multi-sampler version very soon.~~\
+We have fixed the bug when batch_size > 1 for argoverse 2 training. Users could increase the batch_size in the config.
 
 ### Inference
 See `run_argo.sh`.
