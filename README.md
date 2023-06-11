@@ -8,7 +8,7 @@ This repo contains official implementations of our series of work in LiDAR-based
 
 - [Embracing Single Stride 3D Object Detector with Sparse Transformer](https://arxiv.org/abs/2112.06375) (CVPR 2022).
 - [Fully Sparse 3D Object Detection](http://arxiv.org/abs/2207.10035) (NeurIPS 2022).
-- [Super Sparse 3D Object Detection](http://arxiv.org/abs/2301.02562)
+- [Super Sparse 3D Object Detection](http://arxiv.org/abs/2301.02562) (TPAMI 2023).
 
 Users could follow the [instructions](https://github.com/tusen-ai/SST/blob/main/instructions.md) to use this repo.
 
@@ -50,7 +50,7 @@ Please consider citing our work as follows if it is helpful.
 @article{fan2023super,
   title={Super Sparse 3D Object Detection},
   author={Fan, Lue and Yang, Yuxue and Wang, Feng and Wang, Naiyan and Zhang, Zhaoxiang},
-  journal={arXiv preprint arXiv:2301.02562},
+  journal={IEEE Transactions on Pattern Analysis and Machine Intelligence},
   year={2023}
 }
 ```
