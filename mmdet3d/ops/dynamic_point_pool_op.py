@@ -58,3 +58,56 @@ class DynamicPointPoolFunction(Function):
         return None, None, None, None, None
 
 dynamic_point_pool = DynamicPointPoolFunction.apply
+
+
+class DynamicPointPoolMixedFunction(Function):
+
+    @staticmethod
+    def forward(ctx, rois, rois_batch, pts, pts_batch, extra_wlh, max_inbox_point, max_all_pts=200000):
+        """RoIAwarePool3d function forward.
+        Args:
+            rois (torch.Tensor): [N, 7], in LiDAR coordinate,
+                (x, y, z) is the bottom center of rois
+            rois_batch (torch.Tensor): [N,] the batch index of each box
+            pts (torch.Tensor): [npoints, 3]
+            pts_batch (torch.Tensor): [N,] the batch index of each point
+        Returns:
+            out_pts_idx (torch.Tensor): [max_all_pts, ]
+            out_roi_idx (torch.Tensor): [max_all_pts, ]
+            out_pts_feats (torch.Tensor): [max_all_pts, 13]
+        """
+
+        # pts_inds, roi_inds, pts_norm_xyz, pts_offset = dynamic_point_pool_ext.forward(rois, pts)
+        out_pts_idx = -1 * pts.new_ones(max_all_pts, dtype=torch.long)
+        out_roi_idx = -1 * pts.new_ones(max_all_pts, dtype=torch.long)
+        out_pts_feats = pts.new_zeros(max_all_pts, 13, dtype=torch.float)
+        assert len(rois) > 0
+        dynamic_point_pool_ext.dynamic_point_pool_mixed_gpu(rois.contiguous(), rois_batch.contiguous(),
+                                                            pts.contiguous(), pts_batch.contiguous(),
+                                                            extra_wlh, max_inbox_point, out_pts_idx, out_roi_idx, out_pts_feats)
+        # Because of cuda block layout, the out_roi_idx is automatically sorted, but not strictly guaranteed.
+        valid_mask = out_pts_idx >= 0
+
+        if not valid_mask.any():
+            # fake a non-empty input
+            out_pts_idx = out_pts_idx[0:1]
+            out_roi_idx = out_roi_idx[0:1]
+            out_pts_feats = out_pts_feats[0:1, :]
+        else:
+            out_pts_idx = out_pts_idx[valid_mask]
+            out_roi_idx = out_roi_idx[valid_mask]
+            out_pts_feats = out_pts_feats[valid_mask]
+            # unique_roi_idx = torch.unique(out_roi_idx)
+
+        ctx.mark_non_differentiable(out_pts_idx)
+        ctx.mark_non_differentiable(out_roi_idx)
+        ctx.mark_non_differentiable(out_pts_feats)
+
+        return out_pts_idx, out_roi_idx, out_pts_feats 
+
+    @staticmethod
+    def backward(ctx, g1, g2, g3):
+
+        return None, None, None, None, None, None, None
+
+dynamic_point_pool_mixed = DynamicPointPoolMixedFunction.apply

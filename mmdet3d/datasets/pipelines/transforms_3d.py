@@ -3,7 +3,7 @@ import warnings
 from mmcv import is_tuple_of
 from mmcv.utils import build_from_cfg
 
-from mmdet3d.core import VoxelGenerator
+from mmdet3d.core import VoxelGenerator, LiDARInstance3DBoxes
 from mmdet3d.core.bbox import box_np_ops
 from mmdet.datasets.builder import PIPELINES
 from mmdet.datasets.pipelines import RandomFlip
@@ -121,6 +121,10 @@ class RandomFlip3D(RandomFlip):
             w = input_dict['img_shape'][1]
             input_dict['centers2d'][..., 0] = \
                 w - input_dict['centers2d'][..., 0]
+        
+        if 'seed_info' in input_dict:
+            for seed in input_dict['seed_info']:
+                seed['gt_bboxes_3d'].flip(direction)
 
     def __call__(self, input_dict):
         """Call function to flip points, values in the ``bbox3d_fields`` and \
@@ -168,6 +172,39 @@ class RandomFlip3D(RandomFlip):
         repr_str += f' flip_ratio_bev_vertical={self.flip_ratio_bev_vertical})'
         return repr_str
 
+@PIPELINES.register_module()
+class NormalizePoints(object):
+
+    def __init__(self,
+                 std=[255,],
+                 mean=[0,],
+                 dims=[3,]):
+        self.dims = dims
+        self.std = std
+        self.mean = mean
+
+    def __call__(self, input_dict):
+        """Call function to jitter all the points in the scene.
+        Args:
+            input_dict (dict): Result dict from loading pipeline.
+        Returns:
+            dict: Results after adding noise to each point, \
+                'points' key is updated in the result dict.
+        """
+        points = input_dict['points']
+        mean = torch.tensor(self.mean)
+        std = torch.tensor(self.std)
+
+        points.tensor[:, self.dims] = (points.tensor[:, self.dims] - mean[None, :]) / std[None, :]
+
+        return input_dict
+
+    def __repr__(self):
+        """str: Return a string that describes the module."""
+        repr_str = self.__class__.__name__
+        repr_str += f'(jitter_std={self.jitter_std},'
+        repr_str += f' clip_range={self.clip_range})'
+        return repr_str
 
 @PIPELINES.register_module()
 class RandomJitterPoints(object):
@@ -256,7 +293,7 @@ class ObjectSample(object):
         self.db_sampler = build_from_cfg(db_sampler, OBJECTSAMPLERS)
 
     @staticmethod
-    def remove_points_in_boxes(points, boxes):
+    def remove_points_in_boxes(points, boxes, return_mask=False):
         """Remove the points in the sampled bounding boxes.
 
         Args:
@@ -267,8 +304,12 @@ class ObjectSample(object):
             np.ndarray: Points with those in the boxes removed.
         """
         masks = box_np_ops.points_in_rbbox(points.coord.numpy(), boxes)
-        points = points[np.logical_not(masks.any(-1))]
-        return points
+        keep_mask = np.logical_not(masks.any(-1))
+        points = points[keep_mask]
+        if return_mask:
+            return points, keep_mask
+        else:
+            return points
 
     def __call__(self, input_dict):
         """Call function to sample ground truth objects to the data.
@@ -306,13 +347,30 @@ class ObjectSample(object):
 
             gt_labels_3d = np.concatenate([gt_labels_3d, sampled_gt_labels],
                                           axis=0)
+
+            gt_dim = gt_bboxes_3d.tensor.size(1)
+            assert gt_dim in (7, 9)
+            # assert sampled_gt_bboxes_3d.shape[1] == 7
+            gt_np = gt_bboxes_3d.tensor.numpy()
+            if gt_dim == 9 and sampled_gt_bboxes_3d.shape[1] == 7:
+                # padding fake speed and the flag
+                # only reached at WOD. In nuS, sampled boxes are in 9-dim format.
+                sampled_gt_bboxes_3d = np.pad(sampled_gt_bboxes_3d, ((0, 0), (0, 3)), mode='constant', constant_values=0 )
+                gt_np = np.pad(gt_np, ((0, 0), (0, 1)), mode='constant', constant_values=1)
+                gt_bboxes_3d.box_dim = 10 # update box_dim
+            
             gt_bboxes_3d = gt_bboxes_3d.new_box(
                 np.concatenate(
-                    [gt_bboxes_3d.tensor.numpy(), sampled_gt_bboxes_3d]))
+                    [gt_np, sampled_gt_bboxes_3d]))
 
-            points = self.remove_points_in_boxes(points, sampled_gt_bboxes_3d)
+            points, mask = self.remove_points_in_boxes(points, sampled_gt_bboxes_3d[:, :7], return_mask=True)
             # check the points dimension
             points = points.cat([sampled_points, points])
+
+            if 'pts_frame_inds' in input_dict:
+                frame_inds = input_dict['pts_frame_inds'][mask]
+                frame_inds = np.concatenate([np.zeros(len(sampled_points), dtype=int), frame_inds], 0)
+                input_dict['pts_frame_inds'] = frame_inds
 
             if self.sample_2d:
                 sampled_gt_bboxes_2d = sampled_dict['gt_bboxes_2d']
@@ -557,6 +615,10 @@ class GlobalRotScaleTrans(object):
         for key in input_dict['bbox3d_fields']:
             input_dict[key].translate(trans_factor)
 
+        if 'seed_info' in input_dict:
+            for seed in input_dict['seed_info']:
+                seed['gt_bboxes_3d'].translate(trans_factor)
+
     def _rot_bbox_points(self, input_dict):
         """Private function to rotate bounding boxes and points.
 
@@ -585,6 +647,11 @@ class GlobalRotScaleTrans(object):
                 input_dict['points'] = points
                 input_dict['pcd_rotation'] = rot_mat_T
 
+        if 'seed_info' in input_dict:
+            for seed in input_dict['seed_info']:
+                if len(seed['gt_bboxes_3d'].tensor) != 0:
+                    seed['gt_bboxes_3d'].rotate(noise_rotation)
+
     def _scale_bbox_points(self, input_dict):
         """Private function to scale bounding boxes and points.
 
@@ -606,6 +673,10 @@ class GlobalRotScaleTrans(object):
 
         for key in input_dict['bbox3d_fields']:
             input_dict[key].scale(scale)
+
+        if 'seed_info' in input_dict:
+            for seed in input_dict['seed_info']:
+                seed['gt_bboxes_3d'].scale(scale)
 
     def _random_scale(self, input_dict):
         """Private function to randomly set the scale factor.
@@ -676,6 +747,7 @@ class PointShuffle(object):
 
         pts_instance_mask = input_dict.get('pts_instance_mask', None)
         pts_semantic_mask = input_dict.get('pts_semantic_mask', None)
+        pts_frame_inds = input_dict.get('pts_frame_inds', None)
 
         if pts_instance_mask is not None:
             input_dict['pts_instance_mask'] = pts_instance_mask[idx]
@@ -683,10 +755,53 @@ class PointShuffle(object):
         if pts_semantic_mask is not None:
             input_dict['pts_semantic_mask'] = pts_semantic_mask[idx]
 
+        if pts_frame_inds is not None:
+            input_dict['pts_frame_inds'] = pts_frame_inds[idx]
+
         return input_dict
 
     def __repr__(self):
         return self.__class__.__name__
+
+@PIPELINES.register_module()
+class RandomPointDrop(object):
+    """Shuffle input points."""
+
+    def __init__(self, drop_ratio=0.05):
+        self.drop_ratio = drop_ratio
+        assert drop_ratio >= 0
+
+    def __call__(self, input_dict):
+        """Call function to shuffle points.
+        Args:
+            input_dict (dict): Result dict from loading pipeline.
+        Returns:
+            dict: Results after filtering, 'points', 'pts_instance_mask' \
+                and 'pts_semantic_mask' keys are updated in the result dict.
+        """
+        if self.drop_ratio == 0:
+            return input_dict
+
+        points = input_dict['points']
+        keep_num = int(len(points) * (1 - self.drop_ratio))
+        mask = points.tensor.new_zeros(len(points), dtype=torch.bool)
+        mask[:keep_num] = True
+        input_dict['points'] = points[mask]
+
+        pts_instance_mask = input_dict.get('pts_instance_mask', None)
+        pts_semantic_mask = input_dict.get('pts_semantic_mask', None)
+        pts_frame_inds = input_dict.get('pts_frame_inds', None)
+
+        if pts_instance_mask is not None:
+            input_dict['pts_instance_mask'] = pts_instance_mask[mask]
+
+        if pts_semantic_mask is not None:
+            input_dict['pts_semantic_mask'] = pts_semantic_mask[mask]
+
+        if pts_frame_inds is not None:
+            input_dict['pts_frame_inds'] = pts_frame_inds[mask]
+
+        return input_dict
 
 
 @PIPELINES.register_module()
@@ -764,12 +879,16 @@ class PointsRangeFilter(object):
 
         pts_instance_mask = input_dict.get('pts_instance_mask', None)
         pts_semantic_mask = input_dict.get('pts_semantic_mask', None)
+        pts_frame_inds = input_dict.get('pts_frame_inds', None)
 
         if pts_instance_mask is not None:
             input_dict['pts_instance_mask'] = pts_instance_mask[points_mask]
 
         if pts_semantic_mask is not None:
             input_dict['pts_semantic_mask'] = pts_semantic_mask[points_mask]
+        
+        if pts_frame_inds is not None:
+            input_dict['pts_frame_inds'] = pts_frame_inds[points_mask]
 
         return input_dict
 

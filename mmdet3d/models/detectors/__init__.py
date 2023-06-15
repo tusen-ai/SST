@@ -16,6 +16,9 @@ from .voxelnet import VoxelNet
 from .single_stage_fsd import SingleStageFSD, VoteSegmentor
 from .two_stage_fsd import FSD
 
+from .incremental_two_stage import TwoStageIncrementalDetector
+from .tracklet_detector import TrackletSegmentor, TrackletDetector
+
 __all__ = [
     'Base3DDetector', 'VoxelNet', 'DynamicVoxelNet', 'MVXTwoStageDetector',
     'DynamicMVXFasterRCNN', 'MVXFasterRCNN', 'PartA2', 'VoteNet', 'H3DNet',

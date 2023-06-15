@@ -18,10 +18,13 @@ class DisableAugmentationHook(Hook):
 
     def __init__(self,
                  num_last_epochs=10,
-                 skip_type_keys=('ObjectSample')):
+                 skip_type_keys=('ObjectSample'),
+                 dataset_wrap=True,
+                 ):
         self.num_last_epochs = num_last_epochs
         self.skip_type_keys = skip_type_keys
         self._restart_dataloader = False
+        self.dataset_wrap = dataset_wrap
 
     def before_train_epoch(self, runner):
         epoch = runner.epoch # begin from 0
@@ -31,7 +34,11 @@ class DisableAugmentationHook(Hook):
             # The dataset pipeline cannot be updated when persistent_workers
             # is True, so we need to force the dataloader's multi-process
             # restart. This is a very hacky approach.
-            train_loader.dataset.dataset.update_skip_type_keys(self.skip_type_keys)
+            if self.dataset_wrap:
+                train_loader.dataset.dataset.update_skip_type_keys(self.skip_type_keys)
+            else:
+                train_loader.dataset.update_skip_type_keys(self.skip_type_keys)
+
             if hasattr(train_loader, 'persistent_workers'
                        ) and train_loader.persistent_workers is True:
 

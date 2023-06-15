@@ -334,6 +334,8 @@ def make_continuous_inds(inds):
 def build_mlp(in_channel, hidden_dims, norm_cfg, is_head=False, act='relu', bias=False, dropout=0):
     layer_list = []
     last_channel = in_channel
+    if isinstance(hidden_dims, int):
+        hidden_dims = [hidden_dims, ]
     for i, c in enumerate(hidden_dims):
         act_layer = get_activation_layer(act, c)
 

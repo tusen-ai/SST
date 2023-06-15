@@ -11,6 +11,7 @@ import yaml
 import torch
 from mmdet.datasets.pipelines import to_tensor
 from mmcv.parallel import DataContainer as DC
+from collections import OrderedDict
 
 
 @PIPELINES.register_module()

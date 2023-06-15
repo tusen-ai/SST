@@ -279,8 +279,9 @@ class VoteSegmentor(Base3DSegmentor):
                       as_subsegmentor=False,
                       ):
         if self.tanh_dims is not None:
-            for p in points:
-                p[:, self.tanh_dims] = torch.tanh(p[:, self.tanh_dims])
+            if len(self.tanh_dims) > 0:
+                for p in points:
+                    p[:, self.tanh_dims] = torch.tanh(p[:, self.tanh_dims])
         elif points[0].size(1) in (4,5):
             # a hack way to scale the intensity and elongation in WOD
             points = [torch.cat([p[:, :3], torch.tanh(p[:, 3:])], dim=1) for p in points]
@@ -333,8 +334,9 @@ class VoteSegmentor(Base3DSegmentor):
     def simple_test(self, points, img_metas, gt_bboxes_3d=None, gt_labels_3d=None, rescale=False):
 
         if self.tanh_dims is not None:
-            for p in points:
-                p[:, self.tanh_dims] = torch.tanh(p[:, self.tanh_dims])
+            if len(self.tanh_dims) > 0:
+                for p in points:
+                    p[:, self.tanh_dims] = torch.tanh(p[:, self.tanh_dims])
         elif points[0].size(1) in (4,5):
             points = [torch.cat([p[:, :3], torch.tanh(p[:, 3:])], dim=1) for p in points]
 
@@ -606,6 +608,8 @@ class SingleStageFSD(SingleStage3DDetector):
             assert isinstance(gt_bboxes_3d, list)
             assert isinstance(gt_labels_3d, list)
             assert len(gt_bboxes_3d) == len(gt_labels_3d) == 1, 'assuming single sample testing'
+            gt_bboxes_3d = [b[l >= 0] for b, l in zip(gt_bboxes_3d, gt_labels_3d)]
+            gt_labels_3d = [l[l >= 0] for l in gt_labels_3d]
 
         seg_out_dict = self.segmentor.simple_test(points, img_metas, rescale=False)
 

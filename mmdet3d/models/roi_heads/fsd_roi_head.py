@@ -186,6 +186,7 @@ class GroupCorrectionHead(Base3DRoIHead):
             pts_xyz[:, :3], # intensity might be in pts_xyz
             batch_idx,
             rois[:, :8],
+            batch_size=1 if not self.training else None,
         )
 
         new_pts_feats = pts_feats[ext_pts_inds]
@@ -229,9 +230,13 @@ class GroupCorrectionHead(Base3DRoIHead):
             cur_boxes, cur_scores, cur_pd_labels = proposal_list[batch_idx]
             # fake a box if no real proposal
             no_proposal = len(cur_boxes) == 0
+            assert cur_boxes.tensor.size(1) in (7, 9)
             if no_proposal:
                 # print('*******fake a box*******')
-                cur_boxes = LiDARInstance3DBoxes(torch.tensor([[0,0,5,1,1,1,0]], dtype=torch.float32, device=cur_boxes.device))
+                if cur_boxes.tensor.size(1) == 7:
+                    cur_boxes = LiDARInstance3DBoxes(torch.tensor([[0,0,5,1,1,1,0]], dtype=torch.float32, device=cur_boxes.device))
+                else:
+                    cur_boxes = LiDARInstance3DBoxes(torch.tensor([[0,0,5,1,1,1,0,0,0]], dtype=torch.float32, device=cur_boxes.device), box_dim=9)
                 cur_scores = torch.tensor([0.0], dtype=torch.float32, device=cur_boxes.device)
                 cur_pd_labels = torch.tensor([0], dtype=torch.int64, device=cur_boxes.device)
 

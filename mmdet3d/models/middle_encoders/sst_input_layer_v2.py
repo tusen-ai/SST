@@ -92,7 +92,7 @@ class SSTInputLayerV2(nn.Module):
 
         if self.shuffle_voxels:
             # shuffle the voxels to make the drop process uniform.
-            shuffle_inds = torch.randperm(len(voxel_feats))
+            shuffle_inds = torch.randperm(len(voxel_feats), device=voxel_feats.device)
             voxel_feats = voxel_feats[shuffle_inds]
             voxel_coors = voxel_coors[shuffle_inds]
 
