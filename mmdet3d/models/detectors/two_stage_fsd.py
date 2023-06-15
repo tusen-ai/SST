@@ -53,6 +53,15 @@ class FSD(SingleStageFSD):
                       gt_bboxes_ignore=None):
         gt_bboxes_3d = [b[l>=0] for b, l in zip(gt_bboxes_3d, gt_labels_3d)]
         gt_labels_3d = [l[l>=0] for l in gt_labels_3d]
+        
+        point_drop_ratio = self.train_cfg.get('point_drop_ratio', 0)
+        if point_drop_ratio > 0:
+            tmp_list = []
+            for p in points:
+                idx = torch.randperm(len(p)).to(p.device) # bug in torch1.8
+                keep_num = int(len(p) * (1-point_drop_ratio))
+                tmp_list.append(p[idx[:keep_num]])
+            points = tmp_list
 
 
         losses = {}

@@ -6,6 +6,7 @@ from .depth_box3d import DepthInstance3DBoxes
 from .lidar_box3d import LiDARInstance3DBoxes
 from .utils import (get_box_type, limit_period, mono_cam_box2vis,
                     points_cam2img, rotation_3d_in_axis, xywhr2xyxyr, det11_to_xyzwhlr, waymo2kitti_box, kitti2waymo_box)
+from .lidar_tracklet import LiDARTracklet
 
 __all__ = [
     'Box3DMode', 'BaseInstance3DBoxes', 'LiDARInstance3DBoxes',

@@ -190,6 +190,10 @@ class KittiDataset(Custom3DDataset):
             bboxes=gt_bboxes,
             labels=gt_labels,
             gt_names=gt_names)
+
+        if 'speed_global' in annos:
+            anns_results['speed_global'] = annos['speed_global']
+
         return anns_results
 
     def drop_arrays_by_name(self, gt_names, used_classes):

@@ -27,7 +27,7 @@ from .sst.sst_ops import (flat2window, window2flat,
     scatter_v2, build_mlp, get_activation, get_activation_layer,
     )
 
-from .dynamic_point_pool_op import dynamic_point_pool
+from .dynamic_point_pool_op import dynamic_point_pool, dynamic_point_pool_mixed
 
 __all__ = [
     'nms', 'soft_nms', 'RoIAlign', 'roi_align', 'get_compiler_version',

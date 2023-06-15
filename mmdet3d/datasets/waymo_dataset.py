@@ -3,6 +3,7 @@ import numpy as np
 import os
 import tempfile
 import torch
+import torch.nn.functional as F
 from mmcv.utils import print_log
 from os import path as osp
 
@@ -167,8 +168,8 @@ class WaymoDataset(KittiDataset):
             img_prefix=None,
             img_info=dict(filename=img_filename),
             lidar2img=lidar2img,
-            pose=info['pose']
-            # instance_id=info['annos']['instance_id'],
+            pose=info['pose'],
+            instance_id=info['annos'].get('instance_id', None),
             # speed=info['annos']['spped'],
             # accel=info['annos']['accel']
             )
@@ -297,8 +298,14 @@ class WaymoDataset(KittiDataset):
         Returns:
             dict[str: float]: results of each evaluation metric
         """
-        assert ('waymo' in metric or 'kitti' in metric or 'fast' in metric), \
+        
+        assert ('waymo' in metric or 'kitti' in metric or 'raw' in metric or 'fast' in metric), \
             f'invalid metric {metric}'
+
+        if 'raw' in metric:
+            self.save_raw_output(results, pklfile_prefix)
+            return
+
         if 'kitti' in metric:
             result_files, tmp_dir = self.format_results(
                 results,
@@ -683,6 +690,28 @@ class WaymoDataset(KittiDataset):
     def update_skip_type_keys(self, skip_type_keys):
         self._skip_type_keys = skip_type_keys
 
+    def save_raw_output(self, results, pklfile_prefix):
+        print('\nSaving to raw output...\n')
+        assert len(results) == len(self.data_infos)
+        new_list = []
+        import tqdm
+        for idx in tqdm.tqdm(range(len(results))):
+            info = self.data_infos[idx]
+            sample_idx = info['image']['image_idx']
+            tmp = {}
+            tmp['boxes_3d'] = results[idx]['boxes_3d'].tensor.numpy()
+            tmp['scores_3d'] = results[idx]['scores_3d'].numpy()
+            tmp['labels_3d'] = results[idx]['labels_3d'].numpy()
+            tmp['sample_idx'] = sample_idx
+            new_list.append(tmp)
+
+        if not pklfile_prefix.endswith('.pkl'):
+            pklfile_prefix += '.pkl'
+
+        with open(pklfile_prefix, 'wb') as fw:
+            pkl.dump(new_list, fw)
+        print(f'Raw outputs are saved to {pklfile_prefix}')
+
     def fast_convert_to_waymo(self, results, pklfile_prefix):
         import tqdm
 
@@ -870,3 +899,257 @@ class MultiSweepsWaymoDataset(WaymoDataset):
             input_dict['ann_info'] = annos
 
         return input_dict
+
+@DATASETS.register_module()
+class IncrementalWaymoDataset(WaymoDataset):
+    """Waymo Dataset.
+    This class serves as the API for experiments on the Waymo Dataset.
+    Please refer to `<https://waymo.com/open/download/>`_for data downloading.
+    It is recommended to symlink the dataset root to $MMDETECTION3D/data and
+    organize them as the doc shows.
+    Args:
+        data_root (str): Path of dataset root.
+        ann_file (str): Path of annotation file.
+        split (str): Split of input data.
+        pts_prefix (str, optional): Prefix of points files.
+            Defaults to 'velodyne'.
+        pipeline (list[dict], optional): Pipeline used for data processing.
+            Defaults to None.
+        classes (tuple[str], optional): Classes used in the dataset.
+            Defaults to None.
+        modality (dict, optional): Modality to specify the sensor data used
+            as input. Defaults to None.
+        box_type_3d (str, optional): Type of 3D box of this dataset.
+            Based on the `box_type_3d`, the dataset will encapsulate the box
+            to its original format then converted them to `box_type_3d`.
+            Defaults to 'LiDAR' in this dataset. Available options includes
+            - 'LiDAR': box in LiDAR coordinates
+            - 'Depth': box in depth coordinates, usually for indoor dataset
+            - 'Camera': box in camera coordinates
+        filter_empty_gt (bool, optional): Whether to filter empty GT.
+            Defaults to True.
+        test_mode (bool, optional): Whether the dataset is in test mode.
+            Defaults to False.
+        pcd_limit_range (list): The range of point cloud used to filter
+            invalid predicted boxes. Default: [-85, -85, -5, 85, 85, 5].
+    """
+
+    CLASSES = ('Car', 'Cyclist', 'Pedestrian')
+
+    def __init__(self,
+                 data_root,
+                 ann_file,
+                 split,
+                 pts_prefix='velodyne',
+                 pipeline=None,
+                 classes=None,
+                 modality=None,
+                 box_type_3d='LiDAR',
+                 filter_empty_gt=True,
+                 test_mode=False,
+                 incremental_test=False,
+                 load_interval=1,
+                 pcd_limit_range=[-85, -85, -5, 85, 85, 5],
+                 save_training=False,
+                 seed_info_path=None,
+                 num_previous_seeds=4,
+                 new_transform=False):
+        super().__init__(
+            data_root=data_root,
+            ann_file=ann_file,
+            split=split,
+            pts_prefix=pts_prefix,
+            pipeline=pipeline,
+            classes=classes,
+            modality=modality,
+            box_type_3d=box_type_3d,
+            filter_empty_gt=filter_empty_gt,
+            test_mode=test_mode,
+            load_interval=load_interval,
+            pcd_limit_range=pcd_limit_range,
+            save_training=save_training)
+
+        self.seed_info_path = seed_info_path
+        self.seed_info = self.load_seed_boxes_info()
+        self.num_previous_seeds = num_previous_seeds
+        self.incremental_test = incremental_test
+        self.new_transform = new_transform
+        #self.data_infos = self.data_infos[9879:9879+202] # for debug
+
+
+    def get_data_info(self, index):
+        """Get data info according to the given index.
+        Args:
+            index (int): Index of the sample data to get.
+        Returns:
+            dict: Standard input_dict consists of the
+                data information.
+                - sample_idx (str): sample index
+                - pts_filename (str): filename of point clouds
+                - img_prefix (str | None): prefix of image files
+                - img_info (dict): image info
+                - lidar2img (list[np.ndarray], optional): transformations from
+                    lidar to different cameras
+                - ann_info (dict): annotation info
+        """
+        info = self.data_infos[index]
+        sample_idx = info['image']['image_idx']
+        img_filename = os.path.join(self.data_root,
+                                    info['image']['image_path'])
+
+        # TODO: consider use torch.Tensor only
+        rect = info['calib']['R0_rect'].astype(np.float32)
+        Trv2c = info['calib']['Tr_velo_to_cam'].astype(np.float32)
+        P0 = info['calib']['P0'].astype(np.float32)
+        lidar2img = P0 @ rect @ Trv2c
+
+        pts_filename = self._get_pts_filename(sample_idx)
+        input_dict = dict(
+            sample_idx=sample_idx,
+            pts_filename=pts_filename,
+            img_prefix=None,
+            img_info=dict(filename=img_filename),
+            lidar2img=lidar2img,
+            sweeps=info['sweeps'],
+            timestamp=info['timestamp'],
+            pose=info['pose'],
+            dataset_classes=self.CLASSES,
+        )
+
+
+
+        if not self.test_mode:
+            annos = self.get_ann_info(index)
+            input_dict['ann_info'] = annos
+
+        if not self.test_mode or not self.incremental_test:
+            sweeps = info['sweeps']
+            real_num_sweeps = min(len(sweeps), self.num_previous_seeds)
+            sweeps = sweeps[:real_num_sweeps]
+
+            # pad self as if the whole scene is static
+            if real_num_sweeps < self.num_previous_seeds:
+                sweeps = [dict(velodyne_path=pts_filename, pose=info['pose']),] +  sweeps
+
+            input_dict['seed_info'] = self.get_previous_seed_info(sweeps, info['pose'])
+
+        return input_dict
+
+    def load_seed_boxes_info(self,):
+        return mmcv.load(self.seed_info_path)
+
+    def get_a_seed(self, idx_str):
+        seed = self.seed_info.get(idx_str, None)
+        if seed is None:
+            print('Developing hint: Seed Missing.')
+            seed = dict(
+                gt_bboxes_3d=np.zeros((0, 7), dtype=np.float32),
+                gt_names=np.zeros(0, dtype='<U32'),
+                scores=np.zeros(0, dtype=np.float32)
+            )
+        seed = copy.deepcopy(seed)
+        return seed
+
+    def get_previous_seed_info(self, sweeps, cur_pose):
+        """
+        sweeps[0] is the closest one
+        """
+        seed_info_list = []
+        for sweep in sweeps:
+            idx_str = sweep['velodyne_path'].split('/')[-1].split('.')[0]
+            seed = self.get_a_seed(idx_str)
+            if self.new_transform:
+                seed['gt_bboxes_3d'] = box_frame_transform_v2(seed['gt_bboxes_3d'], sweep['pose'], cur_pose)
+            else:
+                seed['gt_bboxes_3d'] = box_frame_transform(seed['gt_bboxes_3d'], sweep['pose'], cur_pose)
+            gt_names = seed['gt_names']
+            labels = []
+            for name in gt_names:
+                if name in self.CLASSES:
+                    labels.append(self.CLASSES.index(name))
+                else:
+                    labels.append(-1)
+            labels = np.array(labels).astype(np.int64)
+            seed['gt_labels_3d'] = labels
+
+            seed_info_list.append(seed)
+        return seed_info_list
+
+def box_frame_transform(pre_boxes, pre_pose, cur_pose):
+    if isinstance(pre_boxes, np.ndarray):
+        pre_boxes_lidar = LiDARInstance3DBoxes(pre_boxes, box_dim=pre_boxes.shape[1])
+    elif isinstance(pre_boxes,LiDARInstance3DBoxes):
+        pre_boxes_lidar = pre_boxes
+        pre_boxes = pre_boxes_lidar.tensor.cpu().numpy()
+
+    if len(pre_boxes) == 0:
+        return pre_boxes_lidar
+
+    pre_centers = pre_boxes[:, :3]
+    pre_corners = pre_boxes_lidar.corners.cpu().numpy().reshape(-1, 3)
+
+    pre2world_rot = pre_pose[0:3, 0:3]
+    pre2world_trans = pre_pose[0:3, 3]
+    world2curr_pose = np.linalg.inv(cur_pose)
+    world2curr_rot = world2curr_pose[0:3, 0:3]
+    world2curr_trans = world2curr_pose[0:3, 3]
+
+    corners_in_world = np.einsum('ij,nj->ni', pre2world_rot, pre_corners) + pre2world_trans[None, :]
+    corners_in_curr = np.einsum('ij,nj->ni', world2curr_rot, corners_in_world) + world2curr_trans[None, :]
+
+    centers_in_world = np.einsum('ij,nj->ni', pre2world_rot, pre_centers) + pre2world_trans[None, :]
+    centers_in_curr = np.einsum('ij,nj->ni', world2curr_rot, centers_in_world) + world2curr_trans[None, :]
+
+    # corners_in_curr[:, [1, 3, 7, 4]]
+    corners_in_curr = corners_in_curr.reshape(-1, 8, 3)
+
+    # sanity check
+    # pre_corners = pre_corners.reshape(-1, 8, 3)
+    # c1_test = pre_corners[:, 3, :]
+    # c2_test = pre_corners[:, 1, :]
+    # recalculate_yaw = np.arctan2(c1_test[:, 0] - c2_test[:, 0], c1_test[:, 1] - c2_test[:, 1])
+
+    c1 = corners_in_curr[:, 3, :]
+    c2 = corners_in_curr[:, 1, :]
+    yaw_in_curr = np.arctan2(c1[:, 0] - c2[:, 0], c1[:, 1] - c2[:, 1])
+
+    transformed_boxes = np.concatenate([centers_in_curr, pre_boxes[:, 3:6], yaw_in_curr[:, None]], axis=1)
+    transformed_boxes = LiDARInstance3DBoxes(transformed_boxes)
+    return transformed_boxes
+
+def box_frame_transform_v2(pre_boxes, pre_pose, cur_pose):
+
+    pre_pose = torch.from_numpy(pre_pose).float()
+    cur_pose = torch.from_numpy(cur_pose).float()
+
+    pre_boxes_lidar = LiDARInstance3DBoxes(pre_boxes, box_dim=pre_boxes.shape[1])
+    pre_boxes = pre_boxes_lidar.tensor
+
+    assert pre_boxes.size(1) in (7, 9)
+
+    if len(pre_boxes) == 0:
+        return pre_boxes_lidar
+
+    pre_centers = pre_boxes[:, :3]
+    pre_centers_h = F.pad(pre_centers, (0, 1), 'constant', 1)
+    heading_vector = pre_boxes_lidar.heading_unit_vector
+    heading_vector_h = F.pad(heading_vector, (0, 1), 'constant', 1) 
+
+    world2curr_pose = torch.linalg.inv(cur_pose)
+    mm = world2curr_pose @ pre_pose
+    centers_in_curr = (pre_centers_h @ mm.T)[:, :3]
+
+    mm_zero_t = mm.clone()
+    mm_zero_t[:3, 3] = 0 # a math trick
+    heading_vector_in_curr = (heading_vector_h @ mm_zero_t.T)[:, :3]
+    yaw_in_curr = torch.atan2(heading_vector_in_curr[:, 0], heading_vector_in_curr[:, 1])
+
+    transformed_boxes = torch.cat([centers_in_curr, pre_boxes[:, 3:6], yaw_in_curr[:, None]], axis=1)
+    if pre_boxes.size(1) == 9:
+        velo = pre_boxes[:, [7, 8]]
+        velo = F.pad(velo, (0, 1), 'constant', 0) # pad zeros as z-axis velocity
+        velo = velo @ mm[:3, :3].T
+        transformed_boxes = torch.cat([transformed_boxes, velo[:, :2]], dim=1)
+
+    transformed_boxes = LiDARInstance3DBoxes(transformed_boxes, box_dim=transformed_boxes.size(1))
+    return transformed_boxes

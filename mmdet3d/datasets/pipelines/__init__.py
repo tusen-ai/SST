@@ -1,6 +1,6 @@
 from mmdet.datasets.pipelines import Compose
 from .dbsampler import DataBaseSampler
-from .formating import Collect3D, DefaultFormatBundle, DefaultFormatBundle3D
+from .formating import Collect3D, DefaultFormatBundle, DefaultFormatBundle3D, TrackletFormatBundle
 from .loading import (LoadAnnotations3D, LoadImageFromFileMono3D,
                       LoadMultiViewImageFromFiles, LoadPointsFromFile,
                       LoadPointsFromMultiSweeps, NormalizePointsColor,
@@ -13,6 +13,9 @@ from .transforms_3d import (BackgroundPointsFilter, GlobalAlignment,
                             PointsRangeFilter, RandomDropPointsColor,
                             RandomFlip3D, RandomJitterPoints,
                             VoxelBasedPointSampler)
+
+from .tracklet_pipelines import (LoadTrackletPoints, LoadTrackletAnnotations, TrackletGlobalRotScaleTrans,
+                                 TrackletRandomFlip, TrackletPoseTransform)
 
 __all__ = [
     'ObjectSample', 'RandomFlip3D', 'ObjectNoise', 'GlobalRotScaleTrans',

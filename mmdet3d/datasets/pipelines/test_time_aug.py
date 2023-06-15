@@ -33,6 +33,7 @@ class MultiScaleFlipAug3D(object):
                  transforms,
                  img_scale,
                  pts_scale_ratio,
+                 pts_rots=0,
                  flip=False,
                  flip_direction='horizontal',
                  pcd_horizontal_flip=False,
@@ -42,6 +43,8 @@ class MultiScaleFlipAug3D(object):
                                                  list) else [img_scale]
         self.pts_scale_ratio = pts_scale_ratio \
             if isinstance(pts_scale_ratio, list) else[float(pts_scale_ratio)]
+
+        self.pts_rots = pts_rots if isinstance(pts_rots, list) else [float(pts_rots), ]
 
         assert mmcv.is_list_of(self.img_scale, tuple)
         assert mmcv.is_list_of(self.pts_scale_ratio, float)
@@ -90,18 +93,20 @@ class MultiScaleFlipAug3D(object):
                             for direction in self.flip_direction:
                                 # results.copy will cause bug
                                 # since it is shallow copy
-                                _results = deepcopy(results)
-                                _results['scale'] = scale
-                                _results['flip'] = flip
-                                _results['pcd_scale_factor'] = \
-                                    pts_scale_ratio
-                                _results['flip_direction'] = direction
-                                _results['pcd_horizontal_flip'] = \
-                                    pcd_horizontal_flip
-                                _results['pcd_vertical_flip'] = \
-                                    pcd_vertical_flip
-                                data = self.transforms(_results)
-                                aug_data.append(data)
+                                for rot in self.pts_rots:
+                                    _results = deepcopy(results)
+                                    _results['scale'] = scale
+                                    _results['flip'] = flip
+                                    _results['pcd_scale_factor'] = \
+                                        pts_scale_ratio
+                                    _results['flip_direction'] = direction
+                                    _results['pcd_horizontal_flip'] = \
+                                        pcd_horizontal_flip
+                                    _results['pcd_vertical_flip'] = \
+                                        pcd_vertical_flip
+                                    _results['pcd_rot_angle'] = rot
+                                    data = self.transforms(_results)
+                                    aug_data.append(data)
         # list of dict to dict of list
         aug_data_dict = {key: [] for key in aug_data[0]}
         for data in aug_data:

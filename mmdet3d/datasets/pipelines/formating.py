@@ -52,7 +52,7 @@ class DefaultFormatBundle(object):
         for key in [
                 'proposals', 'gt_bboxes', 'gt_bboxes_ignore', 'gt_labels',
                 'gt_labels_3d', 'attr_labels', 'pts_instance_mask',
-                'pts_semantic_mask', 'centers2d', 'depths'
+                'pts_semantic_mask', 'centers2d', 'depths', 'pts_frame_inds', 'bboxes_frame_inds'
         ]:
             if key not in results:
                 continue
@@ -140,9 +140,10 @@ class Collect3D(object):
                             'pcd_vertical_flip', 'box_mode_3d', 'box_type_3d',
                             'img_norm_cfg', 'rect', 'Trv2c', 'P2', 'pcd_trans',
                             'sample_idx', 'pcd_scale_factor', 'pcd_rotation',
-                            'pts_filename', 'transformation_3d_flow')):
+                            'pts_filename', 'transformation_3d_flow', 'pcd_rot_angle'),
+                 extra_meta_keys=(),):
         self.keys = keys
-        self.meta_keys = meta_keys
+        self.meta_keys = meta_keys + extra_meta_keys
 
     def __call__(self, results):
         """Call function to collect keys in results. The keys in ``meta_keys``
@@ -165,6 +166,10 @@ class Collect3D(object):
         data['img_metas'] = DC(img_metas, cpu_only=True)
         for key in self.keys:
             data[key] = results[key]
+
+        if 'seed_info' in results:
+            data['seed_info'] = DC(results['seed_info'], cpu_only=True)
+
         return data
 
     def __repr__(self):
@@ -259,6 +264,63 @@ class DefaultFormatBundle3D(DefaultFormatBundle):
                     ],
                                                        dtype=np.int64)
         results = super(DefaultFormatBundle3D, self).__call__(results)
+        return results
+
+    def __repr__(self):
+        """str: Return a string that describes the module."""
+        repr_str = self.__class__.__name__
+        repr_str += f'(class_names={self.class_names}, '
+        repr_str += f'with_gt={self.with_gt}, with_label={self.with_label})'
+        return repr_str
+
+@PIPELINES.register_module()
+class TrackletFormatBundle(DefaultFormatBundle):
+    """Default formatting bundle.
+    It simplifies the pipeline of formatting common fields for voxels,
+    including "proposals", "gt_bboxes", "gt_labels", "gt_masks" and
+    "gt_semantic_seg".
+    These fields are formatted as follows.
+    - img: (1)transpose, (2)to tensor, (3)to DataContainer (stack=True)
+    - proposals: (1)to tensor, (2)to DataContainer
+    - gt_bboxes: (1)to tensor, (2)to DataContainer
+    - gt_bboxes_ignore: (1)to tensor, (2)to DataContainer
+    - gt_labels: (1)to tensor, (2)to DataContainer
+    """
+
+    def __init__(self, class_names, with_gt=True, with_label=True):
+        super().__init__()
+        self.class_names = class_names
+        self.with_gt = with_gt
+        self.with_label = with_label
+
+    def __call__(self, results):
+        """Call function to transform and format common fields in results.
+        Args:
+            results (dict): Result dict contains the data to convert.
+        Returns:
+            dict: The result dict contains the data that is formatted with
+                default bundle.
+        """
+        # Format 3D data
+        if 'points' in results:
+            assert isinstance(results['points'], BasePoints)
+            results['points'] = DC(results['points'].tensor)
+
+        # results['tracklet'] = results['tracklet'].to_collate_format()
+        results['tracklet'].to_collate_format()
+
+        if 'tracklet' in results:
+            results['tracklet'] = DC(results['tracklet'], cpu_only=True)
+
+        if 'gt_tracklet_candidates' in results:
+            # gt_candidates = [t.to_collate_format() for t in results['gt_tracklet_candidates']]
+            # results['gt_tracklet_candidates'] = DC(gt_candidates, cpu_only=True)
+            for t in results['gt_tracklet_candidates']:
+                t.to_collate_format()
+            results['gt_tracklet_candidates'] = DC(results['gt_tracklet_candidates'], cpu_only=True)
+
+
+        results = super().__call__(results)
         return results
 
     def __repr__(self):

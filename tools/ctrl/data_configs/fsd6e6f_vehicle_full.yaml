@@ -1,0 +1,17 @@
+bin_path: /mnt/weka/scratch/lve.fan/ImmortalTracker/mot_results/waymo/training/track_learning_data_01_fsd6f/bin/pred.bin 
+val_bin_path: /mnt/weka/scratch/lve.fan/ImmortalTracker/mot_results/waymo/validation/track_learning_data_01_fsd6f/bin/pred.bin 
+data_root: ./data/waymo/kitti_format
+exist_ok: False
+# split: training
+split: val
+type: [1,] # 1:vehicle 2:pedestrian 4: cyclist
+
+box:
+  extra_width: 1
+
+selection:
+  mode: random
+  size: 1.0
+
+candidate:
+  affinity_thresh: 0.5

@@ -272,6 +272,11 @@ class FullySparseBboxHead(BaseModule):
             assert not (pos_bbox_pred == -1).all(1).any()
             bbox_weights_flat = bbox_weights[pos_inds].view(-1, 1).repeat(1, pos_bbox_pred.shape[-1])
 
+            code_weights = self.train_cfg.get('rcnn_code_weights', None)
+            if code_weights is not None:
+                code_weights = torch.tensor(code_weights, dtype=bbox_weights_flat.dtype, device=bbox_weights_flat.device)
+                bbox_weights_flat = bbox_weights_flat * code_weights[None, :]
+
 
             if pos_bbox_pred.size(0) != bbox_targets.size(0):
                 raise ValueError('Impossible after filtering bbox_targets')
@@ -404,10 +409,7 @@ class FullySparseBboxHead(BaseModule):
             pos_bboxes = pos_bboxes[:, :7]
             pos_gt_bboxes = pos_gt_bboxes[:, :7]
 
-        if self.num_classes > 1 or self.train_cfg.get('enable_multi_class_test', False):
-            label, label_weights = self.get_multi_class_soft_label(ious, pos_labels, cfg)
-        else:
-            label, label_weights = self.get_single_class_soft_label(ious, cfg)
+        label, label_weights = self.get_multi_class_soft_label(ious, pos_labels, cfg)
 
         # box regression target
         reg_mask = pos_bboxes.new_zeros(ious.size(0)).long()
@@ -786,3 +788,175 @@ class FullySparseBboxHead(BaseModule):
 
         selected = torch.cat(selected_list, dim=0) if len(selected_list) > 0 else []
         return selected
+
+    def get_bboxes_from_tracklet(
+            self,
+            rois,
+            cls_score,
+            bbox_pred,
+            valid_roi_mask,
+            class_labels,
+            class_pred,
+            img_metas,
+            gt_rois=None,
+            cfg=None,
+        ):
+        """Generate bboxes from bbox head predictions.
+        Args:
+            rois (torch.Tensor): Roi bounding boxes.
+            cls_score (torch.Tensor): Scores of bounding boxes.
+            bbox_pred (torch.Tensor): Bounding boxes predictions
+            class_labels (torch.Tensor): Label of classes, from rpn.
+            class_pred (torch.Tensor): Score for nms. From rpn
+            img_metas (list[dict]): Point cloud and image's meta info.
+            cfg (:obj:`ConfigDict`): Testing config.
+        Returns:
+            list[tuple]: Decoded bbox, scores and labels after nms.
+        """
+        assert rois.size(0) == cls_score.size(0) == bbox_pred.size(0)
+        # assert isinstance(class_labels, list) and isinstance(class_pred, list) and len(class_labels) == len(class_pred) == 1
+
+        cls_score = cls_score.sigmoid()
+        # assert (class_pred[0] >= 0).all()
+
+
+        # do not filter out invalid roi, leave it outside
+        # rois = rois[valid_roi_mask]
+        # cls_score = cls_score[valid_roi_mask]
+        # bbox_pred = bbox_pred[valid_roi_mask]
+        # for i in range(len(class_labels)):
+        #     class_labels[i] = class_labels[i][valid_roi_mask]
+        #     class_pred[i] = class_pred[i][valid_roi_mask]
+
+
+        if self.test_cfg.get('identical_decode', False):
+            rcnn_boxes3d = rois[:, 1:]
+            cls_score = class_pred  
+        else:
+            rcnn_boxes3d = self.decode_from_rois(rois, bbox_pred)
+
+        if self.test_cfg.get('replace_center', False):
+            assert gt_rois.size(1) == 8
+            valid_mask = gt_rois[:, 0].bool()
+            rcnn_boxes3d[valid_mask, :3] = gt_rois[valid_mask, 1:4]
+
+        if self.test_cfg.get('replace_size', False):
+            valid_mask = gt_rois[:, 0].bool()
+            rcnn_boxes3d[valid_mask, 3:6] = gt_rois[valid_mask, 4:7]
+
+        if self.test_cfg.get('replace_yaw', False):
+            valid_mask = gt_rois[:, 0].bool()
+            rcnn_boxes3d[valid_mask, 6] = gt_rois[valid_mask, 7]
+
+        # post processing
+        result_list = []
+        roi_batch_id = rois[..., 0]
+        batch_size = int(roi_batch_id.max().item() + 1)
+
+        for batch_id in range(batch_size):
+            roi_batch_mask = roi_batch_id == batch_id
+            cur_class_labels = class_labels[roi_batch_mask]
+            cur_cls_score = cls_score[roi_batch_mask].view(-1)
+            cur_rcnn_boxes3d = rcnn_boxes3d[roi_batch_mask]
+            valid_mask_this = valid_roi_mask[roi_batch_mask]
+            result_list.append(
+                (
+                    img_metas[batch_id]['box_type_3d'](cur_rcnn_boxes3d, cur_rcnn_boxes3d.size(1)),
+                    cur_cls_score, cur_class_labels, valid_mask_this
+                )
+            )
+
+        return result_list
+
+    def decode_from_rois(self, rois, bbox_pred):
+        roi_batch_id = rois[..., 0]
+        roi_boxes = rois[..., 1:]  # boxes without batch id
+
+        # decode boxes
+        roi_ry = roi_boxes[..., 6].view(-1)
+        roi_xyz = roi_boxes[..., 0:3].view(-1, 3)
+        local_roi_boxes = roi_boxes.clone().detach()
+        local_roi_boxes[..., 0:3] = 0
+
+        assert local_roi_boxes.size(1) in (7, 9) # with or without velocity
+        if local_roi_boxes.size(1) == 9:
+            # fake zero predicted velocity, which means rcnn do not refine the velocity
+            bbox_pred = F.pad(bbox_pred, (0, 2), 'constant', 0)
+
+        rcnn_boxes3d = self.bbox_coder.decode(local_roi_boxes, bbox_pred)
+        rcnn_boxes3d[..., 0:3] = rotation_3d_in_axis(
+            rcnn_boxes3d[..., 0:3].unsqueeze(1), (roi_ry + np.pi / 2),
+            axis=2).squeeze(1)
+        rcnn_boxes3d[:, 0:3] += roi_xyz
+
+        return rcnn_boxes3d
+
+    @force_fp32(apply_to=('pts_features', 'rois'))
+    def tracklet_forward(self, pts_xyz, pts_features, pts_info, roi_inds, rois, tracklet_info=None, tracklet_net=None):
+        """Forward pass.
+        Args:
+            seg_feats (torch.Tensor): Point-wise semantic features.
+            part_feats (torch.Tensor): Point-wise part prediction features.
+        Returns:
+            tuple[torch.Tensor]: Score of class and bbox predictions.
+        """
+        assert pts_features.size(0) > 0
+
+        rois_batch_idx = rois[:, 0]
+        real_batch_size = rois_batch_idx.max().item() + 1
+        rois = rois[:, 1:]
+        roi_centers = rois[:, :3]
+        rel_xyz = pts_xyz[:, :3] - roi_centers[roi_inds] 
+
+        if self.unique_once:
+            new_coors, unq_inv = torch.unique(roi_inds, return_inverse=True, return_counts=False, dim=0)
+        else:
+            new_coors = unq_inv = None
+
+        point_feat_list = []
+        out_feats = pts_features
+        f_cluster = torch.cat([pts_info['local_xyz'], pts_info['boundary_offset'], pts_info['is_in_margin'][:, None], rel_xyz], dim=-1)
+
+        if self.fast_scatter and not self.training:
+            roi_inds, order = get_sorted_group_inds(roi_inds)
+            pts_xyz, out_feats, f_cluster = pts_xyz[order], out_feats[order], f_cluster[order]
+            scatter_meta = get_scatter_meta(roi_inds, check_sorted=False)
+        else:
+            scatter_meta = None
+
+        cluster_feat_list = []
+        for i, block in enumerate(self.block_list):
+
+            in_feats = torch.cat([pts_xyz, out_feats], 1)
+
+            if self.geo_input:
+                in_feats = torch.cat([in_feats, f_cluster / 10], 1)
+
+            if i < self.num_blocks - 1:
+                # return point features
+                out_feats, out_cluster_feats = block(in_feats, roi_inds, f_cluster, unq_inv_once=unq_inv, new_coors_once=new_coors, scatter_meta=scatter_meta)
+                if self.use_middle_cluster_feature:
+                    cluster_feat_list.append(out_cluster_feats)
+            if i == self.num_blocks - 1:
+                # return group features
+                out_cluster_feats, out_coors = block(in_feats, roi_inds, f_cluster, unq_inv_once=unq_inv, new_coors_once=new_coors, scatter_meta=scatter_meta)
+                cluster_feat_list.append(out_cluster_feats)
+
+        final_cluster_feats = torch.cat(cluster_feat_list, dim=1)
+
+        final_cluster_feats = self.align_roi_feature_and_rois(final_cluster_feats, out_coors, len(rois))
+
+        if self.training and (out_coors == -1).any():
+            assert out_coors[0].item() == -1, 'This should be hold due to sorted=True in torch.unique'
+
+        nonempty_roi_mask = self.get_nonempty_roi_mask(out_coors, len(rois))
+
+        if tracklet_net is not None:
+            tracklet_info['nonempty_roi_mask'] = nonempty_roi_mask
+            final_cluster_feats = tracklet_net(final_cluster_feats, tracklet_info)
+
+        cls_score = self.conv_cls(final_cluster_feats)
+        bbox_pred = self.conv_reg(final_cluster_feats)
+
+        return cls_score, bbox_pred, nonempty_roi_mask
+    

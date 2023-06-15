@@ -33,7 +33,7 @@ class BaseInstance3DBoxes(object):
             boxes.
     """
 
-    def __init__(self, tensor, box_dim=7, with_yaw=True, origin=(0.5, 0.5, 0)):
+    def __init__(self, tensor, box_dim=7, with_yaw=True, origin=(0.5, 0.5, 0), moved=False):
         if isinstance(tensor, torch.Tensor):
             device = tensor.device
         else:
@@ -64,10 +64,17 @@ class BaseInstance3DBoxes(object):
             src = self.tensor.new_tensor(origin)
             self.tensor[:, :3] += self.tensor[:, 3:6] * (dst - src)
 
+        self.moved = moved
+
     @property
     def volume(self):
         """torch.Tensor: A vector with volume of each box."""
         return self.tensor[:, 3] * self.tensor[:, 4] * self.tensor[:, 5]
+
+    @property
+    def area(self):
+        """torch.Tensor: A vector with volume of each box."""
+        return self.tensor[:, 3] * self.tensor[:, 4]
 
     @property
     def dims(self):
@@ -442,7 +449,7 @@ class BaseInstance3DBoxes(object):
 
         return iou3d
 
-    def new_box(self, data):
+    def new_box(self, data, moved=False):
         """Create a new box object with data.
 
         The new box and its tensor has the similar properties \
@@ -459,4 +466,4 @@ class BaseInstance3DBoxes(object):
             if not isinstance(data, torch.Tensor) else data.to(self.device)
         original_type = type(self)
         return original_type(
-            new_tensor, box_dim=self.box_dim, with_yaw=self.with_yaw)
+            new_tensor, box_dim=self.box_dim, with_yaw=self.with_yaw, moved=moved)
