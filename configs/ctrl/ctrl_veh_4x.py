@@ -96,12 +96,8 @@ model = dict(
             cls_mlp=[512, 512],
             mode='max',
             xyz_normalizer=[20, 20, 4],
-            # cat_voxel_feats=True,
-            # pos_fusion='mul',
-            # fusion='cat',
             act='gelu',
             geo_input=True,
-            # use_middle_cluster_feature=True,
             with_corner_loss=True,
             corner_loss_weight=1.0,
             bbox_coder=dict(type='DeltaXYZWLHRBBoxCoder'),
@@ -169,8 +165,7 @@ train_pipeline = [
         type='LoadTrackletAnnotations',
     ),
 
-    # add this and resume in case of OOM
-    dict(
+    dict( # optional
         type='TrackletCutting',
         ratio=0.0,
         max_length=150,
@@ -206,11 +201,9 @@ train_pipeline = [
     ),
 
     dict(type='PointsRangeFilter', point_cloud_range=[-204.7, -204.7, -3.99, 204.7, 204.7, 7.99]),
-    # dict(type='TrackletRangeFilter', point_cloud_range=point_cloud_range),
     dict(type='PointShuffle'),
     dict(type='TrackletFormatBundle', class_names=class_names),
     dict(type='Collect3D', keys=['points', 'pts_frame_inds', 'tracklet', 'gt_tracklet_candidates'])
-    # dict(type='Collect3D', keys=['points', 'pts_frame_inds', 'tracklet',])
 ]
 test_pipeline = [
     dict(
@@ -293,26 +286,23 @@ data = dict(
         type='RepeatDataset',
         times=2,
         dataset=dict(
-            ann_file='./data/waymo/kitti_format/fsd6f6e_vehicle_full_training_gt_candidates.pkl',
-            tracklet_proposals_file='./data/waymo/kitti_format/fsd6f6e_vehicle_full_training.pkl',
+            ann_file='./data/waymo/kitti_format/fsd_base_vehicle_training_gt_candidates.pkl',
+            tracklet_proposals_file='./data/waymo/kitti_format/fsd_base_vehicle_training.pkl',
             pipeline=train_pipeline,
             load_interval=1,
         )
     ),
     val=dict(
-        # tracklet_proposals_file='./data/waymo/kitti_format/fsd6f6e_vehicle_full_val.pkl',
-        # tracklet_proposals_file='./data/waymo/kitti_format/fsd_pastfuture_inter_vehicle_val.pkl',
         pipeline=eval_pipeline,
         min_tracklet_points=1,
         samples_per_gpu=8,
         ),
     test=dict(
-        tracklet_proposals_file='./data/waymo/kitti_format/fsd_pastfuture_vehicle_val.pkl',
+        tracklet_proposals_file='./data/waymo/kitti_format/tracklet_data/fsd_base_vehicle_val.pkl',
         pipeline=test_pipeline,
         # pipeline=tta_pipeline,
         min_tracklet_points=1,
         samples_per_gpu=8,
-        # load_interval=100,
     )
 )
 log_config=dict(
