@@ -36,11 +36,9 @@ train_pipeline = [
     ),
 
     dict(type='PointsRangeFilter', point_cloud_range=point_cloud_range),
-    # dict(type='TrackletRangeFilter', point_cloud_range=point_cloud_range),
     dict(type='PointShuffle'),
     dict(type='TrackletFormatBundle', class_names=class_names),
     dict(type='Collect3D', keys=['points', 'pts_frame_inds', 'tracklet', 'gt_tracklet_candidates'])
-    # dict(type='Collect3D', keys=['points', 'pts_frame_inds', 'tracklet',])
 ]
 test_pipeline = [
     dict(

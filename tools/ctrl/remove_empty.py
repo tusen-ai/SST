@@ -148,7 +148,7 @@ args = parser.parse_args()
 if __name__ == '__main__':
     bin_path = args.bin_path
     old_bin_name = osp.basename(bin_path).split('.')[0]
-    assert args.split in ('training', 'testing')
+    assert args.split in ('training', 'testing') # training for train set and validation set; testing for test set.
 
     # suffix = osp.basename(args.config).split('.')[0]
     # config = yaml.load(open(args.config, 'r'))
