@@ -1,10 +1,12 @@
-DIR=ctrl
+DIR=fsd
 WORK=work_dirs
-CONFIG=ctrl_veh_4x
-#bash tools/dist_train.sh configs/$DIR/$CONFIG.py 8 --work-dir ./$WORK/$CONFIG/ --cfg-options evaluation.pklfile_prefix=./$WORK/$CONFIG/results evaluation.metric=fast --seed 1
+CONFIG=fsd_waymoD1_1x
+bash tools/dist_train.sh configs/$DIR/$CONFIG.py 8 --work-dir ./$WORK/$CONFIG/ --cfg-options evaluation.pklfile_prefix=./$WORK/$CONFIG/results evaluation.metric=fast --seed 1
 
-# CTRL
+# CTRL training
+# DIR=ctrl
+# CONFIG=ctrl_veh_24e
 # bash tools/dist_train.sh configs/$DIR/$CONFIG.py 8 --work-dir ./$WORK/$CONFIG/ --no-validate
 
-# fast Waymo Evaluation
-bash tools/dist_test.sh configs/$DIR/$CONFIG.py ./$WORK/$CONFIG/latest.pth 8 --options "pklfile_prefix=./$WORK/$CONFIG/test_newvaldata_results" --eval waymo
+# fast Waymo Evaluation, for all waymo-based models
+bash tools/dist_test.sh configs/$DIR/$CONFIG.py ./$WORK/$CONFIG/latest.pth 8 --options "pklfile_prefix=./$WORK/$CONFIG/results" --eval waymo
