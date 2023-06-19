@@ -4,7 +4,7 @@
 [![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/embracing-single-stride-3d-object-detector/3d-object-detection-on-waymo-cyclist)](https://paperswithcode.com/sota/3d-object-detection-on-waymo-cyclist?p=embracing-single-stride-3d-object-detector)
 [![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/embracing-single-stride-3d-object-detector/3d-object-detection-on-waymo-vehicle)](https://paperswithcode.com/sota/3d-object-detection-on-waymo-vehicle?p=embracing-single-stride-3d-object-detector)
 
-### 🔥 We release the code of CTRL, the first open-sourced auto-labeling system. See [ctrl_instruction](https://github.com/tusen-ai/SST/blob/main/CTRL_instructions.md).
+### 🔥 We release the code of CTRL, the first open-sourced LiDAR-based auto-labeling system. See [ctrl_instruction](https://github.com/tusen-ai/SST/blob/main/CTRL_instructions.md).
 
 ---
 
@@ -56,6 +56,14 @@ Please consider citing our work as follows if it is helpful.
   title={Super Sparse 3D Object Detection},
   author={Fan, Lue and Yang, Yuxue and Wang, Feng and Wang, Naiyan and Zhang, Zhaoxiang},
   journal={IEEE Transactions on Pattern Analysis and Machine Intelligence},
+  year={2023}
+}
+```
+```
+@article{fan2023once,
+  title={Once Detected, Never Lost: Surpassing Human Performance in Offline LiDAR based 3D Object Detection},
+  author={Fan, Lue and Yang, Yuxue and Mao, Yiming and Wang, Feng and Chen, Yuntao and Wang, Naiyan and Zhang, Zhaoxiang},
+  journal={arXiv preprint arXiv:2304.12315},
   year={2023}
 }
 ```
