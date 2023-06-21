@@ -14,6 +14,12 @@ User could download the generated results 'train_gt.bin' from the link at the en
 
 The generated 'train_gt.bin' will be used in Step 4.
 
+Then extract frame poses and save it:
+
+`python ./tools/ctrl/extract_poses.py`
+
+This step only need to be executed **once** for all experiments on WOD.
+
 
 ### Step 2: Use ImmortalTracker to generate tracking results in training split (bin file format)
 This step can be finished with any 3D Object Tracking methods, and we will release our modified ImmortalTracker codebase in near future.
