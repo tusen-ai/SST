@@ -16,7 +16,7 @@ from .voxelnet import VoxelNet
 from .single_stage_fsd import SingleStageFSD, VoteSegmentor
 from .two_stage_fsd import FSD
 
-from .incremental_two_stage import TwoStageIncrementalDetector
+from .two_stage_fsdpp import TwoStageFSDPP
 from .tracklet_detector import TrackletSegmentor, TrackletDetector
 
 __all__ = [

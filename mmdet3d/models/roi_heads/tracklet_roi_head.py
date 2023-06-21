@@ -28,7 +28,6 @@ class TrackletRoIHead(Base3DRoIHead):
     def __init__(self,
                  num_classes=3,
                  roi_extractor=None,
-                 tracklet_net=None,
                  bbox_head=None,
                  train_cfg=None,
                  test_cfg=None,
@@ -47,10 +46,6 @@ class TrackletRoIHead(Base3DRoIHead):
         self.checkpointing = general_cfg.get('checkpointing', False)
 
         self.roi_extractor = build_roi_extractor(roi_extractor)
-        if tracklet_net is not None:
-            self.tracklet_net = build_backbone(tracklet_net)
-        else:
-            self.tracklet_net = None
 
         self.init_assigner_sampler()
 
@@ -273,27 +268,13 @@ class TrackletRoIHead(Base3DRoIHead):
             new_pts_feats = torch.cat([new_pts_feats, offsets], 1)
 
 
-        if self.tracklet_net is None:
-            cls_score, bbox_pred, valid_roi_mask = self.bbox_head(
-                new_pts_xyz,
-                new_pts_feats,
-                ext_pts_info,
-                ext_pts_roi_inds,
-                rois,
-            )
-        else:
-            tracklet_info = {}
-            tracklet_info['rois'] = rois
-            tracklet_info['roi_frame_inds'] = roi_frame_inds
-            cls_score, bbox_pred, valid_roi_mask = self.bbox_head.tracklet_forward(
-                new_pts_xyz,
-                new_pts_feats,
-                ext_pts_info,
-                ext_pts_roi_inds,
-                rois,
-                tracklet_info=tracklet_info,
-                tracklet_net=self.tracklet_net,
-            )
+        cls_score, bbox_pred, valid_roi_mask = self.bbox_head(
+            new_pts_xyz,
+            new_pts_feats,
+            ext_pts_info,
+            ext_pts_roi_inds,
+            rois,
+        )
 
         bbox_results = dict(
             cls_score=cls_score,
