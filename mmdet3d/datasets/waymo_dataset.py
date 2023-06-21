@@ -1041,7 +1041,7 @@ class IncrementalWaymoDataset(WaymoDataset):
     def get_a_seed(self, idx_str):
         seed = self.seed_info.get(idx_str, None)
         if seed is None:
-            print('Developing hint: Seed Missing.')
+            # print('Developing hint: Seed Missing.')
             seed = dict(
                 gt_bboxes_3d=np.zeros((0, 7), dtype=np.float32),
                 gt_names=np.zeros(0, dtype='<U32'),

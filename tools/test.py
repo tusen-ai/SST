@@ -10,10 +10,11 @@ from mmcv.runner import (get_dist_info, init_dist, load_checkpoint,
                          wrap_fp16_model)
 
 from mmdet3d.apis import single_gpu_test
-from mmdet3d.datasets import build_dataloader, build_dataset
+from mmdet3d.datasets import build_dataloader, build_dataset, build_dataloader_sequential
 from mmdet3d.models import build_model
 from mmdet.apis import multi_gpu_test, set_random_seed
 from mmdet.datasets import replace_ImageToTensor
+from mmdet3d.apis.test import multi_gpu_test_sequential
 
 
 def parse_args():
@@ -158,12 +159,23 @@ def main():
 
     # build the dataloader
     dataset = build_dataset(cfg.data.test)
-    data_loader = build_dataloader(
-        dataset,
-        samples_per_gpu=samples_per_gpu,
-        workers_per_gpu=cfg.data.workers_per_gpu,
-        dist=distributed,
-        shuffle=False)
+    if not cfg.model.test_cfg.get('sequential', False):
+        data_loader = build_dataloader(
+            dataset,
+            samples_per_gpu=samples_per_gpu,
+            workers_per_gpu=cfg.data.workers_per_gpu,
+            dist=distributed,
+            shuffle=False
+        )
+    else:
+        data_loader = build_dataloader_sequential(
+            dataset,
+            samples_per_gpu=samples_per_gpu,
+            workers_per_gpu=cfg.data.workers_per_gpu,
+            dist=distributed,
+            shuffle=False,
+            segment_break=cfg.model.test_cfg['segment_break']
+            )
 
     # build the model and load checkpoint
     cfg.model.train_cfg = None
@@ -189,8 +201,13 @@ def main():
             model.cuda(),
             device_ids=[torch.cuda.current_device()],
             broadcast_buffers=False)
-        outputs = multi_gpu_test(model, data_loader, args.tmpdir,
-                                 args.gpu_collect)
+        if not cfg.model.test_cfg.get('sequential', False):
+            outputs = multi_gpu_test(model, data_loader, args.tmpdir,
+                                args.gpu_collect)
+        else:
+            print('********* Use Sequential test scheme *********')
+            outputs = multi_gpu_test_sequential(model, data_loader, args.tmpdir,
+                                args.gpu_collect)
 
     rank, _ = get_dist_info()
     if rank == 0:

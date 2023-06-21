@@ -34,7 +34,7 @@ from mmdet3d.utils import TorchTimer
 timer = TorchTimer(-1)
 
 @DETECTORS.register_module()
-class TwoStageIncrementalDetector(SingleStageFSD):
+class TwoStageFSDPP(SingleStageFSD):
 
     def __init__(self,
                  backbone,
@@ -732,7 +732,6 @@ class TwoStageIncrementalDetector(SingleStageFSD):
             # too small numer of points may lead to error in spconv
             filler = F.pad(cur_points[:500, :], (0, 1), 'constant', 0) # hard code frame IDs
             out_points = torch.cat([filler, out_points], 0)
-            print('*********padding*********')
 
         return out_points
 

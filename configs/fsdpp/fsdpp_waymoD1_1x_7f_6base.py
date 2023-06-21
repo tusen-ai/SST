@@ -1,5 +1,5 @@
 _base_ = [
-    '../_base_/datasets/waymo-3d-3class-incremental-8f.py',
+    '../_base_/datasets/waymo-3d-3class-fsdpp-8f.py',
     '../_base_/schedules/cosine_2x.py',
     '../_base_/default_runtime.py',
 ]
@@ -12,8 +12,6 @@ seg_score_thresh = (0.5, 0.25, 0.15)
 
 segmentor = dict(
     type='VoteSegmentor',
-    segmentation_test=False,
-    drop_output=True,
     tanh_dims=[3, 4],
     voxel_downsampling_size=(0.05, 0.05, 0.05),
 
@@ -87,15 +85,10 @@ segmentor = dict(
         class_names=('Car', 'Ped', 'Cyc'), # for training log
         centroid_offset=False,
     ),
-    test_cfg=dict(
-        point_loss=True,
-        score_thresh=seg_score_thresh, # for test
-        clustering_voxel_size=(0.5, 0.5, 6), # for test
-    )
 )
 
 model = dict(
-    type='TwoStageIncrementalDetector',
+    type='TwoStageFSDPP',
 
     incremental_cfg=dict(
         voxel_size=(0.25, 0.25, 0.4),
@@ -115,20 +108,14 @@ model = dict(
     segmentor=segmentor,
 
     backbone=dict(
-        type='StackedVFE',
+        type='SIR',
         num_blocks=3,
         in_channels=[85,] + [134, ] * 2,
         feat_channels=[[128, 128], ] * 3,
         rel_mlp_hidden_dims=[[16, 32],] * 3,
-        with_rel_mlp=True,
-        with_distance=False,
-        with_cluster_center=False,
         norm_cfg=dict(type='LN', eps=1e-3),
         mode='max',
         xyz_normalizer=[20, 20, 4],
-        use_middle_cluster_feature=True,
-        cat_voxel_feats=True,
-        pos_fusion='mul',
         act='gelu',
         unique_once=True,
     ),
@@ -184,21 +171,14 @@ model = dict(
             num_blocks=3,
             in_channels=[214, 131+13+3, 131+13+3], 
             feat_channels=[[128, 128], ] * 3,
-            with_distance=False,
-            with_cluster_center=False,
-            with_rel_mlp=True,
             rel_mlp_hidden_dims=[[16, 32],] * 3,
             rel_mlp_in_channels=[13, ] * 3,
             reg_mlp=[512, 512],
             cls_mlp=[512, 512],
             mode='max',
             xyz_normalizer=[20, 20, 4],
-            cat_voxel_feats=True,
-            pos_fusion='mul',
-            fusion='cat',
             act='gelu',
             geo_input=True,
-            use_middle_cluster_feature=True,
             with_corner_loss=True,
             corner_loss_weight=1.0,
             bbox_coder=dict(type='DeltaXYZWLHRBBoxCoder'),
@@ -220,7 +200,6 @@ model = dict(
         test_cfg=None,
         pretrained=None,
         init_cfg=None,
-        checkpointing=False,
     ),
 
     train_cfg=dict(
@@ -299,6 +278,7 @@ model = dict(
         reuse_test=True,
         reuse_results=True,
         calib_interval=-1,
+        segment_break=[0, 4931, 9879, 14820, 19764, 24719, 29680, 34833, 39987], # index of the first frame on each GPU
         rpn=dict(
             use_rotate_nms=True,
             nms_pre=-1,

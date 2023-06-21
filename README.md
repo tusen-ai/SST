@@ -4,7 +4,7 @@
 [![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/embracing-single-stride-3d-object-detector/3d-object-detection-on-waymo-cyclist)](https://paperswithcode.com/sota/3d-object-detection-on-waymo-cyclist?p=embracing-single-stride-3d-object-detector)
 [![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/embracing-single-stride-3d-object-detector/3d-object-detection-on-waymo-vehicle)](https://paperswithcode.com/sota/3d-object-detection-on-waymo-vehicle?p=embracing-single-stride-3d-object-detector)
 
-### 🔥 We release the code of CTRL, the first open-sourced LiDAR-based auto-labeling system. See [ctrl_instruction](https://github.com/tusen-ai/SST/blob/main/CTRL_instructions.md).
+### 🔥 We release the code of CTRL, the first open-sourced LiDAR-based auto-labeling system. See [ctrl_instruction](https://github.com/tusen-ai/SST/blob/main/docs/CTRL_instructions.md).
 
 ---
 
@@ -15,15 +15,15 @@ This repo contains official implementations of our series of work in LiDAR-based
 - [Super Sparse 3D Object Detection](http://arxiv.org/abs/2301.02562) (TPAMI 2023).
 - [Once Detected, Never Lost: Surpassing Human Performance in Offline LiDAR based 3D Object Detection](https://arxiv.org/abs/2304.12315).
 
-Users could follow the [instructions](https://github.com/tusen-ai/SST/blob/main/instructions.md) to use this repo.
+Users could follow the instructions in [docs](https://github.com/tusen-ai/SST/blob/main/docs) to use this repo.
 
 
 **NEWS**
+- [23-06-21] 🔥 The code of FSD++ (TPAMI version of FSD) is released.
 - [23-06-19] 🔥 The code of CTRL is released.
 - [23-03-21] The Argoverse 2 model of FSD is released. See [instructions](https://github.com/tusen-ai/SST/blob/main/instructions.md).
 - [22-09-19] The code of FSD is released here.
 - [22-09-15] FSD is accepted at NeurIPS 2022.
-- [22-06-06] Support SST with CenterHead, cosine similarity in attention, faster SSTInputLayer.
 - [22-03-02] SST is accepted at CVPR 2022.
 - [21-12-10] The code of SST is released.
 
