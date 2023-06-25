@@ -871,6 +871,86 @@ class LoadPointsFromMultiSweepsWaymo(LoadPointsFromMultiSweeps):
         return f'{self.__class__.__name__}(sweeps_num={self.sweeps_num})'
 
 @PIPELINES.register_module()
+class LoadPreviousSweepsWaymo(LoadPointsFromMultiSweeps):
+
+    def __init__(self,
+                 sweeps_num=10,
+                 load_dim=5,
+                 use_dim=[0, 1, 2, 3, 4],
+                 file_client_args=dict(backend='disk'),
+                 ):
+        super().__init__(
+                 sweeps_num=sweeps_num,
+                 load_dim=load_dim,
+                 use_dim=use_dim,
+                 file_client_args=file_client_args,
+                 pad_empty_sweeps=False,
+                 remove_close=False,
+                 )
+        if isinstance(self.use_dim, int):
+            self.use_dim = list(range(self.use_dim))
+
+
+    def __call__(self, results):
+
+        cur_points = results['points']
+        sweep_points_list = [cur_points]
+        frame_inds_list = [np.zeros(len(cur_points.tensor), dtype=int),]
+        sweeps = results['sweeps']
+        real_num_sweeps = min(self.sweeps_num, len(sweeps))
+        sweeps = sweeps[:real_num_sweeps]
+
+        # pad self as latest frame. So there are at least 1 previous frame and can make a very clean diff operation.
+        if real_num_sweeps < self.sweeps_num:
+            sweeps = [
+                dict(
+                    velodyne_path=results['pts_filename'],
+                    pose=results['pose']
+                )
+            ] + sweeps
+
+        # ts = results['timestamp']
+        ts = None # timestamp in mmdet is wrong
+
+        for idx in range(len(sweeps)):
+            sweep = sweeps[idx]
+            data_path = os.path.join(os.path.dirname(results['pts_filename']), os.path.basename(sweep['velodyne_path']))
+            points_sweep = self._load_points(data_path)
+            points_sweep = np.copy(points_sweep).reshape(-1, self.load_dim)
+            curr_pose = results['pose']
+            past_pose = sweep['pose']
+
+            past2world_rot = past_pose[0:3, 0:3]
+            past2world_trans = past_pose[0:3, 3]
+
+            world2curr_pose = np.linalg.inv(curr_pose)
+            world2curr_rot = world2curr_pose[0:3, 0:3]
+            world2curr_trans = world2curr_pose[0:3, 3]
+
+            past_points = points_sweep[:, :3]
+
+            past_pc_in_world = np.einsum('ij,nj->ni', past2world_rot, past_points) + past2world_trans[None, :]
+            past_pc_in_curr = np.einsum('ij,nj->ni', world2curr_rot, past_pc_in_world) + world2curr_trans[None, :]
+
+            points_sweep[:, :3] = past_pc_in_curr
+            points_sweep = points_sweep[:, self.use_dim]
+
+            frame_inds_list.append(np.zeros(len(points_sweep), dtype=int) - idx - 1)
+            points_sweep = cur_points.new_point(points_sweep)
+            # vis_bev_pc('ms_01_before_cat.png', points_sweep.tensor[:, :3], [-80.88, -80.88, -2, 80.88, 80.88, 4])
+            sweep_points_list.append(points_sweep)
+
+        results['points'] = cur_points.cat(sweep_points_list)
+        results['pts_frame_inds'] = np.concatenate(frame_inds_list, 0)
+        results['num_frames'] = len(sweeps) + 1
+
+        return results
+
+    def __repr__(self):
+        """str: Return a string that describes the module."""
+        return f'{self.__class__.__name__}(sweeps_num={self.sweeps_num})'
+
+@PIPELINES.register_module()
 class LoadPointsFromFileResetLast(LoadPointsFromFile):
 
     def __init__(self,
