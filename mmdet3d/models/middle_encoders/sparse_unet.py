@@ -342,7 +342,9 @@ class SimpleSparseUNet(SparseUNet):
                  decoder_paddings=((1, 0), (1, 0), (0, 0), (0, 1)),
                  keep_coors_dims=None,
                  act_type='relu',
-                 init_cfg=None):
+                 return_multiscale_features=False,
+                 init_cfg=None,
+                 ):
         super().__init__(
             in_channels=in_channels,
             sparse_shape=sparse_shape,
@@ -361,6 +363,7 @@ class SimpleSparseUNet(SparseUNet):
         self.conv_out = None # override
         self.ndim = ndim
         self.keep_coors_dims = keep_coors_dims
+        self.return_multiscale_features = return_multiscale_features
 
     @auto_fp16(apply_to=('voxel_features', ))
     def forward(self, voxel_info):
@@ -390,6 +393,102 @@ class SimpleSparseUNet(SparseUNet):
         x = self.conv_input(input_sp_tensor)
 
         encode_features = []
+        decode_features = []
+        for encoder_layer in self.encoder_layers:
+            x = encoder_layer(x)
+            encode_features.append(x)
+
+        x = encode_features[-1]
+        for i in range(self.stage_num, 0, -1):
+            x = self.decoder_layer_forward(encode_features[i - 1], x,
+                                           getattr(self, f'lateral_layer{i}'),
+                                           getattr(self, f'merge_layer{i}'),
+                                           getattr(self, f'upsample_layer{i}'))
+            if self.return_multiscale_features:
+                decode_features.append(x)
+
+        seg_features = x.features
+        ret = {'voxel_feats':x.features, 'voxel_coors': x.indices, 'sparse_shape':x.spatial_shape, 'batch_size':x.batch_size, 'decoder_features':decode_features}
+        ret = [ret,] # keep consistent with SSTv2
+
+        return ret
+
+@BACKBONES.register_module()
+class VirtualVoxelMixer(SparseUNet):
+    r""" A simpler SparseUNet, removing the densify part
+    """
+
+    def __init__(self,
+                 in_channels,
+                 sparse_shape,
+                 order=('conv', 'norm', 'act'),
+                 norm_cfg=dict(type='BN1d', eps=1e-3, momentum=0.01),
+                 base_channels=16,
+                 output_channels=128,
+                 ndim=3,
+                 encoder_channels=((16, ), (32, 32, 32), (64, 64, 64), (64, 64,
+                                                                        64)),
+                 encoder_paddings=((1, ), (1, 1, 1), (1, 1, 1), ((0, 1, 1), 1,
+                                                                 1)),
+                 decoder_channels=((64, 64, 64), (64, 64, 32), (32, 32, 16),
+                                   (16, 16, 16)),
+                 decoder_paddings=((1, 0), (1, 0), (0, 0), (0, 1)),
+                 keep_coors_dims=None,
+                 act_type='relu',
+                 init_cfg=None):
+        super().__init__(
+            in_channels=in_channels,
+            sparse_shape=sparse_shape,
+            order=order,
+            norm_cfg=norm_cfg,
+            base_channels=base_channels,
+            output_channels=output_channels,
+            encoder_channels=encoder_channels,
+            encoder_paddings=encoder_paddings,
+            decoder_channels=decoder_channels,
+            decoder_paddings=decoder_paddings,
+            ndim=ndim,
+            act_type=act_type,
+            init_cfg=init_cfg,
+        )
+        self.ndim = ndim
+        self.keep_coors_dims = keep_coors_dims
+
+        self.conv_out = make_sparse_convmodule(
+            decoder_channels[-1][-1],
+            self.output_channels,
+            kernel_size=3,
+            stride=1,
+            norm_cfg=norm_cfg,
+            padding=0,
+            indice_key='out_conv',
+            conv_type=f'SubMConv{self.ndim}d',
+            act_type=act_type
+            )
+
+    @auto_fp16(apply_to=('voxel_features', ))
+    def forward(self, voxel_features, coors, batch_size):
+        """Forward of SparseUNet.
+        Args:
+            voxel_features (torch.float32): Voxel features in shape [N, C].
+            coors (torch.int32): Coordinates in shape [N, 4],
+                the columns in the order of (batch_idx, z_idx, y_idx, x_idx).
+            batch_size (int): Batch size.
+        Returns:
+            dict[str, torch.Tensor]: Backbone features.
+        """
+        if self.ndim == 2:
+            assert (coors[:, 1] == 0).all()
+            coors = coors[:, [0, 2, 3]] # remove the z-axis indices
+        if self.keep_coors_dims is not None:
+            coors = coors[:, self.keep_coors_dims]
+        coors = coors.int()
+        input_sp_tensor = SparseConvTensor(voxel_features, coors,
+                                                  self.sparse_shape,
+                                                  batch_size)
+        x = self.conv_input(input_sp_tensor)
+
+        encode_features = []
         for encoder_layer in self.encoder_layers:
             x = encoder_layer(x)
             encode_features.append(x)
@@ -401,9 +500,6 @@ class SimpleSparseUNet(SparseUNet):
                                            getattr(self, f'merge_layer{i}'),
                                            getattr(self, f'upsample_layer{i}'))
             # decode_features.append(x)
+        x = self.conv_out(x)
 
-        seg_features = x.features
-        ret = {'voxel_feats':x.features}
-        ret = [ret,] # keep consistent with SSTv2
-
-        return ret
+        return x.features, x.indices, x.spatial_shape

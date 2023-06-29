@@ -12,6 +12,7 @@ from .ssd_3d_head import SSD3DHead
 from .vote_head import VoteHead
 from .sparse_cluster_head import SparseClusterHead
 from .sparse_cluster_head_v2 import SparseClusterHeadV2, FSDSeparateHead
+from .fsd_v2_head import FSDV2Head 
 
 
 __all__ = [

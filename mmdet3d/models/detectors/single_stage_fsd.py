@@ -195,6 +195,7 @@ class VoteSegmentor(Base3DSegmentor):
         self.voxel_size = voxel_layer['voxel_size']
         self.voxel_downsampling_size = voxel_downsampling_size
         self.tanh_dims = tanh_dims
+        self.use_multiscale_features = backbone.get('return_multiscale_features', False)
     
     def encode_decode(self, ):
         return None
@@ -240,6 +241,11 @@ class VoteSegmentor(Base3DSegmentor):
             voxel_feats_reorder = self.reorder(x['voxel_feats'], voxel_info['shuffle_inds'], voxel_info['voxel_keep_inds'], padding) #'not consistent with voxel_coors any more'
 
         out = self.decode_neck(batch_points, coors, voxel_feats_reorder, voxel2point_inds, padding)
+
+        if self.use_multiscale_features:
+            return out, coors, batch_points, x['decoder_features']
+        else:
+            return out, coors, batch_points
 
         return out, coors, batch_points
     
@@ -291,7 +297,11 @@ class VoteSegmentor(Base3DSegmentor):
 
         labels, vote_targets, vote_mask = self.segmentation_head.get_targets(points, gt_bboxes_3d, gt_labels_3d)
 
-        neck_out, pts_coors, points = self.extract_feat(points, img_metas)
+        if self.use_multiscale_features:
+            neck_out, pts_coors, points, decoder_features = self.extract_feat(points, img_metas)
+        else:
+            neck_out, pts_coors, points = self.extract_feat(points, img_metas)
+            decoder_features = None
 
         losses = dict()
 
@@ -321,7 +331,8 @@ class VoteSegmentor(Base3DSegmentor):
                 offsets=offsets,
                 seg_feats=feats,
                 batch_idx=pts_coors[:, 0],
-                losses=losses
+                losses=losses,
+                decoder_features=decoder_features,
             )
         else:
             loss_decode = self.segmentation_head.forward_train(feats, img_metas, labels, vote_targets, vote_mask, return_preds=False)
@@ -344,7 +355,13 @@ class VoteSegmentor(Base3DSegmentor):
             points = self.voxel_downsample(points)
 
         seg_pred = []
-        x, pts_coors, points = self.extract_feat(points, img_metas)
+
+        if self.use_multiscale_features:
+            x, pts_coors, points, decoder_features = self.extract_feat(points, img_metas)
+        else:
+            x, pts_coors, points = self.extract_feat(points, img_metas)
+            decoder_features = None
+
         feats = x[0]
         valid_pts_mask = x[1]
         points = points[valid_pts_mask]
@@ -361,6 +378,7 @@ class VoteSegmentor(Base3DSegmentor):
             offsets=offsets,
             seg_feats=feats,
             batch_idx=pts_coors[:, 0],
+            decoder_features=decoder_features,
         )
 
         return output_dict

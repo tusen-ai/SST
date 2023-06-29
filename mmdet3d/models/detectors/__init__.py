@@ -15,6 +15,8 @@ from .votenet import VoteNet
 from .voxelnet import VoxelNet
 from .single_stage_fsd import SingleStageFSD, VoteSegmentor
 from .two_stage_fsd import FSD
+from .single_stage_fsd_v2 import SingleStageFSDV2
+from .two_stage_fsd_v2 import FSDV2
 
 from .two_stage_fsdpp import TwoStageFSDPP
 from .tracklet_detector import TrackletSegmentor, TrackletDetector
