@@ -222,7 +222,7 @@ log_config=dict(
     interval=50,
 )
 custom_hooks = [
-    dict(type='DisableAugmentationHook', num_last_epochs=5, skip_type_keys=('MyObjectSample'), dataset_wrap=True),
+    dict(type='DisableAugmentationHook', num_last_epochs=5, skip_type_keys=('ObjectSample',), dataset_wrap=True),
     dict(type='EnableFSDDetectionHookIter', enable_after_iter=4000, threshold_buffer=0.4, buffer_iter=8000) 
 ]
 
