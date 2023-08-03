@@ -22,7 +22,8 @@ This step only need to be executed **once** for all experiments on WOD.
 
 
 ### Step 2: Use ImmortalTracker to generate tracking results in training split (bin file format)
-This step can be finished with any 3D Object Tracking methods, and we will release our modified ImmortalTracker codebase in near future.
+~~This step can be finished with any 3D Object Tracking methods, and we will release our modified ImmortalTracker codebase in near future.~~
+We have released the tailored ImmortalTracker here: https://github.com/Abyssaledge/ImmortalTracker-for-CTRL
 
 ### Step 3: Generate track input for training
 
