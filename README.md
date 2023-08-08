@@ -5,6 +5,7 @@
 [![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/embracing-single-stride-3d-object-detector/3d-object-detection-on-waymo-vehicle)](https://paperswithcode.com/sota/3d-object-detection-on-waymo-vehicle?p=embracing-single-stride-3d-object-detector)
 
 ### 🔥 We release the code of CTRL, the first open-sourced LiDAR-based auto-labeling system. See [ctrl_instruction](https://github.com/tusen-ai/SST/blob/main/docs/CTRL_instructions.md).
+### 🔥 We release FSDv2. Better performance, easier use! Support Waymo, nuScenes, and Argoverse 2. See [overall_instruction](https://github.com/tusen-ai/SST/blob/main/docs/overall_instructions.md).
 
 ---
 
@@ -19,8 +20,10 @@ Users could follow the instructions in [docs](https://github.com/tusen-ai/SST/bl
 
 
 **NEWS**
-- [23-06-21] 🔥 The code of FSD++ (TPAMI version of FSD) is released.
-- [23-06-19] 🔥 The code of CTRL is released.
+- [23-08-08] The code of FSDv2 is merged into this repo.
+- [23-07-14] CTRL is aceepted at ICCV 2023.
+- [23-06-21] The code of FSD++ (TPAMI version of FSD) is released.
+- [23-06-19] The code of CTRL is released.
 - [23-03-21] The Argoverse 2 model of FSD is released. See [instructions](https://github.com/tusen-ai/SST/blob/main/instructions.md).
 - [22-09-19] The code of FSD is released here.
 - [22-09-15] FSD is accepted at NeurIPS 2022.
@@ -64,6 +67,14 @@ Please consider citing our work as follows if it is helpful.
   title={Once Detected, Never Lost: Surpassing Human Performance in Offline LiDAR based 3D Object Detection},
   author={Fan, Lue and Yang, Yuxue and Mao, Yiming and Wang, Feng and Chen, Yuntao and Wang, Naiyan and Zhang, Zhaoxiang},
   booktitle={ICCV},
+  year={2023}
+}
+```
+```
+@article{fan2023fsdv2,
+  title={FSD V2: Improving Fully Sparse 3D Object Detection with Virtual Voxels},
+  author={Fan, Lue and Wang, Feng and Wang, Naiyan and Zhang, Zhaoxiang},
+  journal={arXiv preprint arXiv:2308.03755},
   year={2023}
 }
 ```
