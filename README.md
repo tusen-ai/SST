@@ -15,6 +15,7 @@ This repo contains official implementations of our series of work in LiDAR-based
 - [Fully Sparse 3D Object Detection](http://arxiv.org/abs/2207.10035) (NeurIPS 2022).
 - [Super Sparse 3D Object Detection](http://arxiv.org/abs/2301.02562) (TPAMI 2023).
 - [Once Detected, Never Lost: Surpassing Human Performance in Offline LiDAR based 3D Object Detection](https://arxiv.org/abs/2304.12315) (ICCV 2023).
+- [FSD V2: Improving Fully Sparse 3D Object Detection with Virtual Voxels](https://arxiv.org/abs/2308.03755).
 
 Users could follow the instructions in [docs](https://github.com/tusen-ai/SST/blob/main/docs) to use this repo.
 
