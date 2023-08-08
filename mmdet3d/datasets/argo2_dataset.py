@@ -136,6 +136,8 @@ class Argo2Dataset(KittiDataset):
             test_mode=test_mode,
             pcd_limit_range=pcd_limit_range)
         self.save_training = save_training
+        self.pipeline_types = [p['type'] for p in pipeline]
+        self._skip_type_keys = None
 
         # to load a subset, just set the load_interval in the dataset config
         self.data_infos = self.data_infos[::load_interval]
@@ -255,6 +257,34 @@ class Argo2Dataset(KittiDataset):
             gt_names=gt_names)
         return anns_results
 
+    def update_skip_type_keys(self, skip_type_keys):
+        self._skip_type_keys = skip_type_keys
+
+    def prepare_train_data(self, index):
+        """Training data preparation.
+        Args:
+            index (int): Index for accessing the target data.
+        Returns:
+            dict: Training data dict of the corresponding index.
+        """
+        input_dict = self.get_data_info(index)
+        if input_dict is None:
+            return None
+        self.pre_pipeline(input_dict)
+
+        example = input_dict
+        for transform, transform_type in zip(self.pipeline.transforms, self.pipeline_types):
+            if self._skip_type_keys is not None and transform_type in self._skip_type_keys:
+                continue
+            example = transform(example)
+
+        # example = self.pipeline(input_dict)
+        if self.filter_empty_gt and \
+                (example is None or
+                    ~(example['gt_labels_3d']._data != -1).any()):
+            return None
+        return example
+
     def format_results_old(self,
                        outputs,
                        pklfile_prefix=None,
@@ -345,6 +375,7 @@ class Argo2Dataset(KittiDataset):
                        outputs,
                        pklfile_prefix=None,
                        submission_prefix=None,
+                       **kwargs,
                        ):
         """Format the results to .feather file with argo2 format.
 

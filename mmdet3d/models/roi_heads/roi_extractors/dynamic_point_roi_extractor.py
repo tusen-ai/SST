@@ -20,11 +20,13 @@ class DynamicPointROIExtractor(BaseModule):
         init_cfg=None,
         debug=True,
         extra_wlh=[0, 0, 0],
-        max_inbox_point=512,):
+        max_inbox_point=512,
+        max_all_pts=50000,):
         super().__init__(init_cfg=init_cfg)
         self.debug = debug
         self.extra_wlh = extra_wlh
         self.max_inbox_point = max_inbox_point
+        self.max_all_pts = max_all_pts
 
 
     def forward(self, pts_xyz, batch_inds, rois, max_inbox_point=None, batch_size=None):
@@ -62,6 +64,7 @@ class DynamicPointROIExtractor(BaseModule):
                 pts_xyz[pts_batch_mask],
                 self.extra_wlh,
                 max_inbox_point,
+                self.max_all_pts,
             )
             # append returns to all_inds, all_local_xyz, all_offset
             if len(ext_pts_inds) == 1 and ext_pts_inds[0].item() == -1:

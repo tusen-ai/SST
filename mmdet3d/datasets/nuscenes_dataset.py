@@ -10,6 +10,8 @@ from ..core import show_result
 from ..core.bbox import Box3DMode, Coord3DMode, LiDARInstance3DBoxes
 from .custom_3d import Custom3DDataset
 from .pipelines import Compose
+import multiprocessing, pickle
+import os
 
 
 @DATASETS.register_module()
@@ -147,6 +149,36 @@ class NuScenesDataset(Custom3DDataset):
                 use_map=False,
                 use_external=False,
             )
+        self._skip_type_keys = None
+        self.pipeline_types = [p['type'] for p in pipeline]
+
+    def prepare_train_data(self, index):
+        """Training data preparation.
+        Args:
+            index (int): Index for accessing the target data.
+        Returns:
+            dict: Training data dict of the corresponding index.
+        """
+        input_dict = self.get_data_info(index)
+        if input_dict is None:
+            return None
+        self.pre_pipeline(input_dict)
+
+        example = input_dict
+        for transform, transform_type in zip(self.pipeline.transforms, self.pipeline_types):
+            if self._skip_type_keys is not None and transform_type in self._skip_type_keys:
+                continue
+            example = transform(example)
+
+        # example = self.pipeline(input_dict)
+        if self.filter_empty_gt and \
+                (example is None or
+                    ~(example['gt_labels_3d']._data != -1).any()):
+            return None
+        return example
+
+    def update_skip_type_keys(self, skip_type_keys):
+        self._skip_type_keys = skip_type_keys
 
     def get_cat_ids(self, idx):
         """Get category distribution of single scene.
@@ -295,8 +327,8 @@ class NuScenesDataset(Custom3DDataset):
             gt_names=gt_names_3d)
         return anns_results
 
-    def _format_bbox(self, results, jsonfile_prefix=None):
-        """Convert the results to the standard format.
+    def format_bbox(self, results, jsonfile_prefix=None):
+        """Convert the results to the standard format with multiproccessing.
 
         Args:
             results (list[dict]): Testing results of the dataset.
@@ -307,52 +339,30 @@ class NuScenesDataset(Custom3DDataset):
         Returns:
             str: Path of the output json file.
         """
-        nusc_annos = {}
-        mapped_class_names = self.CLASSES
 
-        print('Start to convert detection format...')
-        for sample_id, det in enumerate(mmcv.track_iter_progress(results)):
-            annos = []
-            boxes = output_to_nusc_box(det)
-            sample_token = self.data_infos[sample_id]['token']
-            boxes = lidar_nusc_box_to_global(self.data_infos[sample_id], boxes,
-                                             mapped_class_names,
-                                             self.eval_detection_configs,
-                                             self.eval_version)
-            for i, box in enumerate(boxes):
-                name = mapped_class_names[box.label]
-                if np.sqrt(box.velocity[0]**2 + box.velocity[1]**2) > 0.2:
-                    if name in [
-                            'car',
-                            'construction_vehicle',
-                            'bus',
-                            'truck',
-                            'trailer',
-                    ]:
-                        attr = 'vehicle.moving'
-                    elif name in ['bicycle', 'motorcycle']:
-                        attr = 'cycle.with_rider'
-                    else:
-                        attr = NuScenesDataset.DefaultAttribute[name]
-                else:
-                    if name in ['pedestrian']:
-                        attr = 'pedestrian.standing'
-                    elif name in ['bus']:
-                        attr = 'vehicle.stopped'
-                    else:
-                        attr = NuScenesDataset.DefaultAttribute[name]
+        print('\nStart to convert detection format...')
+        # single thread
+        # nusc_annos = {}
+        # mapped_class_names = self.CLASSES
+        # nusc_annos = self.format_bbox_single(results, jsonfile_prefix, 0)
+        for det in results:
+            det['boxes_3d'].to_ndarray()
+            det['scores_3d'] = det['scores_3d'].numpy()
+            det['labels_3d'] = det['labels_3d'].numpy()
 
-                nusc_anno = dict(
-                    sample_token=sample_token,
-                    translation=box.center.tolist(),
-                    size=box.wlh.tolist(),
-                    rotation=box.orientation.elements.tolist(),
-                    velocity=box.velocity[:2].tolist(),
-                    detection_name=name,
-                    detection_score=box.score,
-                    attribute_name=attr)
-                annos.append(nusc_anno)
-            nusc_annos[sample_token] = annos
+        #multi thread
+        num_process = 20
+        with multiprocessing.Manager() as manager:
+            nusc_annos = manager.dict()
+            pool = multiprocessing.Pool(num_process)
+            for token in range(num_process):
+                result = pool.apply_async(
+                    format_bbox_single, 
+                    args=(results, nusc_annos, jsonfile_prefix, num_process, token, self.CLASSES, self.data_infos, self.eval_detection_configs, self.eval_version))
+            pool.close()
+            pool.join()
+            nusc_annos = dict(nusc_annos)
+
         nusc_submissions = {
             'meta': self.modality,
             'results': nusc_annos,
@@ -399,7 +409,7 @@ class NuScenesDataset(Custom3DDataset):
             eval_set=eval_set_map[self.version],
             output_dir=output_dir,
             verbose=False)
-        nusc_eval.main(render_curves=False)
+        nusc_eval.main(plot_examples=10,render_curves=True)
 
         # record metrics
         metrics = mmcv.load(osp.join(output_dir, 'metrics_summary.json'))
@@ -454,7 +464,7 @@ class NuScenesDataset(Custom3DDataset):
         # this is a workaround to enable evaluation of both formats on nuScenes
         # refer to https://github.com/open-mmlab/mmdetection3d/issues/449
         if not ('pts_bbox' in results[0] or 'img_bbox' in results[0]):
-            result_files = self._format_bbox(results, jsonfile_prefix)
+            result_files = self.format_bbox(results, jsonfile_prefix)
         else:
             # should take the inner dict out of 'pts_bbox' or 'img_bbox' dict
             result_files = dict()
@@ -463,7 +473,7 @@ class NuScenesDataset(Custom3DDataset):
                 results_ = [out[name] for out in results]
                 tmp_file_ = osp.join(jsonfile_prefix, name)
                 result_files.update(
-                    {name: self._format_bbox(results_, tmp_file_)})
+                    {name: self.format_bbox(results_, tmp_file_)})
         return result_files, tmp_dir
 
     def evaluate(self,
@@ -581,8 +591,9 @@ def output_to_nusc_box(detection):
         list[:obj:`NuScenesBox`]: List of standard NuScenesBoxes.
     """
     box3d = detection['boxes_3d']
-    scores = detection['scores_3d'].numpy()
-    labels = detection['labels_3d'].numpy()
+    box3d.to_tensor()
+    scores = detection['scores_3d']
+    labels = detection['labels_3d']
 
     box_gravity_center = box3d.gravity_center.numpy()
     box_dims = box3d.dims.numpy()
@@ -646,3 +657,52 @@ def lidar_nusc_box_to_global(info,
         box.translate(np.array(info['ego2global_translation']))
         box_list.append(box)
     return box_list
+
+def format_bbox_single(results, nusc_annos, jsonfile_prefix, num_process, task_id, mapped_class_names, data_infos, eval_detection_configs, eval_version):
+    print('start task id {}'.format(task_id))
+    #single thread
+    for sample_id, det in enumerate(mmcv.track_iter_progress(results)):
+        if sample_id % num_process != task_id:
+            continue
+        annos = []
+        boxes = output_to_nusc_box(det)
+        sample_token = data_infos[sample_id]['token']
+        boxes = lidar_nusc_box_to_global(data_infos[sample_id], boxes,
+                                            mapped_class_names,
+                                            eval_detection_configs,
+                                            eval_version)
+        for i, box in enumerate(boxes):
+            name = mapped_class_names[box.label]
+            if np.sqrt(box.velocity[0]**2 + box.velocity[1]**2) > 0.2:
+                if name in [
+                        'car',
+                        'construction_vehicle',
+                        'bus',
+                        'truck',
+                        'trailer',
+                ]:
+                    attr = 'vehicle.moving'
+                elif name in ['bicycle', 'motorcycle']:
+                    attr = 'cycle.with_rider'
+                else:
+                    attr = NuScenesDataset.DefaultAttribute[name]
+            else:
+                if name in ['pedestrian']:
+                    attr = 'pedestrian.standing'
+                elif name in ['bus']:
+                    attr = 'vehicle.stopped'
+                else:
+                    attr = NuScenesDataset.DefaultAttribute[name]
+
+            nusc_anno = dict(
+                sample_token=sample_token,
+                translation=box.center.tolist(),
+                size=box.wlh.tolist(),
+                rotation=box.orientation.elements.tolist(),
+                velocity=box.velocity[:2].tolist(),
+                detection_name=name,
+                detection_score=box.score,
+                attribute_name=attr)
+            annos.append(nusc_anno)
+        nusc_annos[sample_token] = annos
+    return None

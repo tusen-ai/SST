@@ -1021,3 +1021,37 @@ class LoadPointsFromFileResetLast(LoadPointsFromFile):
         results['points'] = points
 
         return results
+
+@PIPELINES.register_module()
+class NormalizePoints(object):
+
+    def __init__(self,
+                 std=[255,],
+                 mean=[0,],
+                 dims=[3,]):
+        self.dims = dims
+        self.std = std
+        self.mean = mean
+
+    def __call__(self, input_dict):
+        """Call function to jitter all the points in the scene.
+        Args:
+            input_dict (dict): Result dict from loading pipeline.
+        Returns:
+            dict: Results after adding noise to each point, \
+                'points' key is updated in the result dict.
+        """
+        points = input_dict['points']
+        mean = torch.tensor(self.mean)
+        std = torch.tensor(self.std)
+
+        points.tensor[:, self.dims] = (points.tensor[:, self.dims] - mean[None, :]) / std[None, :]
+
+        return input_dict
+
+    def __repr__(self):
+        """str: Return a string that describes the module."""
+        repr_str = self.__class__.__name__
+        repr_str += f'(jitter_std={self.jitter_std},'
+        repr_str += f' clip_range={self.clip_range})'
+        return repr_str

@@ -467,3 +467,10 @@ class BaseInstance3DBoxes(object):
         original_type = type(self)
         return original_type(
             new_tensor, box_dim=self.box_dim, with_yaw=self.with_yaw, moved=moved)
+
+    def to_ndarray(self,):
+        self.original_device = self.tensor.device
+        self.tensor = self.tensor.cpu().numpy()
+
+    def to_tensor(self,):
+        self.tensor = torch.from_numpy(self.tensor).to(self.original_device)
