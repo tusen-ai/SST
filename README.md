@@ -14,7 +14,8 @@ This repo contains official implementations of our series of work in LiDAR-based
 - [Embracing Single Stride 3D Object Detector with Sparse Transformer](https://arxiv.org/abs/2112.06375) (CVPR 2022).
 - [Fully Sparse 3D Object Detection](http://arxiv.org/abs/2207.10035) (NeurIPS 2022).
 - [Super Sparse 3D Object Detection](http://arxiv.org/abs/2301.02562) (TPAMI 2023).
-- [Once Detected, Never Lost: Surpassing Human Performance in Offline LiDAR based 3D Object Detection](https://arxiv.org/abs/2304.12315) (ICCV 2023).
+- [Once Detected, Never Lost: Surpassing Human Performance in Offline LiDAR based 3D Object Detection](https://arxiv.org/abs/2304.12315) (ICCV 2023, Oral).
+- [FSD V2: Improving Fully Sparse 3D Object Detection with Virtual Voxels](https://arxiv.org/abs/2308.03755).
 
 Users could follow the instructions in [docs](https://github.com/tusen-ai/SST/blob/main/docs) to use this repo.
 
@@ -37,7 +38,7 @@ Users could follow the instructions in [docs](https://github.com/tusen-ai/SST/bl
 ## Citation
 Please consider citing our work as follows if it is helpful.
 
-**Since FSD is accidentally excluded in Google Scholar search results, if possible, please kindly consider citing the journal version of FSD as well**.
+**Since FSD++ (TPAMI version) is accidentally excluded in Google Scholar search results, if possible, please kindly use the following bibtex**.
 ```
 @inproceedings{fan2022embracing,
   title={{Embracing Single Stride 3D Object Detector with Sparse Transformer}},
