@@ -1,0 +1,20 @@
+# old name: fsd_pastfuture_width1_ped
+
+# detection result in waymo bin format
+bin_path: ./data/ctrl_bins/training/fsd_base_ped_trainset.bin
+val_bin_path: ./data/ctrl_bins/validation/fsd_base_ped_val.bin
+data_root: ./data/waymo/tracklet_data
+exist_ok: False
+# split: training
+split: val
+type: [2,] # 1:vehicle 2:pedestrian 4: cyclist
+
+box:
+  extra_width: 1
+
+selection:
+  mode: random
+  size: 1.0
+
+candidate:
+  affinity_thresh: 0.2

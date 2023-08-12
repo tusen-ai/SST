@@ -1,12 +1,13 @@
+# old name: trk_ped_width1_2x
 _base_ = [
-    '../_base_/datasets/waymo-tracklet-vehicle.py',
+    '../_base_/datasets/waymo-tracklet-vehicle.py', # use vehicle base config, it does not matter since overwrite the data pipeline
     '../_base_/schedules/cosine_2x.py',
     '../_base_/default_runtime.py',
 ]
 
 seg_voxel_size = (0.2, 0.2, 0.2)
 point_cloud_range = [-204.8, -204.8, -4.0, 204.8, 204.8, 8.0]
-class_names = ['Car',]
+class_names = ['Pedestrian',]
 num_classes = len(class_names)
 
 segmentor = dict(
@@ -98,7 +99,7 @@ model = dict(
             xyz_normalizer=[20, 20, 4],
             act='gelu',
             geo_input=True,
-            with_corner_loss=True,
+            with_corner_loss=False,
             corner_loss_weight=1.0,
             bbox_coder=dict(type='DeltaXYZWLHRBBoxCoder'),
             norm_cfg=dict(type='LN', eps=1e-3),
@@ -130,8 +131,8 @@ model = dict(
             type='TrackletAssigner',
         ),
         hack_sampler_bug=True,
-        cls_pos_thr=(0.8, ),
-        cls_neg_thr=(0.2, ),
+        cls_pos_thr=(0.65, ),
+        cls_neg_thr=(0.15, ),
 
         sync_reg_avg_factor=True,
         sync_cls_avg_factor=True,
@@ -165,21 +166,9 @@ train_pipeline = [
         type='LoadTrackletAnnotations',
     ),
 
-    dict( # optional
-        type='TrackletCutting',
-        ratio=0.0,
-        max_length=150,
-    ),
-
     dict(
         type='TrackletPoseTransform',
         concat=False,
-    ),
-    dict(
-        type='TrackletNoise',
-        center_noise_cfg=dict(max_noise=[0.2, 0.2, 0.1], consistent=False),
-        size_noise_cfg=dict(max_noise=[0.2, 0.2, 0.1], consistent=False),
-        yaw_noise_cfg=dict(max_noise=0.2, consistent=False),
     ),
     dict(
         type='PointDecoration',
@@ -227,6 +216,9 @@ test_pipeline = [
     dict(type='TrackletFormatBundle', class_names=class_names),
     dict(type='Collect3D', keys=['points', 'pts_frame_inds', 'tracklet']),
 ]
+# construct a pipeline for data and gt loading in show function
+# please keep its loading function consistent with test_pipeline (e.g. client)
+eval_pipeline = test_pipeline
 
 tta_pipeline = [
     dict(
@@ -275,20 +267,18 @@ tta_pipeline = [
         ]
     )
 ]
-# construct a pipeline for data and gt loading in show function
-# please keep its loading function consistent with test_pipeline (e.g. client)
-eval_pipeline = test_pipeline
 
 data = dict(
     samples_per_gpu=16,
     workers_per_gpu=4,
     train=dict(
         type='RepeatDataset',
-        times=2,
+        times=1,
         dataset=dict(
-            ann_file='./data/waymo/tracklet_data/fsd_base_vehicle_training_gt_candidates.pkl',
-            tracklet_proposals_file='./data/waymo/tracklet_data/fsd_base_vehicle_training.pkl',
+            ann_file='./data/waymo/tracklet_data/fsd_base_ped_training_gt_candidates.pkl', # old name: fsd_pastfuture_ped_width1_training_gt_candidates
+            tracklet_proposals_file='./data/waymo/tracklet_data/fsd_base_ped_training.pkl', # old name: fsd_pastfuture_ped_width1_training
             pipeline=train_pipeline,
+            classes=class_names,
             load_interval=1,
         )
     ),
@@ -296,13 +286,15 @@ data = dict(
         pipeline=eval_pipeline,
         min_tracklet_points=1,
         samples_per_gpu=8,
+        classes=class_names,
         ),
     test=dict(
-        tracklet_proposals_file='./data/waymo/tracklet_data/fsd_base_vehicle_val.pkl',
+        tracklet_proposals_file='./data/waymo/tracklet_data/fsd_base_ped_val.pkl', # old name: fsd_pastfuture_ped_width1_val
         pipeline=test_pipeline,
         # pipeline=tta_pipeline,
         min_tracklet_points=1,
         samples_per_gpu=8,
+        classes=class_names,
     )
 )
 log_config=dict(

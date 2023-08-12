@@ -1,11 +1,13 @@
 # Instructions of Our Auto-labeling Framework CTRL
 
-### Here we provide a simple guidance to train and inference CTRL. We also offer the processed data for a quick start at the end of this page. Configs of other classes (pedestrian, cyclist) and tricks such as backtracing will be updated in near future.
+### Here we provide a simple guidance to train and inference CTRL. We also offer the processed data for a quick start at the end of this page. ~~Configs of other classes (pedestrian, cyclist) and tricks such as backtracing will be updated in near future.~~ Configs of all classes have been released.
 
 
 ---
 
 ## Training
+
+Here we take the vehicle class for example.
 
 ### Step 1: Generate train_gt.bin once for all. (waymo bin format).
 User could download the generated results 'train_gt.bin' from the link at the end.
@@ -45,15 +47,17 @@ This steps select some potential GT track for the input predicted tracks in an o
 
 ---
 
-## Inference
+## Inference 
+
+Here we take the vehicle class for example.
 
 ### Step 1: Use ImmortalTracker to generate tracking results in bin file format
 Similar to step 1 in training
 
-### Step 2 (Optional): Backtracing and Extension, specific information are specified in the extend_veh.yaml
-This step is optional. Users could skip this step for quickly start. We will update relevant resources in near future.
+### Step 2 (Optional): Backtracing and Extension, specific information are specified in the extend.yaml
+This step is optional. Users could skip this step for quickly start. ~~We will update relevant resources in near future.~~ `extend.yaml` has been updated.
 
-`python ./tools/ctrl/extend_tracks.py ./tools/ctrl/data_configs/extend_veh.yaml`
+`python ./tools/ctrl/extend_tracks.py ./tools/ctrl/data_configs/extend.yaml`
 
 ### Step 3: Generate track input for inference (bin file path and split need to be specified in fsd_base_vehicle.yaml)
 `python ./tools/ctrl/generate_track_input.py ./tools/ctrl/data_configs/fsd_base_vehicle.yaml --process 8`

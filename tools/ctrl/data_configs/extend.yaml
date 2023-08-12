@@ -1,0 +1,6 @@
+bin_path: /path/to/the/tracker_output.bin
+direction: backward # only backward here, forward should be done in ImmortalTracker see ImmortalTracker-for-CTRL repo
+extend_length: 10
+min_length_to_extend: 3
+score_multiplier: 0.01
+velo_window_size: 10

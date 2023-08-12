@@ -1,12 +1,13 @@
+# old name: trk_cyc_heavy_noise_disable01
 _base_ = [
-    '../_base_/datasets/waymo-tracklet-vehicle.py',
+    '../_base_/datasets/waymo-tracklet-vehicle.py', # use vehicle base config, it does not matter since overwrite the data pipeline
     '../_base_/schedules/cosine_2x.py',
     '../_base_/default_runtime.py',
 ]
 
 seg_voxel_size = (0.2, 0.2, 0.2)
 point_cloud_range = [-204.8, -204.8, -4.0, 204.8, 204.8, 8.0]
-class_names = ['Car',]
+class_names = ['Cyclist',]
 num_classes = len(class_names)
 
 segmentor = dict(
@@ -75,6 +76,7 @@ model = dict(
         num_classes=num_classes,
         general_cfg=dict(
             with_roi_scores=True,
+            class_names=class_names,
         ),
         roi_extractor=dict(
              type='TrackletPointRoIExtractor',
@@ -98,7 +100,7 @@ model = dict(
             xyz_normalizer=[20, 20, 4],
             act='gelu',
             geo_input=True,
-            with_corner_loss=True,
+            with_corner_loss=False,
             corner_loss_weight=1.0,
             bbox_coder=dict(type='DeltaXYZWLHRBBoxCoder'),
             norm_cfg=dict(type='LN', eps=1e-3),
@@ -113,7 +115,7 @@ model = dict(
                 type='CrossEntropyLoss',
                 use_sigmoid=True,
                 reduction='mean',
-                loss_weight=1.0),
+                loss_weight=2.0),
             cls_dropout=0.1,
             reg_dropout=0.1,
         ),
@@ -130,8 +132,8 @@ model = dict(
             type='TrackletAssigner',
         ),
         hack_sampler_bug=True,
-        cls_pos_thr=(0.8, ),
-        cls_neg_thr=(0.2, ),
+        cls_pos_thr=(0.65, ),
+        cls_neg_thr=(0.15, ),
 
         sync_reg_avg_factor=True,
         sync_cls_avg_factor=True,
@@ -149,8 +151,8 @@ model = dict(
 )
 
 # runtime settings
-runner = dict(type='EpochBasedRunner', max_epochs=24)
-evaluation = dict(interval=24)
+runner = dict(type='EpochBasedRunner', max_epochs=12)
+evaluation = dict(interval=12)
 
 train_pipeline = [
     dict(
@@ -165,19 +167,13 @@ train_pipeline = [
         type='LoadTrackletAnnotations',
     ),
 
-    dict( # optional
-        type='TrackletCutting',
-        ratio=0.0,
-        max_length=150,
-    ),
-
     dict(
         type='TrackletPoseTransform',
         concat=False,
     ),
     dict(
         type='TrackletNoise',
-        center_noise_cfg=dict(max_noise=[0.2, 0.2, 0.1], consistent=False),
+        center_noise_cfg=dict(max_noise=[0.4, 0.4, 0.2], consistent=False),
         size_noise_cfg=dict(max_noise=[0.2, 0.2, 0.1], consistent=False),
         yaw_noise_cfg=dict(max_noise=0.2, consistent=False),
     ),
@@ -227,7 +223,6 @@ test_pipeline = [
     dict(type='TrackletFormatBundle', class_names=class_names),
     dict(type='Collect3D', keys=['points', 'pts_frame_inds', 'tracklet']),
 ]
-
 tta_pipeline = [
     dict(
         type='LoadTrackletPoints',
@@ -284,11 +279,12 @@ data = dict(
     workers_per_gpu=4,
     train=dict(
         type='RepeatDataset',
-        times=2,
+        times=10,
         dataset=dict(
-            ann_file='./data/waymo/tracklet_data/fsd_base_vehicle_training_gt_candidates.pkl',
-            tracklet_proposals_file='./data/waymo/tracklet_data/fsd_base_vehicle_training.pkl',
+            ann_file='./data/waymo/tracklet_data/fsd_base_cyc_training_gt_candidates.pkl', # old name: fsd_pastfuture_cyc_training_gt_candidates
+            tracklet_proposals_file='./data/waymo/tracklet_data/fsd_base_cyc_training.pkl', # old name: fsd_pastfuture_cyc_training
             pipeline=train_pipeline,
+            classes=class_names,
             load_interval=1,
         )
     ),
@@ -296,13 +292,15 @@ data = dict(
         pipeline=eval_pipeline,
         min_tracklet_points=1,
         samples_per_gpu=8,
+        classes=class_names,
         ),
     test=dict(
-        tracklet_proposals_file='./data/waymo/tracklet_data/fsd_base_vehicle_val.pkl',
+        tracklet_proposals_file='./data/waymo/tracklet_data/fsd_base_cyc_val.pkl',
         pipeline=test_pipeline,
         # pipeline=tta_pipeline,
         min_tracklet_points=1,
         samples_per_gpu=8,
+        classes=class_names,
     )
 )
 log_config=dict(
@@ -312,3 +310,7 @@ log_config=dict(
 optimizer = dict(
     lr=1e-5,
 )
+
+custom_hooks = [
+    dict(type='DisableAugmentationHook', num_last_epochs=1, skip_type_keys=('TrackletNoise',)),
+]

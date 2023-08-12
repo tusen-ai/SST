@@ -1,8 +1,11 @@
 # modified from old file "fsd_pastfuture_vehicle"
-bin_path: /data/ctrl_bins/training/fsd6f6e_vehicle_full_trainset.bin 
+
+# detection result in waymo bin format
+bin_path: ./data/ctrl_bins/training/fsd6f6e_vehicle_full_trainset.bin 
 val_bin_path: ./data/ctrl_bins/validation/fsd_base_vehicle_val.bin 
-data_root: ./data/waymo/kitti_format/tracklet_data
+data_root: ./data/waymo/tracklet_data
 exist_ok: False
+# change the split for your need
 # split: training
 split: val
 # split: test

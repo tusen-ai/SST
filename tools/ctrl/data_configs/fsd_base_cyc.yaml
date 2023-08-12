@@ -1,0 +1,20 @@
+# detection result in waymo bin format
+bin_path: ./data/ctrl_bins/training/fsd_base_cyc_training.bin 
+val_bin_path: ./data/ctrl_bins/validation/fsd_base_cyc_val.bin 
+data_root: ./data/waymo/tracklet_data
+exist_ok: False
+# change the split for your need
+# split: training
+split: val
+# split: test
+type: [4,] # 1:vehicle 2:pedestrian 4: cyclist
+
+box:
+  extra_width: 2
+
+selection:
+  mode: random
+  size: 1.0
+
+candidate:
+  affinity_thresh: 0.2
