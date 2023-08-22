@@ -2,7 +2,7 @@
 
 ## Resources
 ### We provide complete first-hand resources on all three datasets to reproduce our performance and track the training process, including checkpoints, logs, results.
-Access the resources at: https://share.weiyun.com/1HgbFpyI
+Access the resources at: https://share.weiyun.com/1HgbFpyI or https://drive.google.com/drive/folders/17xG_AVqCOTzPPKl6RNHQyXlwG8hmCyJC?usp=sharing
 
 If the link expires, feel free to open an issue.
 Due to the Waymo license, please contact Lue Fan (fanlue2019@ia.ac) to access the Waymo resources privately.
