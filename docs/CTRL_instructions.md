@@ -75,7 +75,9 @@ We provide pretrained baseline models and result file of base detector in valida
 Users could use these data for inference, directly from step 3.
 Here is the link：https://share.weiyun.com/1r6VsFfJ
 
-Due to the WOD license, if you are interested in these data for inference, please contact Lue Fan (fanlue2019@ia.ac.cn) and you will be offered a private password for data access. 
+or Google Drive link: https://drive.google.com/drive/folders/19-pvKCTLgJ_x6j1C3AvKgHM3GYMNxf6I?usp=sharing
+
+Due to the WOD license, if you are interested in these data for inference, please contact Lue Fan (fanlue2019@ia.ac.cn) and you will be privately authorized for data access. 
 
 ## Results
 If you use the default config and everything goes well, you should get the following results, which is the baseline result without bidirectional tracking and TTA:
