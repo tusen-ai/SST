@@ -11,7 +11,8 @@ Our implementation is based on [MMDetection3D](https://github.com/open-mmlab/mmd
 ### Fast Waymo Evaluation:
 - Copy `tools/idx2timestamp.pkl` and `tools/idx2contextname.pkl` to `./data/waymo/kitti_format/`.
 - Passing the argument `--eval fast` (See `run.sh`). This argument will directly convert network outputs to Waymo `.bin` format, which is much faster than the old way.
-- Users could further build the multi-thread Waymo evaluation tool ([link](https://github.com/Abyssaledge/waymo-open-dataset-master)) for faster evaluation. 
+- Follow the [installation instruction](https://github.com/Abyssaledge/faster-waymo-detection-evaluation/blob/master/docs/quick_start.md#local-compilation-without-docker-system-requirements) to install waymo evaluation tool.
+- Users could further use the multi-thread Waymo evaluation tool ([link](https://github.com/Abyssaledge/waymo-open-dataset-master)) instead of the official tool for faster evaluation, following the same installation steps in the [instructions](https://github.com/Abyssaledge/faster-waymo-detection-evaluation/blob/master/docs/quick_start.md#local-compilation-without-docker-system-requirements) above (do not forget to replace the repo name).  
 
 ### For FSD:
 
