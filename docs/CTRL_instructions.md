@@ -27,6 +27,8 @@ This step only need to be executed **once** for all experiments on WOD.
 ~~This step can be finished with any 3D Object Tracking methods, and we will release our modified ImmortalTracker codebase in near future.~~
 We have released the tailored ImmortalTracker here: https://github.com/Abyssaledge/ImmortalTracker-for-CTRL
 
+**NOTE:** Users should remove the `merge: max_time_since_update: 10` section in the tracking config when generating training data to avoid the oversize error of 'bin' result file. This option should only be enabled when generating the inference data.
+
 ### Step 3: Generate track input for training
 
 This step generates track input for training/inference from the results of base detector (`xxx.bin`). The bin file path and split need to be specified in yaml config file such as the following `fsd_base_vehicle.yaml`.
