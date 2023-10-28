@@ -1,12 +1,42 @@
 # Instructions
 
 ## Basic Usage
-**PyTorch >= 1.9 is recommended for a better support of the checkpoint technique.**
 Before using this repo, please install [TorchEx](https://github.com/Abyssaledge/TorchEx), [SpConv2](https://github.com/traveller59/spconv) (SpConv 1.x is not supported) and [torch_scatter](https://github.com/rusty1s/pytorch_scatter).
 
 Our implementation is based on [MMDetection3D](https://github.com/open-mmlab/mmdetection3d), so just follow their [getting_started](https://github.com/open-mmlab/mmdetection3d/blob/master/docs/getting_started.md) and simply run the script: `run.sh`.
 
 **ATTENTION: It is highly recommended to check the data version if users generate data with the official MMDetection3D. MMDetection3D refactors its coordinate definition after v1.0. A hotfix is using our code to re-generate the waymo_dbinfo_train.pkl**
+
+Particularly, we adopt the following script to set up the environment:
+```
+pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
+pip install tensorflow==2.4.0
+pip3 install waymo-open-dataset-tf-2-4-0 --user
+pip install torch-1.8.0+cu111-cp38-cp38-linux_x86_64.whl
+pip install torchvision-0.9.0+cu111-cp38-cp38-linux_x86_64.whl
+cd ./mmcv-1.3.9
+TORCH_CUDA_ARCH_LIST="8.6" MMCV_WITH_OPS=1 pip install -e .
+cd ..
+pip install mmdet==2.14.0
+pip install mmsegmentation==0.14.1
+cd ./SST
+pip install -e .
+```
+And the versions of some core packages are:
+
+```
+cumm-cu113                    0.3.4
+mmcv-full                     1.3.9              
+mmdet                         2.14.0
+mmdet3d                       0.15.0            
+mmsegmentation                0.14.1
+spconv-cu113                  2.2.3
+torch                         1.8.0+cu111
+torchvision                   0.9.0+cu111
+torch-scatter                 2.0.9
+tensorflow                    2.4.0
+waymo-open-dataset-tf-2-4-0   1.4.1
+```
 
 ### Fast Waymo Evaluation:
 - Copy `tools/idx2timestamp.pkl` and `tools/idx2contextname.pkl` to `./data/waymo/kitti_format/`.
